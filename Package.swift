@@ -36,5 +36,10 @@ let package = Package(
             dependencies: ["ParleyCore"],
             swiftSettings: testSwiftSettings
         ),
+        .testTarget(
+            name: "ParleyAppTests",
+            dependencies: ["Parley", "ParleyCore"],
+            swiftSettings: testSwiftSettings
+        ),
     ]
 )

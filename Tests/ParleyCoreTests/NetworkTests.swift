@@ -738,10 +738,14 @@ private func withMockServer(_ body: (String) async throws -> Void) async throws 
     process.arguments = ["-I", "-u", mockServerScript.path, String(port)]
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
+    // waitUntilExit() spins the current run loop and can miss the exit, hanging the suite;
+    // wait on the termination handler instead, with a bound.
+    let exited = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in exited.signal() }
     try process.run()
     defer {
         if process.isRunning { process.terminate() }
-        process.waitUntilExit()
+        _ = exited.wait(timeout: .now() + 5)
     }
 
     let baseURL = "http://127.0.0.1:\(port)/v1"
