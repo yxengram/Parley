@@ -9,17 +9,37 @@ struct SidebarView: View {
     @ViewState private var removeEncryptionTarget: ConversationSession?
     @ViewState private var deleteTarget: LibraryEntry?
     @ViewState private var showEncryptedNotice = false
+    @ViewState private var query = ""
 
     var body: some View {
         @Bindable var state = appState
+        let groups = groupedEntries
         List(selection: $state.selection) {
-            ForEach(appState.sortedEntries) { entry in
-                SidebarRow(entry: entry)
-                    .tag(entry.id)
-                    .contextMenu { contextMenu(for: entry) }
+            ForEach(groups, id: \.title) { group in
+                Section(group.title) {
+                    ForEach(group.entries) { entry in
+                        SidebarRow(entry: entry, dateStyle: group.dateStyle)
+                            .tag(entry.id)
+                    }
+                }
             }
         }
         .listStyle(.sidebar)
+        .searchable(text: $query, placement: .sidebar, prompt: "Search")
+        // Right-click menu for the clicked row; double-click or Return renames.
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            if let id = ids.first, let entry = appState.entry(id: id) {
+                contextMenu(for: entry)
+            }
+        } primaryAction: { ids in
+            if let id = ids.first, let entry = appState.entry(id: id) {
+                rename(entry)
+            }
+        }
+        // Delete / ⌘⌫ while the list has focus: the same "Move to Trash" confirmation.
+        .onDeleteCommand {
+            if let entry = appState.entry(id: appState.selection) { deleteTarget = entry }
+        }
         .overlay {
             if appState.entries.isEmpty && !appState.isScanning {
                 ContentUnavailableView {
@@ -27,32 +47,9 @@ struct SidebarView: View {
                 } description: {
                     Text("Press ⌘N to start a new chat.")
                 }
+            } else if !query.isEmpty && groups.isEmpty {
+                ContentUnavailableView.search(text: query)
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 8) {
-                Button {
-                    appState.showNewChatSheet = true
-                } label: {
-                    Label("New Chat", systemImage: "square.and.pencil")
-                }
-                .buttonStyle(.borderless)
-                Spacer()
-                Menu {
-                    Button("Open Conversation File…") { appState.openConversationFile() }
-                    Button("Refresh List") { appState.reloadLibrary() }
-                    Divider()
-                    Button("Lock All Encrypted") { appState.lockAll() }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.bar)
         }
         .toolbar {
             ToolbarItem {
@@ -63,6 +60,11 @@ struct SidebarView: View {
                 }
                 .help("New Chat (⌘N)")
             }
+        }
+        .onChange(of: appState.sidebarRequest) { _, request in
+            guard let request else { return }
+            appState.sidebarRequest = nil
+            handle(request)
         }
         .sheet(item: $renameTarget) { session in
             RenameSheet(title: session.conversation.title) { newTitle in
@@ -111,14 +113,14 @@ struct SidebarView: View {
         let locked = entry.isEncrypted && session == nil
         let streaming = session?.isStreaming ?? false
 
-        Button("Rename…") {
-            Task {
-                if let s = await ensureSession(entry) {
-                    renameTarget = s
-                }
+        Button("Rename…") { rename(entry) }
+            .disabled(locked)
+        Button("Fork") {
+            if let session, let last = session.conversation.messages.indices.last {
+                appState.fork(session, through: last)
             }
         }
-        .disabled(locked)
+        .disabled(session == nil || streaming || (session?.conversation.messages.isEmpty ?? true))
 
         if entry.isEncrypted || (session?.isEncrypted ?? false) {
             Button("Change Password…") {
@@ -148,7 +150,69 @@ struct SidebarView: View {
         Button("Reveal in Finder") { appState.revealInFinder(entry) }
         Button("Remove from List") { appState.removeFromList(entry) }
         Divider()
-        Button("Delete File…", role: .destructive) { deleteTarget = entry }
+        Button("Move to Trash…", role: .destructive) { deleteTarget = entry }
+    }
+
+    private func rename(_ entry: LibraryEntry) {
+        guard !(entry.isEncrypted && appState.session(for: entry.id) == nil) else { return }
+        Task {
+            if let s = await ensureSession(entry) { renameTarget = s }
+        }
+    }
+
+    private func handle(_ request: AppState.SidebarRequest) {
+        switch request {
+        case .rename(let id):
+            if let entry = appState.entry(id: id) { rename(entry) }
+        case .encrypt(let id):
+            guard let entry = appState.entry(id: id) else { return }
+            Task {
+                if let s = await ensureSession(entry) { passwordTarget = .init(session: s, mode: .encrypt) }
+            }
+        case .changePassword(let id):
+            if let s = appState.session(for: id) { passwordTarget = .init(session: s, mode: .change) }
+        case .removeEncryption(let id):
+            removeEncryptionTarget = appState.session(for: id)
+        case .moveToTrash(let id):
+            deleteTarget = appState.entry(id: id)
+        }
+    }
+
+    // MARK: Grouping and search
+
+    struct DateGroup {
+        let title: String
+        let dateStyle: SidebarRow.DateStyle
+        var entries: [LibraryEntry]
+    }
+
+    /// Today / Yesterday / Previous 7 Days / Older, newest first. Search matches titles of plain
+    /// and unlocked conversations only (locked ones have no title in memory).
+    private var groupedEntries: [DateGroup] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let entries = appState.sortedEntries.filter { entry in
+            guard !q.isEmpty else { return true }
+            return appState.displayTitle(for: entry)?.localizedStandardContains(q) ?? false
+        }
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now)) ?? now
+        var groups: [DateGroup] = [
+            DateGroup(title: "Today", dateStyle: .time, entries: []),
+            DateGroup(title: "Yesterday", dateStyle: .time, entries: []),
+            DateGroup(title: "Previous 7 Days", dateStyle: .weekday, entries: []),
+            DateGroup(title: "Older", dateStyle: .date, entries: []),
+        ]
+        for entry in entries {
+            let date = appState.sortDate(for: entry)
+            let i: Int
+            if calendar.isDateInToday(date) || date > now { i = 0 }
+            else if calendar.isDateInYesterday(date) { i = 1 }
+            else if date >= weekAgo { i = 2 }
+            else { i = 3 }
+            groups[i].entries.append(entry)
+        }
+        return groups.filter { !$0.entries.isEmpty }
     }
 
     private func ensureSession(_ entry: LibraryEntry) async -> ConversationSession? {
@@ -157,13 +221,19 @@ struct SidebarView: View {
     }
 }
 
-private struct SidebarRow: View {
+struct SidebarRow: View {
+    enum DateStyle { case time, weekday, date }
+
     @Environment(AppState.self) private var appState
     let entry: LibraryEntry
+    var dateStyle: DateStyle = .date
 
     var body: some View {
         let session = appState.session(for: entry.id)
         let title = appState.displayTitle(for: entry)
+        let date = appState.sortDate(for: entry)
+        let url = session?.fileURL ?? entry.url
+        let locked = entry.isEncrypted && session == nil
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 if let title {
@@ -175,9 +245,18 @@ private struct SidebarRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Text(appState.sortDate(for: entry), format: .relative(presentation: .named))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 0) {
+                    dateText(date)
+                    // Locked conversations show their folder, which helps tell them apart
+                    // without decrypting anything.
+                    if locked || !appState.settings.isInDefaultDirectory(url) {
+                        Text(" · " + url.deletingLastPathComponent().lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
             if session?.isStreaming == true {
@@ -185,11 +264,23 @@ private struct SidebarRow: View {
             }
             if entry.isEncrypted || session?.isEncrypted == true {
                 Image(systemName: session == nil ? "lock.fill" : "lock.open")
+                    .imageScale(.small)
                     .foregroundStyle(.secondary)
                     .help(session == nil ? "Encrypted, locked" : "Encrypted, unlocked")
+                    .accessibilityLabel(session == nil ? "Locked" : "Unlocked")
             }
         }
         .padding(.vertical, 2)
+        .help(abbreviated(url.path))
+    }
+
+    @ViewBuilder
+    private func dateText(_ date: Date) -> some View {
+        switch dateStyle {
+        case .time: Text(date, format: .dateTime.hour().minute())
+        case .weekday: Text(date, format: .dateTime.weekday(.wide))
+        case .date: Text(date, format: .dateTime.day().month(.abbreviated).year())
+        }
     }
 }
 

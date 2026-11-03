@@ -22,18 +22,37 @@ struct MarkdownView: View {
         switch block {
         case .paragraph(let s):
             Text(MarkdownParser.inline(s))
+                .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         case .heading(let level, let s):
             Text(MarkdownParser.inline(s))
                 .font(Self.headingFont(level))
-                .fontWeight(.bold)
-                .padding(.top, level <= 2 ? 4 : 2)
+                .fontWeight(.semibold)
+                .padding(.top, level <= 2 ? 6 : 3)
+                .fixedSize(horizontal: false, vertical: true)
+        case .list(let items):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(item.marker)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .frame(minWidth: 14, alignment: .trailing)
+                        Text(MarkdownParser.inline(item.text))
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.leading, CGFloat(item.indent) * 18)
+                }
+            }
         case .quote(let s):
             Text(MarkdownParser.inline(s))
                 .foregroundStyle(.secondary)
-                .padding(.leading, 10)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 12)
                 .overlay(alignment: .leading) {
-                    Rectangle().fill(Color.secondary.opacity(0.4)).frame(width: 3)
+                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 3)
                 }
         case .code(let lang, let code):
             CodeBlockView(language: lang, code: code)
@@ -44,9 +63,8 @@ struct MarkdownView: View {
 
     private static func headingFont(_ level: Int) -> Font {
         switch level {
-        case 1: return .title
-        case 2: return .title2
-        case 3: return .title3
+        case 1: return .title2
+        case 2: return .title3
         default: return .headline
         }
     }
@@ -59,9 +77,9 @@ struct CodeBlockView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            HStack(spacing: 6) {
                 Text(language.isEmpty ? "code" : language)
-                    .font(.caption)
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
@@ -69,35 +87,49 @@ struct CodeBlockView: View {
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
                 } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         .font(.caption)
+                        .frame(width: 20, height: 18)
                 }
                 .buttonStyle(.borderless)
+                .help(copied ? "Copied" : "Copy code")
+                .accessibilityLabel("Copy Code")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.secondary.opacity(0.08))
+            .padding(.leading, 12)
+            .padding(.trailing, 6)
+            .padding(.top, 6)
 
-            ScrollView(.horizontal, showsIndicators: true) {
+            ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
+                    .lineSpacing(2)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: true, vertical: true)
-                    .padding(10)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 2)
+                    .padding(.bottom, 12)
             }
         }
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.2)))
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.secondary.opacity(0.12)))
     }
 }
 
 enum MarkdownBlock: Hashable {
     case paragraph(String)
     case heading(level: Int, text: String)
+    case list([ListItem])
     case quote(String)
     case code(language: String, code: String)
     case rule
+}
+
+struct ListItem: Hashable {
+    /// Nesting level (0 = top).
+    var indent: Int
+    /// "•", "◦", "1.", "☐", "☑"…
+    var marker: String
+    var text: String
 }
 
 enum MarkdownParser {
@@ -105,11 +137,18 @@ enum MarkdownParser {
         var blocks: [MarkdownBlock] = []
         var paragraph: [String] = []
         var quote: [String] = []
+        var list: [ListItem] = []
 
         func flushParagraph() {
             if !paragraph.isEmpty {
                 blocks.append(.paragraph(paragraph.joined(separator: "\n")))
                 paragraph.removeAll()
+            }
+        }
+        func flushList() {
+            if !list.isEmpty {
+                blocks.append(.list(list))
+                list.removeAll()
             }
         }
         func flushQuote() {
@@ -127,7 +166,7 @@ enum MarkdownParser {
 
             // Fenced code block (``` or ~~~). An unclosed fence runs to the end (streaming).
             if let fence = fenceMarker(trimmed) {
-                flushParagraph(); flushQuote()
+                flushParagraph(); flushQuote(); flushList()
                 let lang = String(trimmed.dropFirst(fence.count)).trimmingCharacters(in: .whitespaces)
                 var codeLines: [String] = []
                 i += 1
@@ -145,27 +184,41 @@ enum MarkdownParser {
             }
 
             if trimmed.isEmpty {
-                flushParagraph(); flushQuote()
+                flushParagraph(); flushQuote(); flushList()
                 i += 1
                 continue
             }
 
             if let (level, content) = heading(trimmed) {
-                flushParagraph(); flushQuote()
+                flushParagraph(); flushQuote(); flushList()
                 blocks.append(.heading(level: level, text: content))
                 i += 1
                 continue
             }
 
             if isRule(trimmed) {
-                flushParagraph(); flushQuote()
+                flushParagraph(); flushQuote(); flushList()
                 blocks.append(.rule)
                 i += 1
                 continue
             }
 
+            if let item = listItem(line) {
+                flushParagraph(); flushQuote()
+                list.append(item)
+                i += 1
+                continue
+            }
+
+            // An indented line right after a list item continues that item.
+            if !list.isEmpty, line.first == " " || line.first == "\t" {
+                list[list.count - 1].text += " " + trimmed
+                i += 1
+                continue
+            }
+
             if trimmed.hasPrefix(">") {
-                flushParagraph()
+                flushParagraph(); flushList()
                 var q = String(trimmed.dropFirst())
                 if q.hasPrefix(" ") { q.removeFirst() }
                 quote.append(q)
@@ -173,11 +226,11 @@ enum MarkdownParser {
                 continue
             }
 
-            flushQuote()
-            paragraph.append(bulletize(line))
+            flushQuote(); flushList()
+            paragraph.append(line)
             i += 1
         }
-        flushParagraph(); flushQuote()
+        flushParagraph(); flushQuote(); flushList()
         return blocks
     }
 
@@ -204,18 +257,27 @@ enum MarkdownParser {
         return compact.allSatisfy { $0 == first }
     }
 
-    /// "- item" / "* item" / "+ item" → "• item", keeping indentation. Numbered lists stay as-is.
-    private static func bulletize(_ line: String) -> String {
-        let indent = line.prefix { $0 == " " || $0 == "\t" }
-        let rest = line.dropFirst(indent.count)
-        for marker in ["- [ ] ", "- [x] ", "- [X] "] where rest.hasPrefix(marker) {
-            let box = marker.contains("[ ]") ? "☐ " : "☑ "
-            return String(indent) + box + rest.dropFirst(marker.count)
+    /// "- item", "* item", "+ item", "1. item", "1) item", "- [ ] task"; nil for other lines.
+    static func listItem(_ line: String) -> ListItem? {
+        let lead = line.prefix { $0 == " " || $0 == "\t" }
+        let width = lead.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+        let level = min(width / 2, 5)
+        let rest = line.dropFirst(lead.count)
+        for (marker, box) in [("- [ ] ", "☐"), ("- [x] ", "☑"), ("- [X] ", "☑"), ("* [ ] ", "☐"), ("* [x] ", "☑")] where rest.hasPrefix(marker) {
+            return ListItem(indent: level, marker: box, text: String(rest.dropFirst(marker.count)))
         }
         for marker in ["- ", "* ", "+ "] where rest.hasPrefix(marker) {
-            return String(indent) + "• " + rest.dropFirst(marker.count)
+            let bullet = ["•", "◦", "▪"][min(level, 2)]
+            return ListItem(indent: level, marker: bullet, text: String(rest.dropFirst(marker.count)))
         }
-        return line
+        let digits = rest.prefix { $0.isASCII && $0.isNumber }
+        if !digits.isEmpty, digits.count <= 3 {
+            let after = rest.dropFirst(digits.count)
+            if let sep = after.first, sep == "." || sep == ")", after.dropFirst().first == " " {
+                return ListItem(indent: level, marker: "\(digits)\(sep)", text: String(after.dropFirst(2)))
+            }
+        }
+        return nil
     }
 
     static func inline(_ s: String) -> AttributedString {
@@ -224,7 +286,12 @@ enum MarkdownParser {
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible
         )
-        if let attributed = try? AttributedString(markdown: s, options: options) {
+        if var attributed = try? AttributedString(markdown: s, options: options) {
+            // Inline code: smaller monospaced text on a tinted background (visible in CJK text too).
+            for run in attributed.runs where run.inlinePresentationIntent?.contains(.code) == true {
+                attributed[run.range].font = .system(size: 12, design: .monospaced)
+                attributed[run.range].backgroundColor = Color.secondary.opacity(0.16)
+            }
             return attributed
         }
         return AttributedString(s)

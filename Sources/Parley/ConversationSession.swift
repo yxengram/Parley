@@ -18,12 +18,19 @@ final class ConversationSession: Identifiable {
     private(set) var streamingMessageID: UUID?
     /// Mirrors `StreamAccumulator.isReasoning` for the in-flight message.
     private(set) var streamIsReasoning = false
+    /// When the in-flight message started reasoning (for the live "Thinking… N s" label).
+    private(set) var streamReasoningStartedAt: Date?
     var isStreaming: Bool { streamingMessageID != nil }
 
     // Composer state (memory only, never persisted).
     var draftText: String = ""
     var draftAttachments: [Attachment] = []
     var composerError: String?
+    /// A user message being edited in the composer. History is truncated only when the
+    /// edited message is sent; cancelling leaves the conversation untouched.
+    var pendingEditMessageID: UUID?
+    /// The draft that was in the composer when an edit started; restored on cancel.
+    @ObservationIgnored private var draftBeforeEdit: (text: String, attachments: [Attachment])?
 
     /// Last save failure, shown as a banner.
     var saveError: String?
@@ -167,6 +174,13 @@ final class ConversationSession: Identifiable {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || !attachments.isEmpty else { return }
 
+        if let editID = pendingEditMessageID {
+            pendingEditMessageID = nil
+            draftBeforeEdit = nil
+            if let index = conversation.messages.firstIndex(where: { $0.id == editID }) {
+                conversation.truncate(keepingThrough: index - 1)
+            }
+        }
         let isFirstUserMessage = !conversation.messages.contains { $0.role == .user }
         let message = Message(role: .user, content: text, attachments: attachments)
         conversation.messages.append(message)
@@ -235,6 +249,7 @@ final class ConversationSession: Identifiable {
         liveAccumulator = StreamAccumulator()
         streamingMessageID = placeholder.id
         streamIsReasoning = false
+        streamReasoningStartedAt = nil
         saveNow()
 
         let messageID = placeholder.id
@@ -333,6 +348,9 @@ final class ConversationSession: Identifiable {
         if streamIsReasoning != acc.isReasoning {
             streamIsReasoning = acc.isReasoning
         }
+        if streamReasoningStartedAt != acc.reasoningStartedAt {
+            streamReasoningStartedAt = acc.reasoningStartedAt
+        }
     }
 
     /// Keeps the partial reply with isComplete=false.
@@ -350,6 +368,7 @@ final class ConversationSession: Identifiable {
         streamTask = nil
         streamingMessageID = nil
         streamIsReasoning = false
+        streamReasoningStartedAt = nil
         conversation.updatedAt = Date()
         saveNow()
     }
@@ -365,6 +384,7 @@ final class ConversationSession: Identifiable {
 
     func rollback(toMessageAt index: Int) {
         guard !isStreaming, index >= 0, index < conversation.messages.count else { return }
+        pendingEditMessageID = nil
         conversation.truncate(keepingThrough: index)
         saveNow()
     }
@@ -380,10 +400,50 @@ final class ConversationSession: Identifiable {
         saveNow()
     }
 
+    /// Staged edit (what the UI uses): puts a user message in the composer without changing
+    /// the history. Sending replaces that message and everything after it; `cancelEdit` keeps all.
+    func beginEdit(messageAt index: Int) {
+        guard !isStreaming, conversation.messages.indices.contains(index) else { return }
+        let message = conversation.messages[index]
+        guard message.role == .user else { return }
+        if pendingEditMessageID == nil {
+            draftBeforeEdit = (draftText, draftAttachments)
+        }
+        pendingEditMessageID = message.id
+        draftText = message.content
+        draftAttachments = message.attachments
+        composerError = nil
+    }
+
+    func cancelEdit() {
+        guard pendingEditMessageID != nil else { return }
+        pendingEditMessageID = nil
+        draftText = draftBeforeEdit?.text ?? ""
+        draftAttachments = draftBeforeEdit?.attachments ?? []
+        draftBeforeEdit = nil
+    }
+
+    /// Index of the message being edited, if any.
+    var pendingEditIndex: Int? {
+        guard let id = pendingEditMessageID else { return nil }
+        return conversation.messages.firstIndex { $0.id == id }
+    }
+
+    /// Index of the last user message (for "Edit Last Message" and ↑ in the composer).
+    var lastUserMessageIndex: Int? {
+        conversation.messages.lastIndex { $0.role == .user }
+    }
+
+    /// True when the conversation ends with a user message that has no reply yet.
+    var awaitsReply: Bool {
+        !isStreaming && conversation.messages.last?.role == .user
+    }
+
     /// Drops an assistant message (and later ones) and asks again.
     func regenerate(messageAt index: Int, settings: AppSettings) {
         guard !isStreaming, conversation.messages.indices.contains(index) else { return }
         guard conversation.messages[index].role == .assistant else { return }
+        pendingEditMessageID = nil
         conversation.truncate(keepingThrough: index - 1)
         startReply(settings: settings)
     }

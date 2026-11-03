@@ -9,6 +9,14 @@ APP="build/Parley.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Parley"
+# SwiftPM records the deployment target as the SDK version (sdk 14.0). AppKit/SwiftUI pick the
+# current design (macOS 26+ sidebar, toolbar glass, scroll-edge effects) from the linked SDK
+# version, so stamp the real SDK version; the minimum OS stays 14.0.
+SDK_VERSION="$(xcrun --show-sdk-version 2>/dev/null || true)"
+if [[ -n "$SDK_VERSION" ]]; then
+    vtool -set-build-version macos 14.0 "$SDK_VERSION" -replace \
+        -output "$APP/Contents/MacOS/Parley" "$APP/Contents/MacOS/Parley"
+fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$APP" >/dev/null

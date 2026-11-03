@@ -14,8 +14,12 @@ struct PasswordFields: View {
         if let hint = Self.hint(password: password, confirm: confirm) {
             Text(hint)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(!confirm.isEmpty && password != confirm ? Color.red : Color.secondary)
         }
+        Label("If you forget this password, the conversation can't be recovered.", systemImage: "exclamationmark.triangle.fill")
+            .font(.callout)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     static func isValid(password: String, confirm: String) -> Bool {
@@ -25,7 +29,6 @@ struct PasswordFields: View {
     static func hint(password: String, confirm: String) -> String? {
         if !confirm.isEmpty && password != confirm { return "Passwords don't match." }
         if !password.isEmpty && password.count < 8 { return "Short passwords are easy to guess. Use at least 8 characters." }
-        if !password.isEmpty { return "There is no way to recover a forgotten password." }
         return nil
     }
 }
@@ -61,9 +64,14 @@ struct PasswordSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Form {
-                PasswordFields(password: $password, confirm: $confirm)
+                Section {
+                    PasswordFields(password: $password, confirm: $confirm)
+                }
             }
-            .formStyle(.columns)
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, -20)
             if let error {
                 Text(error).foregroundStyle(.red).font(.callout)
             }
@@ -74,6 +82,7 @@ struct PasswordSheet: View {
                     .keyboardShortcut(.cancelAction)
                     .disabled(isWorking)
                 Button(target.mode == .encrypt ? "Encrypt" : "Change Password", action: submit)
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(isWorking || !PasswordFields.isValid(password: password, confirm: confirm))
             }

@@ -9,42 +9,62 @@ struct UnlockView: View {
     @ViewState private var password = ""
     @ViewState private var isWorking = false
     @ViewState private var error: String?
+    @ViewState private var shakes: CGFloat = 0
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 16) {
+        let folder = entry.url.deletingLastPathComponent()
+        VStack(spacing: 14) {
             Image(systemName: "lock.fill")
-                .font(.system(size: 40))
+                .font(.system(size: 44))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.secondary)
-            Text("Encrypted conversation")
+                .accessibilityHidden(true)
+            Text("Encrypted Conversation")
                 .font(.title2.weight(.semibold))
             Text("Enter the password to decrypt it in memory.")
                 .foregroundStyle(.secondary)
-            HStack {
+            HStack(spacing: 8) {
                 SecureField("Password", text: $password)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 260)
                     .focused($focused)
                     .onSubmit(unlock)
                     .disabled(isWorking)
+                    .modifier(ShakeEffect(shakes: shakes))
                 Button("Unlock", action: unlock)
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(password.isEmpty || isWorking)
             }
-            if isWorking {
-                ProgressView().controlSize(.small)
+            .controlSize(.large)
+            .padding(.top, 4)
+            ZStack {
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                } else if let error {
+                    Label(error, systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                        .font(.callout)
+                }
             }
-            if let error {
-                Text(error)
-                    .foregroundStyle(.red)
-                    .font(.callout)
+            .frame(minHeight: 20)
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    Text("In “\(folder.lastPathComponent)” · modified \(entry.updatedAt.formatted(.relative(presentation: .named)))")
+                        .lineLimit(1)
+                        .help(abbreviated(folder.path))
+                    Button("Show in Finder") { appState.revealInFinder(entry) }
+                        .buttonStyle(.link)
+                }
+                Text("Forgotten passwords can't be recovered.")
             }
-            Text(entry.url.lastPathComponent)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Locked Conversation")
         .onAppear { focused = true }
     }
 
@@ -60,9 +80,11 @@ struct UnlockView: View {
             } catch {
                 self.error = error.localizedDescription
                 password = ""
-                focused = true
+                withAnimation(.linear(duration: 0.4)) { shakes += 1 }
             }
             isWorking = false
+            // After re-enabling the field, so focus can land in it.
+            if error != nil { focused = true }
         }
     }
 }

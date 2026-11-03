@@ -7,33 +7,46 @@ struct ParleyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private var appState: AppState { AppState.shared }
 
+    init() {
+        #if DEBUG
+        // Must run before anything touches UserDefaults.standard or AppState.shared.
+        SnapshotHarness.bootstrapIfNeeded()
+        #endif
+    }
+
     var body: some Scene {
-        WindowGroup("Parley") {
+        // A single main window: selection, sheets and alerts live on the shared AppState,
+        // so a second window would mirror them.
+        Window("Parley", id: "main") {
             ContentView()
                 .environment(appState)
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1100, height: 760)
         .commands {
-            CommandGroup(replacing: .newItem) {
-                Button("New Chat") {
-                    appState.showNewChatSheet = true
-                }
-                .keyboardShortcut("n", modifiers: .command)
-
-                Button("Open Conversation File…") {
-                    appState.openConversationFile()
-                }
-                .keyboardShortcut("o", modifiers: .command)
+            SidebarCommands()
+            CommandGroup(replacing: .appInfo) {
+                Button("About Parley") { AboutPanel.show() }
             }
-            CommandGroup(after: .newItem) {
+            CommandGroup(replacing: .newItem) {
+                FileCommands(appState: appState)
+            }
+            CommandGroup(after: .sidebar) {
+                Button("Refresh Conversation List") { appState.reloadLibrary() }
                 Divider()
-                Button("Lock All Encrypted Conversations") {
-                    appState.lockAll()
-                }
-                .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
+            ConversationCommands(appState: appState)
+            MessageCommands(appState: appState)
+            CommandGroup(replacing: .help) {
+                HelpCommand()
             }
         }
+
+        Window("Parley Help", id: "help") {
+            HelpView()
+        }
+        .defaultSize(width: 620, height: 680)
+        .windowResizability(.contentMinSize)
 
         Settings {
             SettingsView()
@@ -45,6 +58,12 @@ struct ParleyApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if SnapshotHarness.isActive {
+            SnapshotHarness.applicationWillFinishLaunching()
+            return
+        }
+        #endif
         // Never let window restoration persist anything (window titles can be
         // conversation titles, including of encrypted conversations).
         UserDefaults.standard.register(defaults: ["NSQuitAlwaysKeepsWindows": false])
@@ -52,6 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if SnapshotHarness.isActive {
+            // Never activate or steal focus; the harness drives the UI and exits on its own.
+            SnapshotHarness.applicationDidFinishLaunching()
+            return
+        }
+        #endif
         // SwiftPM-built bundle: make sure we behave as a regular foreground app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
@@ -66,6 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.isRestorable = false
         }
         AppState.shared.reloadLibrary()
+        // Safety net: make sure the main window is on screen after launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !MainWindow.hasVisibleMainWindow { MainWindow.showViaMenu() }
+        }
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -74,6 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    /// Dock icon click with no window open: bring the main window back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { MainWindow.showViaMenu() }
+        return true
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

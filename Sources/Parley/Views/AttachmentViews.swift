@@ -5,18 +5,18 @@ import ParleyCore
 /// Attachments inside a sent message: image thumbnails and text-file chips.
 struct AttachmentStrip: View {
     let attachments: [Attachment]
+    var alignment: HorizontalAlignment = .leading
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(attachments) { a in
-                    switch a.kind {
-                    case .image: ImageThumbnail(attachment: a, size: 120)
-                    case .text: TextFileChip(attachment: a, onRemove: nil)
-                    }
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(attachments) { a in
+                switch a.kind {
+                case .image: ImageThumbnail(attachment: a, size: 120)
+                case .text: TextFileChip(attachment: a, onRemove: nil)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: alignment == .trailing ? .trailing : .leading)
     }
 }
 
@@ -39,9 +39,14 @@ struct ImageThumbnail: View {
                 }
             }
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.25)))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.secondary.opacity(0.25)))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .onTapGesture { showPreview = true }
+            .accessibilityElement()
+            .accessibilityLabel("Image \(attachment.filename)")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { showPreview = true }
             .help(attachment.filename)
             .popover(isPresented: $showPreview) {
                 if let image {
@@ -72,12 +77,14 @@ struct TextFileChip: View {
             Text(attachment.filename)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(maxWidth: 180)
+                .frame(maxWidth: 180, alignment: .leading)
+                .fixedSize()
             if let onRemove {
                 Button(action: onRemove) { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
                     .help("Remove")
+                    .accessibilityLabel("Remove Attachment")
             }
         }
         .font(.callout)
@@ -86,6 +93,10 @@ struct TextFileChip: View {
         .background(Color.secondary.opacity(0.1), in: Capsule())
         .contentShape(Capsule())
         .onTapGesture { showPreview = true }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(attachment.filename)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Preview") { showPreview = true }
         .help("Click to preview")
         .popover(isPresented: $showPreview) {
             VStack(alignment: .leading, spacing: 6) {
@@ -114,5 +125,6 @@ private struct RemoveBadge: View {
         }
         .buttonStyle(.plain)
         .help("Remove")
+        .accessibilityLabel("Remove Attachment")
     }
 }

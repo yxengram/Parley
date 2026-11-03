@@ -7,7 +7,15 @@ import ParleyCore
 @MainActor
 @Observable
 final class AppState {
-    static let shared = AppState()
+    static let shared: AppState = {
+        #if DEBUG
+        // Debug snapshot mode (PARLEY_SNAPSHOT_DIR): isolated settings, temp folder, sample data.
+        if let settings = SnapshotHarness.isolatedSettingsIfActive() {
+            return AppState(settings: settings)
+        }
+        #endif
+        return AppState()
+    }()
 
     let settings: AppSettings
     private(set) var entries: [LibraryEntry] = []
@@ -20,6 +28,23 @@ final class AppState {
     /// Model lists fetched from providers, memory only.
     var modelsByProvider: [UUID: [String]] = [:]
     var modelFetchError: String?
+    /// Per-provider model-list state (memory only).
+    var modelLoadState: [UUID: ModelLoadState] = [:]
+    /// The base URL each provider's model list was fetched from, so an edited URL refetches.
+    @ObservationIgnored private var modelsFetchedFrom: [UUID: String] = [:]
+
+    enum ModelLoadState: Equatable {
+        case idle, loading, loaded, failed(String)
+    }
+
+    /// Requests from menu commands that the sidebar carries out (it owns the sheets and dialogs).
+    var sidebarRequest: SidebarRequest?
+    /// Set by the Conversation menu: ChatView opens its settings popover for this conversation.
+    var conversationSettingsRequest: UUID?
+
+    enum SidebarRequest: Equatable {
+        case rename(UUID), encrypt(UUID), changePassword(UUID), removeEncryption(UUID), moveToTrash(UUID)
+    }
 
     // UI triggers
     var showNewChatSheet = false
@@ -368,16 +393,43 @@ final class AppState {
 
     // MARK: - Models
 
+    /// Fetches the model list from this one provider (only its configured endpoint is contacted).
     func refreshModels(for provider: Provider) async {
         modelFetchError = nil
+        modelLoadState[provider.id] = .loading
+        let baseURL = provider.baseURL
         do {
             let key = try KeychainStore.apiKey(for: provider.id)
-            let client = try ChatClient(baseURL: provider.baseURL, apiKey: key)
+            let client = try ChatClient(baseURL: baseURL, apiKey: key)
             let models = try await client.listModels()
             modelsByProvider[provider.id] = models
+            modelsFetchedFrom[provider.id] = baseURL
+            modelLoadState[provider.id] = .loaded
         } catch {
             modelFetchError = error.localizedDescription
+            modelsFetchedFrom[provider.id] = baseURL
+            modelLoadState[provider.id] = .failed(error.localizedDescription)
         }
+    }
+
+    /// Loads the model list once per provider and base URL; later calls reuse it.
+    func loadModelsIfNeeded(for provider: Provider) async {
+        switch modelLoadState[provider.id] {
+        case .loading:
+            return
+        case .loaded, .failed:
+            if modelsFetchedFrom[provider.id] == provider.baseURL { return }
+        case .idle, .none:
+            break
+        }
+        await refreshModels(for: provider)
+    }
+
+    /// Records a list fetched elsewhere (Settings > Test Connection).
+    func storeModels(_ models: [String], for provider: Provider) {
+        modelsByProvider[provider.id] = models
+        modelsFetchedFrom[provider.id] = provider.baseURL
+        modelLoadState[provider.id] = .loaded
     }
 
     // MARK: - Lifecycle

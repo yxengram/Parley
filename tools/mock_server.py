@@ -15,6 +15,8 @@ Endpoints:
     mock-error               HTTP 400 {"error":{"message":"mock bad request"}}
     mock-stream-error        some content, then a stream-level {"error":{...}} payload
     mock-slow                one token every 200 ms (for testing Stop)
+    mock-slow-think          reasoning_content then content, one piece every 150 ms
+                             (snapshot harness: captures thinking mid-stream)
 
   GET/POST /redirect-to-PORT/REST   answers 307 with Location http://localhost:PORT/REST
                                     (tests that the client never follows redirects)
@@ -42,6 +44,7 @@ MODELS = [
     "mock-error",
     "mock-stream-error",
     "mock-slow",
+    "mock-slow-think",
     "mock-sse-error-field",
     "mock-sse-error-event",
     "mock-bare-error",
@@ -50,6 +53,7 @@ MODELS = [
 
 SLOW_TOKENS = 50
 SLOW_INTERVAL = 0.2
+SLOW_THINK_INTERVAL = 0.15
 
 
 def last_user_message(messages):
@@ -277,6 +281,19 @@ class Handler(BaseHTTPRequestHandler):
                 time.sleep(SLOW_INTERVAL)
                 content("token%d " % i)
                 completion_tokens += 1
+
+        elif model == "mock-slow-think":
+            thoughts = ("The user wants a migration plan. Core Data and SwiftData can share one "
+                        "store file, so the safest order is: model parity first, then read paths, "
+                        "then write paths, with a feature flag at each step.")
+            for piece in split_tokens(thoughts, 9):
+                self.sse(self.chunk(model, {"reasoning_content": piece, "content": None}))
+                completion_tokens += 1
+                time.sleep(SLOW_THINK_INTERVAL)
+            for piece in split_tokens(echo, 6):
+                content(piece)
+                completion_tokens += 1
+                time.sleep(SLOW_THINK_INTERVAL)
 
         else:  # mock-plain and unknown models
             for piece in split_tokens(echo):

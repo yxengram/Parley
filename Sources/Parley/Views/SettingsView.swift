@@ -6,11 +6,12 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             ProvidersSettingsView()
+                .frame(width: 700, height: 460)
                 .tabItem { Label("Providers", systemImage: "server.rack") }
             GeneralSettingsView()
+                .frame(width: 560, height: 500)
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 680, height: 460)
     }
 }
 
@@ -23,12 +24,13 @@ private struct ProvidersSettingsView: View {
 
     var body: some View {
         let settings = appState.settings
-        HSplitView {
+        HStack(spacing: 0) {
             VStack(spacing: 0) {
                 List(selection: $selectedID) {
                     ForEach(settings.providers) { p in
                         HStack {
                             Text(p.name.isEmpty ? "Untitled" : p.name)
+                                .lineLimit(1)
                             Spacer()
                             if p.id == settings.defaultProviderID {
                                 Text("Default").font(.caption).foregroundStyle(.secondary)
@@ -37,24 +39,30 @@ private struct ProvidersSettingsView: View {
                         .tag(p.id)
                     }
                 }
-                Divider()
+                .listStyle(.bordered(alternatesRowBackgrounds: false))
                 HStack(spacing: 4) {
                     Button {
                         let p = Provider(name: "New Provider", baseURL: "http://localhost:1234/v1")
                         settings.providers.append(p)
                         if settings.defaultProviderID == nil { settings.defaultProviderID = p.id }
                         selectedID = p.id
-                    } label: { Image(systemName: "plus") }
+                    } label: { Image(systemName: "plus").frame(width: 14, height: 14) }
+                    .help("Add Provider")
+                    .accessibilityLabel("Add Provider")
                     Button {
                         confirmDelete = true
-                    } label: { Image(systemName: "minus") }
+                    } label: { Image(systemName: "minus").frame(width: 14, height: 14) }
                     .disabled(selectedID == nil)
+                    .help("Remove Provider")
+                    .accessibilityLabel("Remove Provider")
                     Spacer()
                 }
-                .buttonStyle(.borderless)
-                .padding(6)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.top, 8)
             }
-            .frame(minWidth: 180, idealWidth: 200, maxWidth: 240)
+            .padding([.leading, .top, .bottom], 20)
+            .frame(width: 220)
 
             Group {
                 if let id = selectedID, settings.providers.contains(where: { $0.id == id }) {
@@ -163,10 +171,14 @@ private struct ProviderEditor: View {
                     }
                     Spacer()
                 }
-                Toggle("Default provider for new chats", isOn: Binding(
-                    get: { settings.defaultProviderID == providerID },
-                    set: { if $0 { settings.defaultProviderID = providerID } }
-                ))
+                LabeledContent("New chats") {
+                    if settings.defaultProviderID == providerID {
+                        Label("Default provider", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Make Default") { settings.defaultProviderID = providerID }
+                    }
+                }
             }
         }
         .formStyle(.grouped)
@@ -240,7 +252,7 @@ private struct ProviderEditor: View {
             do {
                 let client = try ChatClient(baseURL: provider.baseURL, apiKey: key)
                 let models = try await client.listModels()
-                appState.modelsByProvider[provider.id] = models
+                appState.storeModels(models, for: provider)
                 testStatus = .ok(models.count)
             } catch {
                 testStatus = .failed(error.localizedDescription)
@@ -258,14 +270,18 @@ private struct GeneralSettingsView: View {
         @Bindable var settings = appState.settings
         Form {
             Section("Conversations") {
-                LabeledContent("Default folder") {
+                LabeledContent {
                     HStack {
-                        Text(abbreviated(settings.defaultDirectoryPath))
+                        Label(settings.defaultDirectoryURL.lastPathComponent, systemImage: "folder")
                             .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(settings.defaultDirectoryPath)
+                            .help(abbreviated(settings.defaultDirectoryPath))
                         Button("Choose…", action: chooseDirectory)
                     }
+                } label: {
+                    Text("Default folder")
+                    Text(abbreviated(settings.defaultDirectoryPath))
+                        .lineLimit(2)
+                        .truncationMode(.middle)
                 }
                 HStack {
                     Button("Reveal in Finder") {

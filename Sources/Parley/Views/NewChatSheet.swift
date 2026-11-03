@@ -15,36 +15,49 @@ struct NewChatSheet: View {
     @ViewState private var error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("New Chat").font(.headline)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("New Chat")
+                .font(.headline)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
             Form {
-                TextField("Title", text: $title, prompt: Text("Automatic (from first message)"))
-                LabeledContent("Folder") {
-                    HStack {
-                        Text(abbreviated(directoryPath))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                Section {
+                    TextField("Title", text: $title, prompt: Text("Automatic (from first message)"))
+                    LabeledContent("Folder") {
+                        HStack(spacing: 8) {
+                            Text(abbreviated(directoryPath))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: 250, alignment: .trailing)
+                                .help(directoryPath)
+                            Button("Choose…", action: chooseDirectory)
+                        }
+                    }
+                    if isCloudSyncedLocation(directoryPath) {
+                        Label(cloudSyncWarning, systemImage: "icloud")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                            .help(directoryPath)
-                        Spacer()
-                        Button("Choose…", action: chooseDirectory)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Toggle("Encrypt this conversation", isOn: $encrypt)
-                if encrypt {
-                    PasswordFields(password: $password, confirm: $confirm)
+                Section {
+                    Toggle("Encrypt this conversation", isOn: $encrypt)
+                        .toggleStyle(.switch)
+                    if encrypt {
+                        PasswordFields(password: $password, confirm: $confirm)
+                    }
                 }
             }
-            .formStyle(.columns)
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
 
-            if isCloudSyncedLocation(directoryPath) {
-                Label(cloudSyncWarning, systemImage: "icloud")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             if let error {
-                Text(error).foregroundStyle(.red).font(.callout)
+                Label(error, systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                    .font(.callout)
+                    .padding(.horizontal, 20)
             }
             HStack {
                 if isWorking { ProgressView().controlSize(.small) }
@@ -53,12 +66,15 @@ struct NewChatSheet: View {
                     .keyboardShortcut(.cancelAction)
                     .disabled(isWorking)
                 Button("Create", action: create)
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(isWorking || (encrypt && !PasswordFields.isValid(password: password, confirm: confirm)))
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 18)
+            .padding(.top, 4)
         }
-        .padding(20)
-        .frame(width: 480)
+        .frame(width: 500)
         .onAppear {
             if directoryPath.isEmpty { directoryPath = appState.settings.defaultDirectoryURL.path }
         }

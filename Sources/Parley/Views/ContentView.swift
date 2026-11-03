@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ParleyCore
 
@@ -81,13 +82,45 @@ private struct EmptyDetailView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        ContentUnavailableView {
-            Label("No conversation selected", systemImage: "bubble.left.and.bubble.right")
-        } description: {
-            Text("Pick a conversation in the sidebar or start a new one.")
-        } actions: {
-            Button("New Chat") { appState.showNewChatSheet = true }
-                .keyboardShortcut(.defaultAction)
+        let settings = appState.settings
+        if settings.providers.isEmpty {
+            ContentUnavailableView {
+                Label("Set up a model provider", systemImage: "server.rack")
+            } description: {
+                Text("Add an OpenAI-compatible server, such as LM Studio on this Mac or an API on your network, in Settings.")
+            } actions: {
+                SettingsLink { Text("Open Settings…") }
+                    .buttonStyle(.borderedProminent)
+                Button("New Chat") { appState.showNewChatSheet = true }
+            }
+        } else {
+            VStack(spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 72, height: 72)
+                    .accessibilityHidden(true)
+                Text("No conversation selected")
+                    .font(.title2.weight(.semibold))
+                Text("Pick a conversation in the sidebar or start a new one.")
+                    .foregroundStyle(.secondary)
+                Button("New Chat") { appState.showNewChatSheet = true }
+                    .keyboardShortcut(.defaultAction)
+                    .controlSize(.large)
+                    .padding(.top, 4)
+                if let provider = settings.defaultProvider {
+                    HStack(spacing: 4) {
+                        Text("New chats use \(provider.name).")
+                        SettingsLink { Text("Change in Settings…") }
+                            .buttonStyle(.link)
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+                }
+            }
+            .padding(40)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

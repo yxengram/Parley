@@ -14,8 +14,21 @@ struct ComposerView: View {
             && (!session.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !session.draftAttachments.isEmpty)
     }
 
+    private var placeholder: String {
+        let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
+        let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
+        return model.isEmpty ? "Message" : "Message \(model)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let editIndex = session.pendingEditIndex {
+                EditingBar(laterCount: session.conversation.messages.count - editIndex - 1) {
+                    session.cancelEdit()
+                    focusToken += 1
+                }
+            }
+
             if !session.draftAttachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
@@ -29,34 +42,42 @@ struct ComposerView: View {
                         }
                     }
                     .padding(.top, 6)
-                    .padding(.horizontal, 2)
+                    .padding(.horizontal, 4)
                 }
             }
 
             if let err = session.composerError {
-                HStack {
-                    Text(err).font(.caption).foregroundStyle(.red)
+                HStack(alignment: .firstTextBaseline) {
+                    Label(err, systemImage: "exclamationmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
                     Spacer()
                     Button { session.composerError = nil } label: { Image(systemName: "xmark") }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("Dismiss")
                 }
+                .padding(.horizontal, 6)
             }
 
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 6) {
                 Button(action: pickFiles) {
                     Image(systemName: "paperclip")
                         .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
                         .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .help("Attach images or text files")
+                .accessibilityLabel("Attach Files")
 
                 ZStack(alignment: .topLeading) {
                     if session.draftText.isEmpty {
-                        Text("Message (Enter to send, Shift-Enter for a new line)")
+                        Text(placeholder)
+                            .lineLimit(1)
                             .foregroundStyle(.tertiary)
                             .padding(.leading, 5)
-                            .padding(.top, 4)
+                            .padding(.top, 3)
                             .allowsHitTesting(false)
                     }
                     ComposerTextView(
@@ -64,39 +85,52 @@ struct ComposerView: View {
                         height: $editorHeight,
                         focusToken: focusToken,
                         onSubmit: send,
+                        onEscape: escape,
+                        onEditLast: editLast,
                         onPasteFiles: { urls in AttachmentImport.importFiles(urls, into: session) },
                         onPasteImageData: { data in AttachmentImport.importImageData(data, filename: "Pasted image", into: session) }
                     )
                     .frame(height: editorHeight)
                 }
-                .padding(6)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
+                .padding(.vertical, 2)
+                .help("Enter sends, Shift-Enter adds a new line. ↑ edits your last message.")
 
                 if session.isStreaming {
                     Button(action: session.stop) {
                         Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 26))
+                            .foregroundStyle(.primary)
                     }
-                    .buttonStyle(.borderless)
-                    .help("Stop")
-                    .keyboardShortcut(".", modifiers: .command)
+                    .buttonStyle(.plain)
+                    .help("Stop generating (Esc or ⌘.)")
+                    .accessibilityLabel("Stop Generating")
                 } else {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 26))
+                            .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.5))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.plain)
                     .disabled(!canSend)
                     .help("Send (Enter)")
+                    .accessibilityLabel("Send Message")
                 }
             }
+            .padding(.leading, 10)
+            .padding(.trailing, 7)
+            .padding(.vertical, 7)
+            .modifier(ComposerBackground())
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: 900)
+        .padding(.top, 6)
+        .padding(.bottom, 14)
+        // Lines the composer up with the message text (rows have 20 pt of side padding).
+        .frame(maxWidth: Layout.contentMaxWidth - 8)
         .frame(maxWidth: .infinity)
         .onAppear { focusToken += 1 }
+        .onChange(of: session.pendingEditMessageID) { _, id in
+            if id != nil { focusToken += 1 }
+        }
     }
 
     private func remove(_ a: Attachment) {
@@ -113,6 +147,28 @@ struct ComposerView: View {
         session.send(text: text, attachments: attachments, settings: appState.settings)
     }
 
+    /// Esc: stop a streaming reply, or cancel an edit. Returns false when there is nothing to do.
+    private func escape() -> Bool {
+        if session.isStreaming {
+            session.stop()
+            return true
+        }
+        if session.pendingEditMessageID != nil {
+            session.cancelEdit()
+            return true
+        }
+        return false
+    }
+
+    /// ↑ in an empty composer: edit the last user message.
+    private func editLast() -> Bool {
+        guard !session.isStreaming, session.draftText.isEmpty, session.draftAttachments.isEmpty,
+              session.pendingEditMessageID == nil,
+              let index = session.lastUserMessageIndex else { return false }
+        session.beginEdit(messageAt: index)
+        return true
+    }
+
     private func pickFiles() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -121,6 +177,58 @@ struct ComposerView: View {
         panel.message = "Attach images or text files"
         guard panel.runModal() == .OK else { return }
         AttachmentImport.importFiles(panel.urls, into: session)
+    }
+}
+
+/// Liquid Glass on macOS 26 and later, a material elsewhere.
+private struct ComposerBackground: ViewModifier {
+    private static var usesGlass: Bool {
+        #if DEBUG
+        // The snapshot harness cannot render glass; its legacy-SDK mode shows the fallback.
+        if SnapshotHarness.disablesGlass { return false }
+        #endif
+        return true
+    }
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        if #available(macOS 26.0, *), Self.usesGlass {
+            content
+                .glassEffect(.regular, in: shape)
+        } else {
+            content
+                .background(.regularMaterial, in: shape)
+                .overlay(shape.strokeBorder(Color.secondary.opacity(0.2)))
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        }
+    }
+}
+
+/// Shown above the composer while a sent message is being edited.
+private struct EditingBar: View {
+    let laterCount: Int
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pencil")
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Editing message")
+                    .font(.callout.weight(.medium))
+                Text(laterCount > 0
+                     ? "Sending replaces it and the \(laterCount) message\(laterCount == 1 ? "" : "s") after it. Esc cancels."
+                     : "Sending replaces it. Esc cancels.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Cancel", action: onCancel)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -193,6 +301,10 @@ struct ComposerTextView: NSViewRepresentable {
     @Binding var height: CGFloat
     var focusToken: Int
     var onSubmit: () -> Void
+    /// Esc. Returns true when handled.
+    var onEscape: () -> Bool = { false }
+    /// ↑ with the caret on the first line. Returns true when handled.
+    var onEditLast: () -> Bool = { false }
     var onPasteFiles: ([URL]) -> Void
     var onPasteImageData: (Data) -> Void
 
@@ -228,8 +340,10 @@ struct ComposerTextView: NSViewRepresentable {
         tv.string = text
         tv.onPasteFiles = { onPasteFiles($0) }
         tv.onPasteImageData = { onPasteImageData($0) }
-        // Dropping files on the editor attaches them instead of inserting paths.
+        // Dropped text is inserted as usual; dropped files become attachments (PastingTextView)
+        // instead of inserting their paths.
         tv.unregisterDraggedTypes()
+        tv.registerForDraggedTypes([.fileURL, .string])
 
         scroll.documentView = tv
         context.coordinator.textView = tv
@@ -243,6 +357,10 @@ struct ComposerTextView: NSViewRepresentable {
         tv.onPasteFiles = { onPasteFiles($0) }
         tv.onPasteImageData = { onPasteImageData($0) }
         if tv.string != text {
+            // A programmatic change (sent, edit started or cancelled): old typing steps no longer
+            // apply to this text, so they must not be undoable.
+            tv.breakUndoCoalescing()
+            context.coordinator.undo.removeAllActions()
             tv.string = text
             context.coordinator.recalcHeight()
         }
@@ -257,8 +375,12 @@ struct ComposerTextView: NSViewRepresentable {
         var parent: ComposerTextView
         weak var textView: PastingTextView?
         var lastFocusToken = -1
+        /// The composer's own undo stack, separate from other fields in the window.
+        let undo = UndoManager()
 
         init(_ parent: ComposerTextView) { self.parent = parent }
+
+        func undoManager(for view: NSTextView) -> UndoManager? { undo }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = textView else { return }
@@ -276,6 +398,14 @@ struct ComposerTextView: NSViewRepresentable {
                 }
                 parent.onSubmit()
                 return true
+            }
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                if textView.hasMarkedText() { return false }
+                return parent.onEscape()
+            }
+            if commandSelector == #selector(NSResponder.moveUp(_:)) {
+                if textView.hasMarkedText() || !textView.string.isEmpty { return false }
+                return parent.onEditLast()
             }
             return false
         }
@@ -316,6 +446,26 @@ final class PastingTextView: NSTextView {
             .filter { $0.length > 0 && NSMaxRange($0) <= ns.length }
             .map { ns.substring(with: $0) }
         return parts.isEmpty ? nil : parts.joined(separator: "\n")
+    }
+
+    // File drops attach the files; text drops are inserted normally.
+    private func droppedFileURLs(_ info: NSDraggingInfo) -> [URL] {
+        (info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedFileURLs(sender).isEmpty ? super.draggingEntered(sender) : .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedFileURLs(sender).isEmpty ? super.draggingUpdated(sender) : .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = droppedFileURLs(sender)
+        guard !urls.isEmpty else { return super.performDragOperation(sender) }
+        onPasteFiles?(urls)
+        return true
     }
 
     override func paste(_ sender: Any?) {

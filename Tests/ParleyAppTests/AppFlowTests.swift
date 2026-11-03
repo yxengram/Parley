@@ -395,6 +395,42 @@ struct AppFlowTests {
         }
     }
 
+    // 3b. Staged edit (what the UI uses): nothing changes until the edit is sent.
+    @Test func stagedEditKeepsHistoryUntilSent() async throws {
+        try await withFixture { fx in
+            let session = try await fx.create()
+            try await fx.send("first", in: session)
+            try await fx.send("second", in: session)
+
+            session.beginEdit(messageAt: 2)
+            #expect(session.draftText == "second")
+            #expect(session.pendingEditIndex == 2)
+            #expect(session.conversation.messages.count == 4)
+            #expect(try readPlain(session.fileURL).messages.count == 4)
+
+            // Cancelling leaves the conversation as it was.
+            session.cancelEdit()
+            #expect(session.pendingEditMessageID == nil)
+            #expect(session.draftText.isEmpty)
+
+            // A draft typed before the edit comes back on cancel.
+            session.draftText = "half-typed"
+            session.beginEdit(messageAt: 2)
+            #expect(session.draftText == "second")
+            session.cancelEdit()
+            #expect(session.draftText == "half-typed")
+            session.draftText = ""
+            #expect(session.conversation.messages.count == 4)
+
+            // Sending the edit replaces the message and everything after it.
+            session.beginEdit(messageAt: 2)
+            try await fx.send("second (edited)", in: session)
+            #expect(session.pendingEditMessageID == nil)
+            #expect(session.conversation.messages.map(\.content) == ["first", echo("first"), "second (edited)", echo("second (edited)")])
+            expectSameMessages(try readPlain(session.fileURL).messages, session.conversation.messages)
+        }
+    }
+
     // 4. Encrypted conversation: nothing readable on disk; lock / unlock through AppState.
     @Test func encryptedConversationLockUnlock() async throws {
         try await withFixture { fx in
