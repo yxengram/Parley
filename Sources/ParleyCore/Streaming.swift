@@ -225,7 +225,7 @@ public enum ChunkParser {
         return delta
     }
 
-    private static func errorMessage(from error: Any) -> String {
+    static func errorMessage(from error: Any) -> String {
         if let dict = error as? [String: Any] {
             if let message = dict["message"] as? String, !message.isEmpty { return message }
             if let code = dict["code"] { return "error \(code)" }

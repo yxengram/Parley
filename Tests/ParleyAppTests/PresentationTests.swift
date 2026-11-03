@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parley
+import ParleyCore
 
 // Pure view-model helpers: markdown block parsing and error presentation.
 
@@ -46,4 +47,18 @@ import Testing
     #expect(down.suggestsSettings)
 
     #expect(ErrorPresentation.make("Something odd").title == "Something odd")
+}
+
+@Test func providerURLWarnsWhenVersionPathMissing() {
+    #expect(ProviderEditor.urlWarning("http://100.100.1.2:1234")
+            == "No version path. Most servers expect it to end in /v1, e.g. http://100.100.1.2:1234/v1.")
+    #expect(ProviderEditor.urlWarning("http://localhost:1234/") != nil)
+    #expect(ProviderEditor.urlWarning("http://100.100.1.2:1234/v1") == nil)
+    #expect(ProviderEditor.urlWarning("http://192.168.1.20:1234/api/v1") == nil)
+}
+
+@Test func missingV1ErrorOffersSettings() {
+    let p = ErrorPresentation.make("API error: Unexpected endpoint or method. (GET /models) " + ChatClient.missingVersionPathHint)
+    #expect(p.suggestsSettings)
+    #expect(!ErrorPresentation.make("API error: something else").suggestsSettings)
 }

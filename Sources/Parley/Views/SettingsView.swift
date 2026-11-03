@@ -95,7 +95,7 @@ private struct ProvidersSettingsView: View {
     }
 }
 
-private struct ProviderEditor: View {
+struct ProviderEditor: View {
     @Environment(AppState.self) private var appState
     let providerID: UUID
 
@@ -167,7 +167,8 @@ private struct ProviderEditor: View {
                     case .failed(let msg):
                         Label(msg, systemImage: "xmark.octagon.fill")
                             .foregroundStyle(.red)
-                            .lineLimit(3)
+                            .lineLimit(6)
+                            .textSelection(.enabled)
                     }
                     Spacer()
                 }
@@ -199,6 +200,10 @@ private struct ProviderEditor: View {
             return "Enter a full URL such as http://localhost:1234/v1."
         }
         guard scheme == "http" || scheme == "https" else { return "Only http and https URLs are supported." }
+        if comps.path.isEmpty || comps.path == "/" {
+            let port = comps.port.map { ":\($0)" } ?? ""
+            return "No version path. Most servers expect it to end in /v1, e.g. \(scheme)://\(host)\(port)/v1."
+        }
         if scheme == "http" && !ChatClient.isLocalHost(host) {
             return "Traffic is unencrypted."
         }

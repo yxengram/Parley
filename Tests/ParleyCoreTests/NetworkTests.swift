@@ -989,6 +989,47 @@ struct MockServerIntegrationTests {
         }
     }
 
+    @Test func missingV1SurfacesServerErrorAndHint() async throws {
+        try await withMockServer { base in
+            // The mock answers /models and /chat/completions without /v1 like LM Studio:
+            // HTTP 200 with {"error":"Unexpected endpoint or method. (...)"}.
+            let root = String(base.dropLast("/v1".count))
+            let client = try ChatClient(baseURL: root, apiKey: nil)
+            #expect(client.baseURLHasNoPath)
+            do {
+                _ = try await client.listModels()
+                Issue.record("expected listModels to fail")
+            } catch let ParleyError.api(message) {
+                #expect(message.contains("Unexpected endpoint or method. (GET /models)"))
+                #expect(message.contains(ChatClient.missingVersionPathHint))
+            }
+
+            do {
+                for try await _ in client.streamChat(messages: [Message(role: .user, content: "x")], options: ChatRequestOptions(model: "mock-plain")) {}
+                Issue.record("expected streamChat to fail")
+            } catch let ParleyError.api(message) {
+                #expect(message.contains("Unexpected endpoint or method. (POST /chat/completions)"))
+                #expect(message.contains(ChatClient.missingVersionPathHint))
+            }
+        }
+    }
+
+    @Test func errorBodyWithV1HasNoHint() async throws {
+        try await withMockServer { base in
+            let client = try ChatClient(baseURL: base, apiKey: nil)
+            #expect(!client.baseURLHasNoPath)
+            #expect(try await !client.listModels().isEmpty)
+            do {
+                for try await _ in client.streamChat(messages: [Message(role: .user, content: "x")], options: ChatRequestOptions(model: "mock-error")) {}
+                Issue.record("expected mock-error to fail")
+            } catch let ParleyError.http(status, body) {
+                #expect(status == 400)
+                #expect(body.contains("mock bad request"))
+                #expect(!body.contains(ChatClient.missingVersionPathHint))
+            }
+        }
+    }
+
     @Test func connectionRefusedThrows() async throws {
         let port = try freeLocalPort()
         let client = try ChatClient(baseURL: "http://127.0.0.1:\(port)/v1", apiKey: nil)
@@ -996,4 +1037,30 @@ struct MockServerIntegrationTests {
             for try await _ in client.streamChat(messages: [Message(role: .user, content: "x")], options: ChatRequestOptions(model: "m")) {}
         }
     }
+}
+
+// MARK: - Missing /v1 hint
+
+@Test func pathHintOnlyForPathlessBaseURLs() throws {
+    let bare = try ChatClient(baseURL: "http://100.100.1.2:1234/", apiKey: nil)
+    let versioned = try ChatClient(baseURL: "http://100.100.1.2:1234/v1", apiKey: nil)
+    #expect(bare.baseURLHasNoPath)
+    #expect(!versioned.baseURLHasNoPath)
+
+    let hint = ChatClient.missingVersionPathHint
+    #expect(bare.withPathHint(ParleyError.api("boom")) as? ParleyError == .api("boom " + hint))
+    #expect(bare.withPathHint(ParleyError.http(status: 404, body: "nope")) as? ParleyError
+            == .api("Endpoint not found (HTTP 404): nope " + hint))
+    #expect(bare.withPathHint(ParleyError.http(status: 405, body: "")) as? ParleyError
+            == .api("Endpoint not found (HTTP 405). " + hint))
+    // Unrelated errors and versioned URLs are left alone.
+    #expect(bare.withPathHint(ParleyError.http(status: 401, body: "x")) as? ParleyError == .http(status: 401, body: "x"))
+    #expect(bare.withPathHint(URLError(.timedOut)) is URLError)
+    #expect(versioned.withPathHint(ParleyError.api("boom")) as? ParleyError == .api("boom"))
+}
+
+@Test func modelListErrorBodyIsReported() throws {
+    // Covered end to end by the mock suite; here the "object":"error" shape from vLLM.
+    let message = ChunkParser.errorMessage(from: ["object": "error", "message": "bad route"] as [String: Any])
+    #expect(message == "bad route")
 }

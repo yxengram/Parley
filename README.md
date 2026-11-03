@@ -6,7 +6,7 @@
 ```bash
 ./build.sh            # 生成 build/Parley.app（ad-hoc 签名）
 open build/Parley.app
-swift test            # 124 个测试：核心层 108 个，App 层 16 个；集成测试会自动启动 tools/mock_server.py
+swift test            # 130 个测试：核心层 112 个，App 层 18 个；集成测试会自动启动 tools/mock_server.py
 ```
 只装了 Command Line Tools 就能构建，不需要 Xcode。
 

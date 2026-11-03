@@ -18,6 +18,9 @@ Endpoints:
     mock-slow-think          reasoning_content then content, one piece every 150 ms
                              (snapshot harness: captures thinking mid-stream)
 
+  GET /models, POST /chat/completions (no /v1)   mimic LM Studio's answer to an unknown
+                             endpoint: HTTP 200 {"error":"Unexpected endpoint or method. (...)"}
+
   GET/POST /redirect-to-PORT/REST   answers 307 with Location http://localhost:PORT/REST
                                     (tests that the client never follows redirects)
   POST /v1/chat/completions with model mock-sse-error-field / mock-sse-error-event /
@@ -139,13 +142,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
         return True
 
+    def send_unexpected_endpoint(self, method, path):
+        # LM Studio answers a request without the /v1 prefix with 200 and an error body.
+        self.send_json(200, {"error": f"Unexpected endpoint or method. ({method} {path})"})
+
     # ---- routing -------------------------------------------------------
 
     def do_GET(self):
         path = self.path.split("?", 1)[0].rstrip("/")
         if self.redirect_if_requested(path):
             return
-        if path in ("/v1/models", "/models"):
+        if path in ("/models", "/chat/completions"):
+            self.send_unexpected_endpoint("GET", path)
+        elif path == "/v1/models":
             now = int(time.time())
             self.send_json(200, {
                 "object": "list",
@@ -160,7 +169,10 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length > 0 else b""
         if self.redirect_if_requested(path):
             return
-        if path not in ("/v1/chat/completions", "/chat/completions"):
+        if path in ("/models", "/chat/completions"):
+            self.send_unexpected_endpoint("POST", path)
+            return
+        if path != "/v1/chat/completions":
             self.send_json(404, {"error": {"message": "not found"}})
             return
         try:

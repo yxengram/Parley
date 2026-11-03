@@ -104,7 +104,9 @@ struct ErrorPresentation: Equatable {
             }
         }
         if text.hasPrefix("API error: ") {
-            return ErrorPresentation(title: String(text.dropFirst("API error: ".count)), raw: nil)
+            return ErrorPresentation(
+                title: String(text.dropFirst("API error: ".count)), raw: nil,
+                suggestsSettings: text.contains(ChatClient.missingVersionPathHint))
         }
         let lower = text.lowercased()
         if lower.contains("could not connect to the server") || lower.contains("connection refused")

@@ -39,6 +39,16 @@ public final class ChatClient: @unchecked Sendable {
 
     private static let maxErrorBodyChars = 2000
 
+    /// Appended to endpoint errors when the base URL has no path (a common slip: LM Studio,
+    /// Ollama, vLLM and OpenAI all serve the API under /v1).
+    public static let missingVersionPathHint =
+        "The base URL has no path; OpenAI-compatible servers usually expect one ending in /v1 (for example http://host:1234/v1)."
+
+    /// True when the base URL is just scheme://host[:port], with no version path.
+    public var baseURLHasNoPath: Bool {
+        baseURL.path.isEmpty || baseURL.path == "/"
+    }
+
     /// Validates scheme http/https + host; throws invalidBaseURL.
     public init(baseURL: String, apiKey: String?) throws {
         var normalized = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,6 +96,14 @@ public final class ChatClient: @unchecked Sendable {
 
     /// GET {base}/models → data[].id sorted
     public func listModels() async throws -> [String] {
+        do {
+            return try await fetchModels()
+        } catch {
+            throw withPathHint(error)
+        }
+    }
+
+    private func fetchModels() async throws -> [String] {
         var request = URLRequest(url: modelsURL)
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -113,6 +131,13 @@ public final class ChatClient: @unchecked Sendable {
             }
         }
         if let root = object as? [String: Any] {
+            // Some servers (LM Studio for an unknown endpoint) answer 200 with an error body.
+            if let error = root["error"], !(error is NSNull) {
+                throw ParleyError.api(ChunkParser.errorMessage(from: error))
+            }
+            if (root["object"] as? String) == "error" {
+                throw ParleyError.api(ChunkParser.errorMessage(from: root))
+            }
             if let list = root["data"] as? [Any] { collect(list) }
             else if let list = root["models"] as? [Any] { collect(list) }
             else { throw ParleyError.api("The server's model list has an unexpected format.") }
@@ -146,7 +171,7 @@ public final class ChatClient: @unchecked Sendable {
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                         continuation.finish(throwing: CancellationError())
                     } else {
-                        continuation.finish(throwing: error)
+                        continuation.finish(throwing: self.withPathHint(error))
                     }
                 }
             }
@@ -228,6 +253,21 @@ public final class ChatClient: @unchecked Sendable {
         applyAuthorization(to: &request)
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
+    }
+
+    /// Adds `missingVersionPathHint` to errors that suggest the wrong endpoint was hit, but only
+    /// when the base URL has no path. Other errors pass through unchanged.
+    func withPathHint(_ error: Error) -> Error {
+        guard baseURLHasNoPath, let parley = error as? ParleyError else { return error }
+        switch parley {
+        case .api(let message):
+            return ParleyError.api(message + " " + Self.missingVersionPathHint)
+        case .http(let status, let body) where status == 404 || status == 405:
+            let detail = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            return ParleyError.api("Endpoint not found (HTTP \(status))" + (detail.isEmpty ? "." : ": \(detail)") + " " + Self.missingVersionPathHint)
+        default:
+            return error
+        }
     }
 
     private func applyAuthorization(to request: inout URLRequest) {
