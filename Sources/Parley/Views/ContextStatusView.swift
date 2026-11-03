@@ -66,6 +66,12 @@ struct ContextSnapshot: Equatable {
     var tokensPerSecond: Double?
     var speedIsEstimated: Bool
     var timeToFirstToken: Double?
+    /// The last reply's prompt reading (Strata, llama.cpp timings).
+    var promptTokensPerSecond: Double? = nil
+    var promptTokensRead: Int? = nil
+    var cachedPromptTokens: Int? = nil
+    /// While streaming, before the first token.
+    var promptProgress: PromptProgress? = nil
     var isStreaming: Bool
     var reload: AppState.ReloadState?
 
@@ -91,6 +97,7 @@ struct ContextSnapshot: Equatable {
         var rate: Double?
         var estimated = false
         var ttft: Double?
+        var lastStats: GenerationStats?
         if let live {
             rate = live.tokensPerSecond
             estimated = live.isEstimated
@@ -98,6 +105,7 @@ struct ContextSnapshot: Equatable {
             rate = stats.tokensPerSecond
             estimated = stats.isEstimated ?? false
             ttft = stats.timeToFirstToken
+            lastStats = stats
         }
         let snapshot = ContextSnapshot(
             usage: usage,
@@ -108,6 +116,10 @@ struct ContextSnapshot: Equatable {
             tokensPerSecond: rate,
             speedIsEstimated: estimated,
             timeToFirstToken: ttft,
+            promptTokensPerSecond: lastStats?.promptTokensPerSecond,
+            promptTokensRead: lastStats?.promptTokensRead,
+            cachedPromptTokens: lastStats?.cachedPromptTokens,
+            promptProgress: live?.promptProgress,
             isStreaming: session.isStreaming,
             reload: provider.flatMap { model.isEmpty ? nil : appState.reloadState(provider: $0, model: model) }
         )
@@ -131,7 +143,7 @@ struct ContextStatusBar: View {
             }
             .buttonStyle(.plain)
             .help(helpText(snap, provider: provider))
-            .accessibilityLabel(accessibilityText(snap))
+            .accessibilityLabel(Self.accessibilityText(snap))
             .accessibilityHint("Shows context details")
             // The strip sits on the window's bottom edge: open upwards, into the window.
             .popover(isPresented: $showPopover, arrowEdge: .top) {
@@ -154,7 +166,15 @@ struct ContextStatusBar: View {
 
     private func label(_ snap: ContextSnapshot) -> some View {
         HStack(spacing: 6) {
-            if snap.isStreaming || snap.tokensPerSecond != nil {
+            if snap.isStreaming, let progress = snap.promptProgress {
+                // Prompt reading (Strata, llama.cpp) before the first token.
+                HStack(spacing: 3) {
+                    Image(systemName: "text.viewfinder")
+                        .imageScale(.small)
+                    Text("Reading prompt \(Int((progress.fraction * 100).rounded(.down)))%")
+                }
+                Text("·").foregroundStyle(.tertiary)
+            } else if snap.isStreaming || snap.tokensPerSecond != nil {
                 HStack(spacing: 3) {
                     Image(systemName: "gauge.with.dots.needle.67percent")
                         .imageScale(.small)
@@ -221,9 +241,12 @@ struct ContextStatusBar: View {
         return lines.joined(separator: "\n")
     }
 
-    private func accessibilityText(_ snap: ContextSnapshot) -> String {
+    static func accessibilityText(_ snap: ContextSnapshot) -> String {
         var parts: [String] = []
-        if let r = snap.tokensPerSecond {
+        if snap.isStreaming, let progress = snap.promptProgress {
+            let cached = progress.cached > 0 ? ", \(TokenFormat.grouped(progress.cached)) cached" : ""
+            parts.append("Reading prompt \(Int((progress.fraction * 100).rounded(.down))) percent of \(TokenFormat.grouped(progress.total)) tokens\(cached)")
+        } else if let r = snap.tokensPerSecond {
             parts.append("Speed \(TokenFormat.rate(r)) tokens per second\(snap.speedIsEstimated ? ", estimated" : "")")
         }
         if case .failed = snap.reload { parts.append("Reload failed") }
@@ -319,6 +342,9 @@ struct ContextPopover: View {
                     .accessibilityLabel("Context used")
             }
             details(snap)
+            if snap.info?.serverKind == .strata {
+                strataNote(snap)
+            }
             // The reload confirmation replaces the manual field, so the popover keeps its height.
             if !confirmingReload {
                 Divider()
@@ -399,7 +425,7 @@ struct ContextPopover: View {
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text(snap.isProbing ? "Checking…" : "Unknown")
-                        if !snap.isProbing {
+                        if !snap.isProbing && snap.info?.serverKind != .strata {
                             Text("\(provider.name) does not report it. Enter it below if you know it.")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -428,9 +454,43 @@ struct ContextPopover: View {
                     ].compactMap { $0 }.joined(separator: " · "))
                 }
             }
+            if let prompt = Self.promptText(snap) {
+                GridRow {
+                    Text("Prompt").foregroundStyle(.secondary)
+                    Text(prompt)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .font(.callout)
         .monospacedDigit()
+    }
+
+    /// "1,204 read at 850 tok/s · 30,112 cached": where the time to the first token went.
+    static func promptText(_ snap: ContextSnapshot) -> String? {
+        var parts: [String] = []
+        if let read = snap.promptTokensRead {
+            parts.append("\(TokenFormat.grouped(read)) read" + (snap.promptTokensPerSecond.map { " at \(TokenFormat.rate($0)) tok/s" } ?? ""))
+        } else if let rate = snap.promptTokensPerSecond {
+            parts.append("read at \(TokenFormat.rate(rate)) tok/s")
+        }
+        if let cached = snap.cachedPromptTokens, cached > 0 {
+            parts.append("\(TokenFormat.grouped(cached)) cached")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Strata fixes the context length when it starts a model; nothing in its API changes it.
+    @ViewBuilder
+    private func strataNote(_ snap: ContextSnapshot) -> some View {
+        Text(snap.info?.loadedContextLength != nil
+             ? "Strata sets the context length when it starts the model. To use a different size, change it in Strata's setup."
+             : snap.manual != nil
+             ? "Strata's shared port does not report the context length, so your value below is used. If you change the context in Strata's setup, update it here."
+             : "Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below; it can only be changed in Strata.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func manualSection(_ snap: ContextSnapshot) -> some View {

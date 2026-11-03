@@ -15,13 +15,17 @@ public struct ChatDelta: Sendable, Equatable {
     public var finishReason: String?
     /// llama.cpp's `timings` block (server-measured speed), when present.
     public var timings: ServerTimings?
+    /// llama.cpp / Strata `prompt_progress` (only sent when the request asked for it).
+    public var promptProgress: PromptProgress?
 
-    public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil, timings: ServerTimings? = nil) {
+    public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil,
+                timings: ServerTimings? = nil, promptProgress: PromptProgress? = nil) {
         self.content = content
         self.reasoning = reasoning
         self.usage = usage
         self.finishReason = finishReason
         self.timings = timings
+        self.promptProgress = promptProgress
     }
 }
 
@@ -213,12 +217,13 @@ public enum ChunkParser {
 
         if let usage = root["usage"] as? [String: Any] {
             let details = usage["completion_tokens_details"] as? [String: Any]
-            let parsed = TokenUsage(
+            var parsed = TokenUsage(
                 promptTokens: intValue(usage["prompt_tokens"]),
                 completionTokens: intValue(usage["completion_tokens"]),
                 totalTokens: intValue(usage["total_tokens"]),
                 reasoningTokens: intValue(details?["reasoning_tokens"])
             )
+            parsed.cachedPromptTokens = intValue((usage["prompt_tokens_details"] as? [String: Any])?["cached_tokens"])
             if parsed.promptTokens != nil || parsed.completionTokens != nil || parsed.totalTokens != nil {
                 delta.usage = parsed
             }
@@ -232,12 +237,21 @@ public enum ChunkParser {
                 cachedTokens: intValue(t["cache_n"]),
                 predictedTokens: intValue(t["predicted_n"]),
                 predictedMilliseconds: doubleValue(t["predicted_ms"]),
-                predictedPerSecond: doubleValue(t["predicted_per_second"])
+                predictedPerSecond: doubleValue(t["predicted_per_second"]),
+                promptPerSecond: doubleValue(t["prompt_per_second"])
             )
             if !parsed.isEmpty { delta.timings = parsed }
         }
 
-        if delta.content == nil, delta.reasoning == nil, delta.usage == nil, delta.finishReason == nil, delta.timings == nil {
+        // llama.cpp / Strata (with return_progress): {"choices":[{"delta":{}}],"prompt_progress":{total, cache, processed, time_ms}}.
+        if let p = root["prompt_progress"] as? [String: Any],
+           let total = intValue(p["total"]), total > 0, let processed = intValue(p["processed"]) {
+            delta.promptProgress = PromptProgress(total: total, cached: max(0, intValue(p["cache"]) ?? 0),
+                                                  processed: processed, milliseconds: intValue(p["time_ms"]))
+        }
+
+        if delta.content == nil, delta.reasoning == nil, delta.usage == nil, delta.finishReason == nil, delta.timings == nil,
+           delta.promptProgress == nil {
             return nil
         }
         return delta

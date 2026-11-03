@@ -13,11 +13,22 @@ import Foundation
 //  2. Native endpoints on {root} = base URL minus a trailing "/v1", only when the host is local
 //     (loopback, LAN, Tailscale) or the list above looks like LM Studio or llama.cpp:
 //     LM Studio GET /api/v1/models, then GET /api/v0/models (servers before 0.4),
-//     llama.cpp GET /props, Ollama GET /api/ps. The first that validates wins.
-// /slots (llama.cpp) is never read: it exposes other clients' prompts.
+//     Strata GET /health (service "strata"), llama.cpp GET /props, Ollama GET /api/ps.
+//     The first that validates wins.
+// /slots (llama.cpp, Strata) is never read: it exposes other clients' prompts.
+//
+// Strata has two HTTP surfaces:
+//  - the desktop app's "share on network" port (by default 47832): only GET /v1/models,
+//    POST /v1/chat/completions and /v1/messages exist, everything else is a 404. Its list says
+//    owned_by "strata"; a loaded native model has no context field there (Strata issue #3931), the
+//    runtime mode has meta.context. Nothing else is probed on it.
+//  - the engine server itself (serve/server.py, also PolyStrata): its list has no owned_by but
+//    status.value and meta.n_ctx per model, and GET /health (no key needed) says service "strata"
+//    with max_context, images and loaded.
+// Strata fixes the context length when it starts the model; it cannot be changed through the API.
 
 public enum InferenceServerKind: String, Sendable, Hashable {
-    case lmStudio, llamaCpp, vLLM, ollama, hosted
+    case lmStudio, llamaCpp, vLLM, ollama, strata, hosted
 
     public var displayName: String {
         switch self {
@@ -25,6 +36,7 @@ public enum InferenceServerKind: String, Sendable, Hashable {
         case .llamaCpp: return "llama.cpp"
         case .vLLM: return "vLLM"
         case .ollama: return "Ollama"
+        case .strata: return "Strata"
         case .hosted: return "OpenAI-compatible API"
         }
     }
@@ -48,6 +60,13 @@ public struct ModelContextInfo: Sendable, Equatable {
     public var modelKey: String?
     /// LM Studio loaded instance ids for this model.
     public var instanceIDs: [String]
+    /// Whether the model reads images: false when the server says it cannot (Strata's engine
+    /// /health "images", an input_modalities list without "image", or an earlier refusal).
+    /// Nil when unknown.
+    public var acceptsImages: Bool?
+    /// The largest request body the server accepts, when it is known to be small (Strata's
+    /// shared port: 12 MiB, 4 MiB in its runtime mode). Images are re-sent with every request.
+    public var maxRequestBytes: Int?
 
     public init(
         model: String,
@@ -57,7 +76,9 @@ public struct ModelContextInfo: Sendable, Equatable {
         isLoaded: Bool? = nil,
         canSetContextLength: Bool = false,
         modelKey: String? = nil,
-        instanceIDs: [String] = []
+        instanceIDs: [String] = [],
+        acceptsImages: Bool? = nil,
+        maxRequestBytes: Int? = nil
     ) {
         self.model = model
         self.serverKind = serverKind
@@ -67,6 +88,8 @@ public struct ModelContextInfo: Sendable, Equatable {
         self.canSetContextLength = canSetContextLength
         self.modelKey = modelKey
         self.instanceIDs = instanceIDs
+        self.acceptsImages = acceptsImages
+        self.maxRequestBytes = maxRequestBytes
     }
 
     /// Later (more specific) values win; nil never overwrites a value.
@@ -78,8 +101,16 @@ public struct ModelContextInfo: Sendable, Equatable {
         canSetContextLength = canSetContextLength || other.canSetContextLength
         modelKey = other.modelKey ?? modelKey
         if !other.instanceIDs.isEmpty { instanceIDs = other.instanceIDs }
+        acceptsImages = other.acceptsImages ?? acceptsImages
+        maxRequestBytes = other.maxRequestBytes ?? maxRequestBytes
     }
 }
+
+/// Strata's shared port reads at most this much of a request body (apps/host/server/index.mjs,
+/// readBody(req, 12 MiB)); a larger one is answered with a plain-text HTTP 500 "Request failed".
+public let strataShareBodyLimit = 12 * 1024 * 1024
+/// The same port in its runtime mode (no native model): readBody's default of 4 MiB.
+public let strataRuntimeBodyLimit = 4 * 1024 * 1024
 
 extension ChatClient {
     static let probeTimeout: TimeInterval = 5
@@ -103,14 +134,17 @@ extension ChatClient {
     /// that fails or times out is simply unknown.
     public func fetchModelInfo(model: String) async -> ModelContextInfo {
         var info = ModelContextInfo(model: model)
-        if let list = await probeJSON(modelsURL), let generic = Self.parseModelList(list, model: model) {
+        let list = await probeJSON(modelsURL)
+        if let list, let generic = Self.parseModelList(list, model: model) {
             info.merge(generic)
         }
-        // vLLM's list is authoritative and it has no other endpoint worth asking.
-        if info.serverKind == .vLLM { return info }
+        // vLLM's list is authoritative and it has no other endpoint worth asking. Strata's shared
+        // port (owned_by "strata") serves nothing but the models list and the chat endpoints.
+        if info.serverKind == .vLLM || info.serverKind == .strata { return info }
 
         guard let root = nativeAPIRoot, let host = baseURL.host else { return info }
-        let looksNative = info.serverKind == .lmStudio || info.serverKind == .llamaCpp
+        let looksStrata = list.map(Self.looksLikeStrataEngine) ?? false
+        let looksNative = info.serverKind == .lmStudio || info.serverKind == .llamaCpp || looksStrata
         // Hosted APIs (OpenAI, OpenRouter, …) would only answer these with 404s.
         guard Self.isLocalHost(host) || looksNative else { return info }
 
@@ -134,9 +168,18 @@ extension ChatClient {
         let ollamaPS: Probe = {
             await self.probeJSON(Self.url(root, "api/ps")).flatMap { Self.parseOllamaPS($0, model: model) }
         }
-        let order: [Probe] = info.serverKind == .llamaCpp
-            ? [llamaProps]
-            : [lmStudioV1, lmStudioV0, llamaProps, ollamaPS]
+        // Strata's engine also answers /props (llama.cpp's shape), so /health goes first.
+        let strataHealth: Probe = {
+            await self.probeJSON(Self.url(root, "health")).flatMap { Self.parseStrataHealth($0, model: model) }
+        }
+        let order: [Probe]
+        if info.serverKind == .llamaCpp {
+            order = [llamaProps]
+        } else if looksStrata {
+            order = [strataHealth, llamaProps]
+        } else {
+            order = [lmStudioV1, lmStudioV0, strataHealth, llamaProps, ollamaPS]
+        }
         for probe in order {
             if Task.isCancelled { break }
             if let native = await probe() {
@@ -268,6 +311,14 @@ extension ChatClient {
         else if owners == ["llamacpp"] { info.serverKind = .llamaCpp }
         // LM Studio's OpenAI-compatible list carries only {id, object, owned_by}.
         else if owners == ["organization_owner"] { info.serverKind = .lmStudio }
+        // Strata's shared port. Its request body limit: 12 MiB for a native model (meta has gpus,
+        // aliases), 4 MiB in the runtime mode (meta has gpuIds, context, mode).
+        else if owners == ["strata"] {
+            info.serverKind = .strata
+            let metas = data.compactMap { $0["meta"] as? [String: Any] }
+            let runtime = !metas.isEmpty && metas.allSatisfy { $0["mode"] != nil || $0["gpuIds"] != nil }
+            info.maxRequestBytes = runtime ? strataRuntimeBodyLimit : strataShareBodyLimit
+        }
 
         if let entry = data.first(where: { ($0["id"] as? String) == model }) {
             if let n = int(entry["max_model_len"]) {          // vLLM: fixed at server start
@@ -275,9 +326,21 @@ extension ChatClient {
                 info.maxContextLength = n
                 info.serverKind = .vLLM
             }
-            if let meta = entry["meta"] as? [String: Any] {   // llama.cpp
+            if let meta = entry["meta"] as? [String: Any] {   // llama.cpp, Strata
                 info.loadedContextLength = int(meta["n_ctx"]) ?? info.loadedContextLength
                 info.maxContextLength = int(meta["n_ctx_train"]) ?? info.maxContextLength
+                // Strata's shared port in its runtime mode (tokens).
+                if info.serverKind == .strata {
+                    info.loadedContextLength = info.loadedContextLength ?? int(meta["context"])
+                }
+            }
+            // Strata's engine: status {value: "loaded"|"unloaded"} (llama.cpp router mode too).
+            if let status = (entry["status"] as? [String: Any])?["value"] as? String {
+                if status == "loaded" { info.isLoaded = true } else if status == "unloaded" { info.isLoaded = false }
+            }
+            // Strata's engine, OpenRouter: architecture.input_modalities.
+            if let modalities = (entry["architecture"] as? [String: Any])?["input_modalities"] as? [String], !modalities.isEmpty {
+                info.acceptsImages = modalities.contains("image")
             }
             // Hosted APIs: OpenRouter/Together context_length (+ top_provider), Groq context_window.
             let top = entry["top_provider"] as? [String: Any]
@@ -330,6 +393,30 @@ extension ChatClient {
         let isLoaded = (entry["state"] as? String) == "loaded"
         info.isLoaded = isLoaded
         if isLoaded { info.loadedContextLength = int(entry["loaded_context_length"]) }
+        return info
+    }
+
+    /// Strata's engine list: no owned_by anywhere, and entries with meta.n_ctx and a status object.
+    /// (llama.cpp's router list has a status too, but says owned_by "llamacpp".)
+    static func looksLikeStrataEngine(_ object: Any) -> Bool {
+        guard let root = object as? [String: Any], let data = root["data"] as? [[String: Any]], !data.isEmpty,
+              data.allSatisfy({ $0["owned_by"] == nil }) else { return false }
+        return data.contains { entry in
+            (entry["meta"] as? [String: Any])?["n_ctx"] != nil && entry["status"] is [String: Any]
+        }
+    }
+
+    /// Strata's engine GET /health (no API key needed): {"status":"ok","max_context":N,"model":id,
+    /// "images":bool,"loaded":bool,"service":"strata",…}. The context, images and loaded state
+    /// describe the engine's current model, so they are used only when that is `model` (PolyStrata
+    /// serves several models; the models list has each one's n_ctx).
+    static func parseStrataHealth(_ object: Any, model: String) -> ModelContextInfo? {
+        guard let root = object as? [String: Any], (root["service"] as? String) == "strata" else { return nil }
+        var info = ModelContextInfo(model: model, serverKind: .strata)
+        guard (root["model"] as? String) == model else { return info }
+        info.loadedContextLength = int(root["max_context"])     // 0 while the engine starts
+        info.acceptsImages = root["images"] as? Bool
+        info.isLoaded = root["loaded"] as? Bool
         return info
     }
 

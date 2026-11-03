@@ -9,6 +9,8 @@
 //   into PARLEY_SNAPSHOT_DIR, then exits on its own.
 // Optional: PARLEY_SNAPSHOT_MOCK_URL (e.g. http://127.0.0.1:8765/v1, tools/mock_server.py)
 // enables the streaming states. Without it, the provider points at an unused dummy localhost URL.
+// Optional: PARLEY_SNAPSHOT_STRATA_URL (tools/mock_server.py in its strata-share flavor, no API
+// key) adds a "Strata" provider, a seeded Strata chat and the Strata states.
 //
 // The app is never activated, its windows sit off-screen at alpha 0 and ignore the mouse.
 // See tools/snapshot.sh for the one-command run.
@@ -53,6 +55,11 @@ enum SnapshotHarness {
         return value.isEmpty ? nil : value
     }()
 
+    nonisolated static let strataURL: String? = {
+        let value = ProcessInfo.processInfo.environment["PARLEY_SNAPSHOT_STRATA_URL"] ?? ""
+        return value.isEmpty ? nil : value
+    }()
+
     /// Read by MessageRow: shows the hover action bar for this message without a mouse.
     static var forcedHoverMessageID: UUID?
 
@@ -70,6 +77,7 @@ enum SnapshotHarness {
     private static var settingsSuiteName = ""
     private static var standardSuiteName = ""
     private static var provider: Provider!
+    private static var strataProvider: Provider?
     private static var ids = SeedIDs()
     private static var logHandle: FileHandle?
     private static var counter = 0
@@ -83,6 +91,7 @@ enum SnapshotHarness {
         var chinese = UUID()
         var short: [UUID] = [UUID(), UUID(), UUID()]
         var lastAssistantInMain = UUID()
+        var strata = UUID()
     }
 
     /// Holds the redirected standard defaults for the swizzled `+standardUserDefaults`.
@@ -118,12 +127,12 @@ enum SnapshotHarness {
 
         // Hard stop, on a background queue so a modal on the main thread cannot block it.
         let rootPath = tmp.path
-        DispatchQueue.global().asyncAfter(deadline: .now() + 85) {
-            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 85 s\n".utf8))
+        DispatchQueue.global().asyncAfter(deadline: .now() + 150) {
+            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 150 s\n".utf8))
             try? FileManager.default.removeItem(atPath: rootPath)
             exit(3)
         }
-        log("bootstrap: tmp=\(tmp.path) bundle=\(Bundle.main.bundleIdentifier ?? "nil") mock=\(mockURL ?? "none")")
+        log("bootstrap: tmp=\(tmp.path) bundle=\(Bundle.main.bundleIdentifier ?? "nil") mock=\(mockURL ?? "none") strata=\(strataURL ?? "none")")
     }
 
     /// Makes `UserDefaults.standard` (and AppKit's internal use of it: window frames, split
@@ -197,6 +206,14 @@ enum SnapshotHarness {
         provider = p
         // The second provider is display-only (never contacted): a LAN example, not an internet API.
         settings.providers = [p, Provider(name: "Studio Mac (LAN)", baseURL: "http://192.168.1.20:1234/v1", defaultModel: "qwen3-14b-instruct")]
+        if let strataURL {
+            // The mock in its strata-share flavor (127.0.0.1, no key): never a real Strata server.
+            let strata = Provider(name: "Strata", baseURL: strataURL, defaultModel: "strata-qwen")
+            strataProvider = strata
+            settings.providers.append(strata)
+            // Strata's shared port does not report the context length: the user's own value.
+            settings.setManualContextLength(32768, providerID: strata.id, model: "strata-qwen")
+        }
         settings.defaultProviderID = p.id
         settings.defaultDirectoryPath = defaultDirectory.path
         // The main sample chat's model is not on the mock server: its limit is the user's own value.
@@ -366,6 +383,9 @@ enum SnapshotHarness {
             await wait(1.0)
             capture(appearance, "new-chat-empty")
             await captureStreaming(appearance)
+
+            // 11. Strata: its chat, context popover, settings, prompt reading, a refused image.
+            await captureStrata(appearance)
         }
 
         finish()
@@ -416,6 +436,66 @@ enum SnapshotHarness {
         }
     }
 
+    private static func captureStrata(_ appearance: String) async {
+        guard let strata = strataProvider else {
+            skip("\(appearance) Strata states (PARLEY_SNAPSHOT_STRATA_URL not set)")
+            return
+        }
+        let appState = AppState.shared
+        await select(ids.strata)
+        // ChatView probes the mock: owned_by "strata", so the kind is known and nothing else is asked.
+        await waitFor(seconds: 4) { appState.contextInfo(provider: strata, model: "strata-qwen")?.serverKind == .strata }
+        await scrollChat(toTop: false)
+        capture(appearance, "strata-chat")
+        await captureContextPopover(appearance, "strata-context-popover")
+        if appearance == "light" {
+            await capturePopover(appearance, "strata-conversation-settings")
+        }
+
+        // A new Strata chat: prompt reading before the first token, then a refused image.
+        do {
+            try await appState.createConversation(title: "", directory: defaultDirectory, password: nil)
+        } catch {
+            log("createConversation failed: \(error)")
+            return
+        }
+        guard let session = appState.session(for: appState.selection) else { return }
+        session.conversation.settings.providerID = strata.id
+        session.conversation.settings.model = "strata-slow"
+        await wait(0.8)
+        session.send(text: "Go through the whole design doc again and list every open question.", attachments: [], settings: appState.settings)
+        await waitFor(seconds: 3) { session.liveGeneration?.promptProgress.map { $0.fraction > 0.4 } ?? false }
+        await wait(0.3)
+        capture(appearance, "strata-reading-prompt")
+        session.stop()
+        await wait(0.4)
+
+        session.conversation.settings.model = "strata-novision"
+        let image = Attachment(kind: .image, filename: "whiteboard.png", mimeType: "image/png", data: samplePNG())
+        session.send(text: "What does the whiteboard say?", attachments: [image], settings: appState.settings)
+        await waitFor(seconds: 4) { !session.isStreaming }
+        // ChatView's onChange(isStreaming) records the refusal; the next image is warned about.
+        await waitFor(seconds: 2) { appState.contextInfo(provider: strata, model: "strata-novision")?.acceptsImages == false }
+        session.draftAttachments = [image]
+        session.draftText = "And this one?"
+        await wait(0.8)
+        capture(appearance, "strata-image-refused")
+        session.draftAttachments = []
+        session.draftText = ""
+        await wait(0.3)
+
+        // Refused before sending (the share's 12 MiB): a short title and no Retry.
+        if appearance == "light" {
+            session.conversation.messages.append(Message(role: .user, content: "Compare all four photos again."))
+            session.conversation.messages.append(Message(
+                role: .assistant, content: "", model: "strata-qwen", isComplete: false,
+                error: "API error: This request is 14.2 MB, more than the 12.0 MB the server accepts. Images are sent again with every message: remove some, or fork from a message before the first image."))
+            await wait(0.6)
+            await scrollChat(toTop: false)
+            capture(appearance, "strata-too-large")
+        }
+    }
+
     /// Opens the context popover through its DEBUG seam and composites it above the status strip
     /// at the bottom right, where it opens (arrowEdge .top; the frame view's origin is its
     /// bottom-left corner). See capturePopover for why the live position cannot be used.
@@ -439,7 +519,7 @@ enum SnapshotHarness {
 
     // MARK: Popover
 
-    private static func capturePopover(_ appearance: String) async {
+    private static func capturePopover(_ appearance: String, _ state: String = "conversation-settings-popover") async {
         guard let window = mainWindow, let session = AppState.shared.session(for: AppState.shared.selection) else {
             skip("\(appearance) settings popover (no open session)")
             return
@@ -460,7 +540,7 @@ enum SnapshotHarness {
                 let origin = NSPoint(x: frameView.bounds.width - size.width + 6,
                                      y: frameView.bounds.height - 44 - size.height)
                 log("popover window \(type(of: popover)) size=\(size); composited at \(origin)")
-                capture(appearance, "conversation-settings-popover", overlays: [(popoverView, origin)])
+                capture(appearance, state, overlays: [(popoverView, origin)])
                 closePopovers()
                 await wait(0.6)
                 return
@@ -472,6 +552,7 @@ enum SnapshotHarness {
         // popover appears (below the toolbar, right side).
         let host = NSHostingView(rootView:
             ConversationSettingsPopover(session: session)
+                .environment(AppState.shared)
                 .background(Color(nsColor: .windowBackgroundColor))
         )
         host.frame.size = host.fittingSize
@@ -486,7 +567,7 @@ enum SnapshotHarness {
         let frameView = window.contentView?.superview ?? window.contentView!
         let origin = NSPoint(x: frameView.bounds.width - host.frame.width - 40,
                              y: frameView.bounds.height - 52 - host.frame.height)
-        capture(appearance, "conversation-settings-popover", overlays: [(host, origin)])
+        capture(appearance, state, overlays: [(host, origin)])
         panel.orderOut(nil)
     }
 
@@ -912,6 +993,59 @@ enum SnapshotHarness {
                     Message(role: .user, content: item.1, createdAt: ago(item.3 + 1)),
                     Message(role: .assistant, content: item.2, createdAt: ago(item.3), model: "qwen3-14b-instruct",
                             usage: TokenUsage(promptTokens: 40, completionTokens: 60, totalTokens: 100)),
+                ]
+            ))
+        }
+
+        // (e) A Strata chat (only with PARLEY_SNAPSHOT_STRATA_URL): speed and prompt statistics from
+        // Strata's timings, a reply whose thinking used up Max Tokens, and Strata's overflow error.
+        if let strata = strataProvider {
+            var strataSettings = ConversationSettings(providerID: strata.id, model: "strata-qwen")
+            strataSettings.maxTokens = 1024
+            strataSettings.reasoningEffort = .high
+            try write(Conversation(
+                id: ids.strata,
+                title: "Release checklist review",
+                createdAt: ago(20),
+                updatedAt: ago(4),
+                settings: strataSettings,
+                messages: [
+                    Message(role: .user, content: "Here is our release checklist. Which steps can run in parallel?", createdAt: ago(20)),
+                    Message(
+                        role: .assistant,
+                        content: "Three groups can run side by side:\n\n- **Build and sign** the installers for each platform\n- **Docs**: release notes, the migration guide and the changelog\n- **QA** on the release candidate, once the build is signed\n\nOnly the store submission has to wait for all three.",
+                        reasoning: "The checklist has build, signing, docs, QA and submission. Docs do not depend on the build. QA needs the signed build. Submission needs everything.",
+                        reasoningDuration: 6.1,
+                        createdAt: ago(19),
+                        model: "strata-qwen",
+                        usage: TokenUsage(promptTokens: 2210, completionTokens: 402, totalTokens: 2612),
+                        stats: GenerationStats(tokensPerSecond: 61.5, completionTokens: 402, timeToFirstToken: 2.8,
+                                               generationDuration: 6.5, isEstimated: false, finishReason: "stop",
+                                               promptTokensRead: 2210, promptTokensPerSecond: 849.9, cachedPromptTokens: 0)
+                    ),
+                    Message(role: .user, content: "Now write the full test plan for the QA group, step by step.", createdAt: ago(12)),
+                    Message(
+                        role: .assistant,
+                        content: "",
+                        reasoning: "A full test plan: smoke tests first, then upgrade paths from the last three versions, then the platform matrix. For each step I need the owner, the build it runs on and the exit criterion. Start with the smoke tests: launch, sign in, open a document, save, quit…",
+                        reasoningDuration: 16.4,
+                        createdAt: ago(11),
+                        model: "strata-qwen",
+                        isComplete: true,
+                        usage: TokenUsage(promptTokens: 2640, completionTokens: 1024, totalTokens: 3664),
+                        stats: GenerationStats(tokensPerSecond: 62.4, completionTokens: 1024, timeToFirstToken: 0.9,
+                                               generationDuration: 16.4, isEstimated: false, finishReason: "length",
+                                               promptTokensRead: 430, promptTokensPerSecond: 812.0, cachedPromptTokens: 2210)
+                    ),
+                    Message(role: .user, content: "Paste the whole QA log from last release and compare it with the plan.", createdAt: ago(5)),
+                    Message(
+                        role: .assistant,
+                        content: "",
+                        createdAt: ago(4),
+                        model: "strata-qwen",
+                        isComplete: false,
+                        error: #"HTTP 400: {"error":{"type":"invalid_request_error","message":"request exceeds the context window: prompt (31870 tokens) + max tokens (1024) exceeds the context (32768); requests are never truncated. Send a smaller max_tokens (at most 890 here), or add \"fit_max_tokens\": true to the model's strata-<model>.json to shorten it to the room left (#545)"}}"#
+                    ),
                 ]
             ))
         }

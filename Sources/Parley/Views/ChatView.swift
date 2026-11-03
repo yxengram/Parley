@@ -170,6 +170,8 @@ private struct MessageListView: View {
 
     private func list(_ messages: [Message]) -> some View {
         let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
+        let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
+        let serverKind = provider.flatMap { model.isEmpty ? nil : appState.contextInfo(provider: $0, model: model) }?.serverKind
         let editIndex = session.pendingEditIndex
         return ScrollViewReader { proxy in
             ScrollView {
@@ -188,6 +190,9 @@ private struct MessageListView: View {
                             editState: editIndex.map { index == $0 ? .editing : (index > $0 ? .replaced : .none) } ?? .none,
                             providerName: provider?.name,
                             providerBaseURL: provider?.baseURL,
+                            serverKind: serverKind,
+                            promptProgress: streamingThis ? session.liveGeneration?.promptProgress : nil,
+                            maxTokens: session.conversation.settings.maxTokens,
                             actions: actions
                         )
                         .equatable()

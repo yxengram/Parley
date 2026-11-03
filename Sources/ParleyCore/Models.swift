@@ -42,6 +42,9 @@ public struct TokenUsage: Codable, Hashable, Sendable {
     /// completion_tokens_details.reasoning_tokens, when the server reports it. Part of
     /// completionTokens. Optional, so files written before it existed still decode.
     public var reasoningTokens: Int?
+    /// prompt_tokens_details.cached_tokens: the part of the prompt the server's cache already
+    /// held (OpenAI, Strata). Part of promptTokens. Optional, like reasoningTokens.
+    public var cachedPromptTokens: Int?
 
     public init(promptTokens: Int? = nil, completionTokens: Int? = nil, totalTokens: Int? = nil, reasoningTokens: Int? = nil) {
         self.promptTokens = promptTokens
@@ -117,6 +120,13 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     public var maxTokens: Int?
     /// Sent as `reasoning_effort` when non-nil.
     public var reasoningEffort: ReasoningEffort?
+    /// Thinking turned off. Only sent to servers known to accept it (Strata: reasoning_effort
+    /// "none"); elsewhere it is ignored. A separate optional field rather than a ReasoningEffort
+    /// case, so older versions still decode files that use it.
+    public var disablesThinking: Bool?
+    /// The most tokens the model may think per reply (Strata: reasoning_budget_tokens). Only
+    /// sent to Strata. Optional, so files written before it existed still decode.
+    public var reasoningBudgetTokens: Int?
 
     public init(
         providerID: UUID? = nil,

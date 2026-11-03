@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OpenAI-compatible mock server for testing Parley. Python 3 standard library only.
 
-Usage:  python3 tools/mock_server.py [PORT] [FLAVOR]   (default 8765, binds 127.0.0.1 only)
+Usage:  python3 tools/mock_server.py [PORT] [FLAVOR] [API_KEY]   (default 8765, binds 127.0.0.1 only)
 Then point a Parley provider at http://127.0.0.1:8765/v1
 
 FLAVOR picks which native (non-OpenAI) endpoints exist, for context-length discovery:
@@ -13,6 +13,29 @@ FLAVOR picks which native (non-OpenAI) endpoints exist, for context-length disco
   vllm         vLLM: /v1/models entries carry owned_by "vllm" and max_model_len.
   ollama       Ollama: GET /api/ps lists running models with context_length.
   plain        none of the above (like a hosted API): native routes are 404.
+  strata-share   Strata desktop's "share on network" port (apps/host/server/local-share.mjs): only
+               GET /v1/models, POST /v1/chat/completions and /v1/messages exist; every other path
+               is a 404 with the bare text "Not found". The list says owned_by "strata" and has no
+               context field (native mode). A body over 12 MiB gets a plain-text 500 "Request failed".
+  strata-engine  Strata's engine server (serve/server.py): GET /health without a key
+               (service "strata", max_context, images false), /v1/models without owned_by (status,
+               meta.n_ctx, architecture.input_modalities ["text"]), /props (build_info "Strata …").
+               Pictures are off: any image is a 400.
+  With API_KEY, the Strata flavors want "Authorization: Bearer API_KEY" (or x-api-key) on every
+  route but /health and /mock/*, and answer 401 as Strata does. Other flavors ignore the key.
+
+Strata flavors stream as Strata does: ": keep-alive" comments, prompt_progress chunks when the
+request has "return_progress": true, reasoning_content, then content, and a last chunk with
+finish_reason, usage (always, with prompt_tokens_details.cached_tokens) and llama.cpp timings.
+The context is STRATA_CTX tokens (prompt ≈ characters / 4); prompt + max_tokens over it is
+shortened (fit_max_tokens, the default) or, for strata-nofit, a 400 with Strata's own text; a
+prompt that alone does not fit is always a 400. reasoning_effort "none" turns thinking off.
+Models: strata-qwen (normal), strata-nofit, strata-slow (prompt reading for ~2 s, then one
+token every 150 ms), strata-loading (share: not in /v1/models, which lists ready models only, and
+400 "This model is not ready."; engine: 503 "the engine is starting"), strata-novision (share: images are a 400), strata-length (thinking uses up
+max_tokens: no content, finish_reason "length").
+GET /mock/last-request (every flavor) returns the last chat request body without its messages
+(message_count instead), so tests can check which fields were sent.
 
 Endpoints:
   GET  /v1/models             lists the mock models below
@@ -77,6 +100,7 @@ MODELS = [
 ]
 
 FLAVOR = "lmstudio"
+API_KEY = ""
 DEFAULT_LOADED_CONTEXT = 8192
 MAX_CONTEXT = 32768
 NOT_LOADED_MAX_CONTEXT = 131072
@@ -86,7 +110,14 @@ LLAMACPP_N_CTX_TRAIN = 131072
 STATE_LOCK = threading.Lock()
 # LM Studio-like model state, in memory: key -> {"max": int, "instances": [{"id", "context_length"}]}
 LMS_MODELS = {}
-COUNTERS = {"chat": 0, "stream_options_rejected": 0, "load": 0, "unload": 0}
+COUNTERS = {"chat": 0, "stream_options_rejected": 0, "load": 0, "unload": 0, "get_other": 0}
+LAST_REQUEST = {}
+
+STRATA_MODELS = ["strata-qwen", "strata-nofit", "strata-slow", "strata-loading", "strata-novision", "strata-length"]
+STRATA_CTX = 8192
+STRATA_SLACK = 8               # serve/server.py CTX_SLACK
+STRATA_SHARE_BODY_LIMIT = 12 * 1024 * 1024
+STRATA_EFFORTS = {"none", "off", "minimal", "disabled", "false", "low", "medium", "high", "xhigh", "max", "maximum"}
 
 
 def reset_lms_state():
@@ -233,15 +264,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0].rstrip("/")
+        if self.mock_control(path):
+            return
+        if FLAVOR.startswith("strata"):
+            self.strata_get(path)
+            return
         if self.redirect_if_requested(path):
             return
         if path in ("/models", "/chat/completions"):
             self.send_unexpected_endpoint("GET", path)
         elif path == "/v1/models":
             self.send_json(200, self.openai_model_list())
-        elif path == "/mock/requests":
-            with STATE_LOCK:
-                self.send_json(200, dict(COUNTERS))
         elif self.native_get(path):
             pass
         else:
@@ -346,6 +379,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = self.path.split("?", 1)[0].rstrip("/")
         length = int(self.headers.get("Content-Length") or 0)
+        if FLAVOR.startswith("strata"):
+            self.strata_post(path, length)
+            return
         raw = self.rfile.read(length) if length > 0 else b""
         if self.redirect_if_requested(path):
             return
@@ -375,6 +411,9 @@ class Handler(BaseHTTPRequestHandler):
         model = str(req.get("model") or "mock-plain")
         with STATE_LOCK:
             COUNTERS["chat"] += 1
+            LAST_REQUEST.clear()
+            LAST_REQUEST.update({k: v for k, v in req.items() if k != "messages"})
+            LAST_REQUEST["message_count"] = len(req.get("messages") or [])
         if model == "mock-no-stream-options" and "stream_options" in req:
             with STATE_LOCK:
                 COUNTERS["stream_options_rejected"] += 1
@@ -401,6 +440,268 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             # The client stopped reading (e.g. the user pressed Stop).
             self.close_connection = True
+
+    # ---- mock control (every flavor) -------------------------------------
+
+    def mock_control(self, path):
+        if path == "/mock/requests":
+            with STATE_LOCK:
+                self.send_json(200, dict(COUNTERS))
+            return True
+        if path == "/mock/last-request":
+            with STATE_LOCK:
+                self.send_json(200, dict(LAST_REQUEST))
+            return True
+        return False
+
+    def send_text(self, status, text, content_type=None):
+        body = text.encode("utf-8")
+        self.send_response(status)
+        if content_type:
+            self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        self.wfile.flush()
+
+    def send_json_utf8(self, status, obj):
+        # Node's res.end(JSON) with "application/json; charset=utf-8" (apps/host/server/util.mjs).
+        self.send_text(status, json.dumps(obj), "application/json; charset=utf-8")
+
+    # ---- Strata --------------------------------------------------------
+
+    def strata_authorized(self):
+        if not API_KEY:
+            return True
+        auth = self.headers.get("Authorization") or ""
+        return auth == "Bearer " + API_KEY or (self.headers.get("x-api-key") or "") == API_KEY
+
+    def strata_unauthorized(self):
+        if FLAVOR == "strata-share":
+            self.send_json_utf8(401, {"error": "Invalid API key"})
+        else:
+            self.send_json(401, {"error": {"type": "authentication_error", "message": "missing or wrong API key"}})
+
+    def strata_share_path_ok(self, path):
+        if path in ("/v1/models", "/v1/chat/completions", "/v1/messages"):
+            return True
+        with STATE_LOCK:
+            COUNTERS["get_other"] += 1
+        self.send_text(404, "Not found")          # res.writeHead(404); res.end('Not found')
+        return False
+
+    def strata_share_path_ok_drained(self, path, length):
+        if path in ("/v1/models", "/v1/chat/completions", "/v1/messages"):
+            return True
+        self.drain(length)
+        return self.strata_share_path_ok(path)
+
+    def strata_get(self, path):
+        if FLAVOR == "strata-share":
+            if not self.strata_share_path_ok(path):
+                return
+            if not self.strata_authorized():
+                self.strata_unauthorized()
+                return
+            if path == "/v1/models":
+                self.send_json_utf8(200, {"object": "list", "data": [{
+                    "id": m, "object": "model", "owned_by": "strata",
+                    "meta": {"instanceId": "inst-%d" % i, "gpus": [0], "label": "Qwen3.8 Flash Next", "aliases": []},
+                } for i, m in enumerate(STRATA_MODELS) if m != "strata-loading"]})
+            else:
+                self.send_json_utf8(404, {"error": "No route for GET %s" % path})
+            return
+        # strata-engine
+        if path in ("/health", "/api/health"):
+            self.send_json(200, {"status": "ok", "max_context": STRATA_CTX, "model": "strata-qwen", "images": False,
+                                 "api_key": bool(API_KEY), "image_generation": False, "loaded": True, "service": "strata"})
+            return
+        if not self.strata_authorized():
+            self.strata_unauthorized()
+            return
+        if path in ("/v1/models", "/models"):
+            self.send_json(200, {"object": "list", "data": [{
+                "id": m, "object": "model", "status": {"value": "loaded" if m == "strata-qwen" else "unloaded"},
+                "meta": {"n_ctx": STRATA_CTX},
+                "architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
+            } for m in STRATA_MODELS]})
+        elif path == "/props":
+            self.send_json(200, {"default_generation_settings": {"n_ctx": STRATA_CTX, "params": {"temperature": 0.6, "n_predict": -1}},
+                                 "total_slots": 1, "model_alias": "strata-qwen", "modalities": {"vision": False},
+                                 "is_sleeping": False, "build_info": "Strata 0.2.10"})
+        else:
+            with STATE_LOCK:
+                COUNTERS["get_other"] += 1
+            self.send_json(404, {"error": {"message": "not found"}})
+
+    def drain(self, length):
+        """Reads and drops a request body (answering before it is read can reset the connection)."""
+        remaining = length
+        while remaining > 0:
+            got = self.rfile.read(min(remaining, 1 << 20))
+            if not got:
+                break
+            remaining -= len(got)
+
+    def strata_post(self, path, length):
+        # Strata's order (local-share.mjs, index.mjs openai()): path, then key, then the body.
+        if FLAVOR == "strata-share" and not self.strata_share_path_ok_drained(path, length):
+            return
+        if not self.strata_authorized():
+            self.drain(length)
+            self.strata_unauthorized()
+            return
+        if FLAVOR == "strata-share" and length > STRATA_SHARE_BODY_LIMIT:
+            # readBody throws past 12 MiB, local-share.mjs's catch answers a bare 500.
+            self.drain(length)
+            self.send_text(500, "Request failed")
+            return
+        raw = self.rfile.read(length) if length > 0 else b""
+        if path != "/v1/chat/completions":
+            self.send_json(404, {"error": {"message": "not found"}})
+            return
+        try:
+            req = json.loads(raw.decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError):
+            if FLAVOR == "strata-share":
+                self.send_text(500, "Request failed")
+            else:
+                self.send_json(400, {"error": {"type": "invalid_request_error", "message": "the request is not JSON"}})
+            return
+        model = str(req.get("model") or "strata-qwen")
+        messages = req.get("messages") or []
+        with STATE_LOCK:
+            COUNTERS["chat"] += 1
+            LAST_REQUEST.clear()
+            LAST_REQUEST.update({k: v for k, v in req.items() if k != "messages"})
+            LAST_REQUEST["message_count"] = len(messages)
+
+        def invalid(message, status=400):
+            self.send_json(status, {"error": {"type": "invalid_request_error", "message": message}})
+
+        if model == "strata-loading":
+            if FLAVOR == "strata-share":
+                self.send_json(400, {"error": {"message": "This model is not ready.", "type": "invalid_request_error",
+                                               "param": "model", "code": None}})
+            else:
+                self.send_json(503, {"error": {"type": "server_error",
+                                               "message": "the engine is starting (a minute or two); try again shortly"}})
+            return
+        effort = req.get("reasoning_effort")
+        if effort is not None and effort is not False and str(effort).strip().lower() not in STRATA_EFFORTS:
+            invalid("unknown reasoning effort %r: use none, low, medium or high" % effort)
+            return
+        budget = req.get("reasoning_budget_tokens")
+        if budget is not None and (isinstance(budget, bool) or not isinstance(budget, int)):
+            invalid("reasoning_budget_tokens=%r: expected a whole number of tokens (0: no budget)" % budget)
+            return
+        images = sum(1 for m in messages if isinstance(m, dict) and isinstance(m.get("content"), list)
+                     for part in m["content"] if isinstance(part, dict) and part.get("type") == "image_url")
+        if images and (FLAVOR == "strata-engine" or model == "strata-novision"):
+            invalid("this server was started without the vision encoder (run setup again and choose 'vision'), "
+                    "so it cannot read images")
+            return
+
+        prompt = 0
+        for m in messages:
+            content = m.get("content") if isinstance(m, dict) else ""
+            if isinstance(content, list):
+                content = " ".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+            prompt += 4 + len(str(content or "")) // 4
+        room = STRATA_CTX - STRATA_SLACK - prompt
+        max_new = req.get("max_tokens", req.get("max_completion_tokens"))
+        if not isinstance(max_new, int) or isinstance(max_new, bool) or max_new <= 0:
+            max_new = None
+        if room < 1:
+            invalid("request exceeds the context window: prompt (%d tokens) leaves no room to answer in the context "
+                    "(%d); requests are never truncated" % (prompt, STRATA_CTX))
+            return
+        if max_new is None:
+            max_new = room
+        elif max_new > room:
+            if model == "strata-nofit":
+                invalid("request exceeds the context window: prompt (%d tokens) + max tokens (%d) exceeds the context "
+                        "(%d); requests are never truncated. Send a smaller max_tokens (at most %d here), or add "
+                        "\"fit_max_tokens\": true to the model's strata-<model>.json to shorten it to the room left (#545)"
+                        % (prompt, max_new, STRATA_CTX, max(0, room)))
+                return
+            max_new = max(1, room)
+
+        text, _ = last_user_message(messages)
+        echo = 'You said: "%s" (%d image%s received)' % (text, images, "" if images == 1 else "s")
+        thinking = effort is None or not (effort is False or str(effort).strip().lower() in ("none", "off", "minimal", "disabled", "false"))
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Accel-Buffering", "no")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.wfile.flush()
+            self.strata_stream(req, model, echo, prompt, max_new, thinking)
+            self.end_stream()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    def strata_stream(self, req, model, echo, prompt, max_new, thinking):
+        cid = "chatcmpl-" + "0" * 24
+        created = int(time.time())
+
+        def chunk(delta, finish=None):
+            return {"id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
+                    "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+
+        slow = model == "strata-slow"
+        self.sse(chunk({"role": "assistant", "content": ""}))
+        cached = prompt // 2
+        if slow:
+            # A long conversation, mostly in Strata's cache (as the snapshot harness shows it).
+            prompt, cached = max(prompt, 40960), 30000
+        steps = 8 if slow else 2
+        for i in range(1, steps + 1):
+            # One keep-alive per prompt-reading line; the progress fills it in when asked for.
+            if req.get("return_progress"):
+                processed = cached + (prompt - cached) * i // (steps + 1)
+                self.sse({**chunk({}), "prompt_progress": {"total": prompt, "cache": cached, "processed": processed,
+                                                           "time_ms": 250 * i}})
+            else:
+                self.write_chunk(": keep-alive\n\n")
+            if slow:
+                time.sleep(0.25)
+
+        generated = 0
+        thoughts = ["The user", " wants an", " echo."]
+        if model == "strata-length":
+            thoughts = ["Let me", " think", " about", " this", " at", " length"]
+        if thinking:
+            for piece in thoughts:
+                if generated >= max_new:
+                    break
+                self.sse(chunk({"reasoning_content": piece}))
+                generated += 1
+        finish = "stop"
+        if model == "strata-length":
+            finish = "length"
+        else:
+            for piece in split_tokens(echo, 6 if slow else 12):
+                if generated >= max_new:
+                    finish = "length"
+                    break
+                self.sse(chunk({"content": piece}))
+                generated += 1
+                if slow:
+                    time.sleep(0.15)
+        last = chunk({}, finish)
+        last["usage"] = {"prompt_tokens": prompt, "completion_tokens": generated, "total_tokens": prompt + generated,
+                         "prompt_tokens_details": {"cached_tokens": cached}}
+        prompt_ms = 2.0 * (prompt - cached) + 1
+        last["timings"] = {"cache_n": cached, "prompt_n": prompt - cached, "prompt_ms": prompt_ms,
+                           "prompt_per_token_ms": prompt_ms / max(1, prompt - cached),
+                           "prompt_per_second": 1000.0 * (prompt - cached) / prompt_ms,
+                           "predicted_n": generated, "predicted_ms": 1000.0 * generated / 61.5,
+                           "predicted_per_token_ms": 1000.0 / 61.5, "predicted_per_second": 61.5}
+        self.sse(last)
+        self.write_chunk("data: [DONE]\n\n")
 
     # ---- responses -----------------------------------------------------
 
@@ -543,12 +844,14 @@ def watch_parent():
 
 
 def main():
-    global FLAVOR
+    global FLAVOR, API_KEY
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     if len(sys.argv) > 2:
         FLAVOR = sys.argv[2]
-        if FLAVOR not in ("lmstudio", "lmstudio-v0", "llamacpp", "vllm", "ollama", "plain"):
+        if FLAVOR not in ("lmstudio", "lmstudio-v0", "llamacpp", "vllm", "ollama", "plain", "strata-share", "strata-engine"):
             sys.exit("unknown flavor: %s" % FLAVOR)
+    if len(sys.argv) > 3:
+        API_KEY = sys.argv[3]
     ThreadingHTTPServer.allow_reuse_address = True
     ThreadingHTTPServer.daemon_threads = True
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)

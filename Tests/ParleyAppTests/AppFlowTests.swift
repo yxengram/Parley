@@ -83,7 +83,7 @@ private struct MockServer {
 /// Starts the mock server on a free port. Retries with a new port if the server exits before
 /// it answers (another suite may have grabbed the same free port in the meantime).
 @MainActor
-private func startMockServer() async throws -> MockServer {
+private func startMockServer(flavor: String? = nil) async throws -> MockServer {
     guard FileManager.default.fileExists(atPath: mockServerScript.path) else {
         throw FlowTestError(description: "mock server not found at \(mockServerScript.path)")
     }
@@ -91,7 +91,7 @@ private func startMockServer() async throws -> MockServer {
         let port = try freeLocalPort()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: python3Path)
-        process.arguments = ["-I", "-u", mockServerScript.path, String(port)]
+        process.arguments = ["-I", "-u", mockServerScript.path, String(port)] + (flavor.map { [$0] } ?? [])
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         let exited = ExitFlag()
@@ -199,9 +199,10 @@ private final class Fixture {
 @MainActor
 private func withFixture(
     model: String = "mock-plain",
+    flavor: String? = nil,
     _ body: (Fixture) async throws -> Void
 ) async throws {
-    let server = try await startMockServer()
+    let server = try await startMockServer(flavor: flavor)
     do {
         let fixture = try Fixture(baseURL: server.baseURL, defaultModel: model)
         defer { fixture.cleanup() }
@@ -892,4 +893,130 @@ struct AppFlowTests {
             #expect(note.contains("now uses mock-plain"))
         }
     }
+
+    // MARK: Strata (tools/mock_server.py strata-share: no API key, like a Strata without one)
+
+    private func lastRequest(_ fx: Fixture) async throws -> [String: Any] {
+        let url = URL(string: fx.provider.baseURL.replacingOccurrences(of: "/v1", with: "") + "/mock/last-request")!
+        let (data, _) = try await URLSession(configuration: .ephemeral).data(from: url)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    // The shared port is recognized, its unknown context falls back to the user's value, and the
+    // request carries Strata's own fields; Max Tokens is sent as set (Strata shortens it to fit).
+    @Test func strataShareFlow() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            let info = try #require(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen"))
+            #expect(info.serverKind == .strata && info.loadedContextLength == nil)
+            fx.settings.setManualContextLength(8192, providerID: fx.provider.id, model: "strata-qwen")
+
+            let session = try await fx.create()
+            session.conversation.settings.maxTokens = 9000
+            session.conversation.settings.disablesThinking = true
+            try await fx.send("hello", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.reasoning == nil)
+            #expect(reply.stats?.finishReason == "stop" && reply.stats?.tokensPerSecond == 61.5)
+            #expect(reply.stats?.cachedPromptTokens != nil)
+            var sent = try await lastRequest(fx)
+            #expect(sent["return_progress"] as? Bool == true)
+            #expect(sent["reasoning_effort"] as? String == "none")
+            #expect(sent["max_tokens"] as? Int == 9000)     // more than the 8192 context: Strata's to shorten
+
+            session.conversation.settings.maxTokens = 2000
+            try await fx.send("again", in: session)
+            sent = try await lastRequest(fx)
+            #expect(sent["max_tokens"] as? Int == 2000)
+            #expect(try readPlain(session.fileURL).settings.disablesThinking == true)
+        }
+    }
+
+    // The same settings against a server that is not Strata: nothing Strata-specific is sent.
+    @Test func strataFieldsStayOffOtherServers() async throws {
+        try await withFixture { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain")
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-plain")?.serverKind == .lmStudio)
+            let session = try await fx.create()
+            session.conversation.settings.disablesThinking = true
+            session.conversation.settings.reasoningBudgetTokens = 512
+            session.conversation.settings.maxTokens = 100_000
+            try await fx.send("hello", in: session)
+            let sent = try await lastRequest(fx)
+            #expect(sent["return_progress"] == nil && sent["reasoning_effort"] == nil && sent["reasoning_budget_tokens"] == nil)
+            #expect(sent["max_tokens"] as? Int == 100_000)
+        }
+    }
+
+    // A model without picture reading refuses images; the refusal is remembered so the composer
+    // can warn before the next image, and the error reads as what to do.
+    @Test func strataVisionRefusalIsRemembered() async throws {
+        try await withFixture(model: "strata-novision", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-novision")
+            let session = try await fx.create()
+            let image = Attachment(kind: .image, filename: "a.png", mimeType: "image/png", data: Data([0x89, 0x50]))
+            session.send(text: "look", attachments: [image], settings: fx.settings)
+            try await fx.waitForReply(session)
+            let error = try #require(session.conversation.messages.last?.error)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-novision")?.acceptsImages == false)
+            #expect(ErrorPresentation.make(error, serverKind: .strata).title == "This Strata model does not read images")
+            // A later probe does not forget it (the shared port cannot report vision).
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-novision", force: true)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-novision")?.acceptsImages == false)
+        }
+    }
+
+    // An overflow error names the context: an unknown limit is filled from it.
+    @Test func strataOverflowFillsTheLimit() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            let session = try await fx.create()
+            try await fx.send(String(repeating: "word ", count: 8000), in: session)
+            let error = try #require(session.conversation.messages.last?.error)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen")?.loadedContextLength == 8192)
+            #expect(ErrorPresentation.make(error).title == "The conversation no longer fits in the model's context")
+        }
+    }
+
+    // Prompt reading is published while the reply waits for its first token.
+    @Test func strataPromptProgressIsLive() async throws {
+        try await withFixture(model: "strata-slow", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-slow")
+            let session = try await fx.create()
+            session.send(text: "slow", attachments: [], settings: fx.settings)
+            try #require(await waitUntil { session.liveGeneration?.promptProgress != nil })
+            let progress = try #require(session.liveGeneration?.promptProgress)
+            #expect(progress.total > 0 && progress.fraction < 1)
+            try #require(await waitUntil { !(session.conversation.messages.last?.content.isEmpty ?? true) })
+            #expect(session.liveGeneration?.promptProgress == nil)
+            session.stop()
+        }
+    }
+
+    // The user's real setup: the shared port reports no context and no value was entered. A
+    // fit-off overflow names the context and the room; a retry with Max Tokens lowered to it succeeds.
+    @Test func strataOverflowLimitFeedsTheRetry() async throws {
+        try await withFixture(model: "strata-nofit", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-nofit")
+            let session = try await fx.create()
+            session.conversation.settings.maxTokens = 9000
+            try await fx.send("hello", in: session)
+            #expect(session.conversation.messages.last?.error != nil)
+            #expect(try await lastRequest(fx)["max_tokens"] as? Int == 9000)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-nofit")?.loadedContextLength == 8192)
+            let error = try #require(session.conversation.messages.last?.error)
+            let room = try #require(ContextBudget.strataOverflow(fromError: error)?.room)
+            #expect(ErrorPresentation.make(error).detail?.contains("to at most \(TokenFormat.grouped(room))") == true)
+
+            session.conversation.settings.maxTokens = room
+            session.regenerate(messageAt: session.conversation.messages.count - 1, settings: fx.settings)
+            try await fx.waitForReply(session)
+            #expect(session.conversation.messages.last?.error == nil)
+            #expect(try await lastRequest(fx)["max_tokens"] as? Int == room)
+        }
+    }
+
 }

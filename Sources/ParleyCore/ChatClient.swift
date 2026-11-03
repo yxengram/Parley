@@ -10,6 +10,15 @@ public struct ChatRequestOptions: Sendable {
     public var temperature: Double?
     public var maxTokens: Int?
     public var reasoningEffort: ReasoningEffort?
+    /// Thinking off (ConversationSettings.disablesThinking). Sent only to Strata.
+    public var disablesThinking = false
+    /// ConversationSettings.reasoningBudgetTokens. Sent only to Strata.
+    public var reasoningBudgetTokens: Int?
+    /// What the app knows about the server (ModelContextInfo.serverKind). Fields only one server
+    /// understands are sent only when this names it: an unknown field can be refused elsewhere.
+    public var serverKind: InferenceServerKind?
+    /// ModelContextInfo.maxRequestBytes: a larger request is refused before it is sent.
+    public var maxRequestBytes: Int?
 
     public init(model: String, systemPrompt: String = "", temperature: Double? = nil, maxTokens: Int? = nil, reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
@@ -27,6 +36,8 @@ public struct ChatRequestOptions: Sendable {
             maxTokens: settings.maxTokens,
             reasoningEffort: settings.reasoningEffort
         )
+        disablesThinking = settings.disablesThinking ?? false
+        reasoningBudgetTokens = settings.reasoningBudgetTokens
     }
 }
 
@@ -271,8 +282,28 @@ public final class ChatClient: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         applyAuthorization(to: &request)
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let data = try JSONSerialization.data(withJSONObject: body)
+        if let limit = options.maxRequestBytes, data.count > limit {
+            throw ParleyError.api(Self.requestTooLargeMessage(bytes: data.count, limit: limit))
+        }
+        request.httpBody = data
         return request
+    }
+
+    /// Strata's shared port answers an oversized body with a bare HTTP 500 "Request failed" (or
+    /// drops the connection), and every later turn would fail the same way: images are re-sent.
+    static func requestTooLargeMessage(bytes: Int, limit: Int) -> String {
+        func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
+        return "This request is \(mb(bytes)), more than the \(mb(limit)) the server accepts. Images are sent again with every message: remove some, or fork from a message before the first image."
+    }
+
+    /// The two sizes ("14.2 MB", "12.0 MB") of a `requestTooLargeMessage`, also with text appended.
+    public static func requestTooLarge(in message: String) -> (bytes: String, limit: String)? {
+        guard let regex = try? NSRegularExpression(pattern: #"^This request is ([\d.]+ MB), more than the ([\d.]+ MB) the server accepts\."#),
+              let match = regex.firstMatch(in: message, range: NSRange(message.startIndex..., in: message)),
+              let bytes = Range(match.range(at: 1), in: message), let limit = Range(match.range(at: 2), in: message)
+        else { return nil }
+        return (String(message[bytes]), String(message[limit]))
     }
 
     /// Adds `missingVersionPathHint` to errors that suggest the wrong endpoint was hit, but only
@@ -360,6 +391,15 @@ public final class ChatClient: @unchecked Sendable {
         if let m = options.maxTokens { body["max_tokens"] = m }
         if let r = options.reasoningEffort { body["reasoning_effort"] = r.rawValue }
         if includeUsage { body["stream_options"] = ["include_usage": true] }
+        if options.serverKind == .strata {
+            // Prompt-reading progress before the first token (llama.cpp's flag; best effort).
+            body["return_progress"] = true
+            // Strata's words: "none" turns thinking off (low/medium/high are as above).
+            if options.disablesThinking { body["reasoning_effort"] = "none" }
+            if let budget = options.reasoningBudgetTokens, budget > 0, !options.disablesThinking {
+                body["reasoning_budget_tokens"] = budget
+            }
+        }
         return body
     }
 

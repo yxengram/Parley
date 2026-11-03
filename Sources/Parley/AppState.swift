@@ -197,6 +197,10 @@ final class AppState {
         session.didEnqueueSave = { [weak self] s in
             self?.syncEntry(from: s)
         }
+        // What the server said about the model (kind, limits) shapes the request (Strata fields).
+        session.serverInfo = { [weak self] provider, model in
+            self?.contextInfo(provider: provider, model: model)
+        }
         sessions[session.id] = session
     }
 
@@ -514,6 +518,9 @@ final class AppState {
     }
 
     private func store(_ info: ModelContextInfo, for key: ContextKey) {
+        var info = info
+        // A refusal of images (replyFinished) is not something a probe of Strata's shared port can see.
+        if info.acceptsImages == nil, contextInfo[key]?.acceptsImages == false { info.acceptsImages = false }
         if info == ModelContextInfo(model: info.model) {
             emptyProbeAt[key] = Date()
         } else {
@@ -619,7 +626,26 @@ final class AppState {
                     contextInfo[key] = info
                 }
             }
+            // Strata's shared port cannot say whether the model reads images; its refusal does.
+            // Remembered (memory only), so the composer warns before the next image is sent.
+            if ErrorPresentation.isStrataVisionRefusal(error) {
+                let known = contextInfo[key]
+                var info = known ?? ModelContextInfo(model: model, serverKind: .strata)
+                if info.acceptsImages != false {
+                    info.acceptsImages = false
+                    contextInfo[key] = info
+                }
+                // Nothing was cached yet: still ask the server (store keeps the refusal).
+                if known == nil {
+                    Task { await refreshContextInfo(provider: provider, model: model, force: true) }
+                }
+            }
             return
+        }
+        // Images went through: an earlier refusal no longer holds (Pictures was turned on).
+        if contextInfo[key]?.acceptsImages == false,
+           session.conversation.messages.contains(where: { $0.attachments.contains { $0.kind == .image } }) {
+            contextInfo[key]?.acceptsImages = nil
         }
         // A successful reply shows the server is reachable now: retry even within the
         // empty-probe interval.

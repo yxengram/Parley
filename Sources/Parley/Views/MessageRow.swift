@@ -32,6 +32,12 @@ struct MessageRow: View, Equatable {
     let editState: EditState
     let providerName: String?
     let providerBaseURL: String?
+    /// What the app knows about the server (for a few server-specific hints).
+    var serverKind: InferenceServerKind? = nil
+    /// How far the server has read the prompt, while this reply waits for its first token.
+    var promptProgress: PromptProgress? = nil
+    /// The conversation's Max Tokens (nil when off), to tell a capped reply from a full context.
+    var maxTokens: Int? = nil
     let actions: Actions
 
     @ViewState private var isHovering = false
@@ -51,6 +57,9 @@ struct MessageRow: View, Equatable {
             && lhs.editState == rhs.editState
             && lhs.providerName == rhs.providerName
             && lhs.providerBaseURL == rhs.providerBaseURL
+            && lhs.serverKind == rhs.serverKind
+            && lhs.promptProgress == rhs.promptProgress
+            && lhs.maxTokens == rhs.maxTokens
     }
 
     private var isUser: Bool { message.role == .user }
@@ -129,7 +138,7 @@ struct MessageRow: View, Equatable {
                         .help(Text(message.createdAt, format: .dateTime.weekday().hour().minute()))
                 }
                 if let error = message.error {
-                    ErrorCallout(presentation: ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL), raw: error, retry: nil, busy: conversationBusy)
+                    ErrorCallout(presentation: ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL, serverKind: serverKind), raw: error, retry: nil, busy: conversationBusy)
                 }
                 if isLast && !conversationBusy {
                     Button(action: actions.getReply) {
@@ -172,17 +181,22 @@ struct MessageRow: View, Equatable {
             if !message.content.isEmpty {
                 MarkdownView(text: message.content)
             } else if isStreamingThis && (message.reasoning ?? "").isEmpty {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for response…").foregroundStyle(.secondary)
-                }
+                WaitingIndicator(startedAt: message.createdAt, progress: promptProgress, serverKind: serverKind)
+            }
+
+            if !isStreamingThis, message.error == nil, let note = Self.finishNote(message, maxTokens: maxTokens) {
+                Label(note, systemImage: "scissors")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let error = message.error {
+                let presentation = ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL, serverKind: serverKind)
                 ErrorCallout(
-                    presentation: ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL),
+                    presentation: presentation,
                     raw: error,
-                    retry: { requestRegenerate() },
+                    retry: presentation.retryable ? { requestRegenerate() } : nil,
                     busy: conversationBusy
                 )
             } else if !message.isComplete && !isStreamingThis {
@@ -238,6 +252,25 @@ struct MessageRow: View, Equatable {
                 .font(.caption2)
                 .foregroundStyle(.secondary.opacity(0.8))
         }
+    }
+
+    /// Why a reply that the server ended early is short: finish_reason "length" means it hit
+    /// max_tokens or the end of the context (Strata shortens max_tokens to the room left). Fewer
+    /// completion tokens than `maxTokens`, or no cap at all, means the context ran out.
+    static func finishNote(_ message: Message, maxTokens: Int? = nil) -> String? {
+        guard message.role == .assistant, message.stats?.finishReason == "length" else { return nil }
+        // A chunk count (estimated) may be short of the real count: it does not prove a full context.
+        let completion = message.usage?.completionTokens
+            ?? (message.stats?.isEstimated == true ? nil : message.stats?.completionTokens)
+        let contextFull = maxTokens.map { cap in completion.map { $0 < cap } ?? false } ?? true
+        if message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(message.reasoning ?? "").isEmpty {
+            return contextFull
+                ? "The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer."
+                : "The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort or set a thinking budget (Conversation Settings, ⌘I), then regenerate."
+        }
+        return contextFull
+            ? "The reply was cut off at the end of the context (or the server's own output limit). Start a new chat, fork from an earlier message or roll back to make room."
+            : "The reply was cut off at the token limit (Max tokens)."
     }
 
     /// "1184 prompt · 236 completion · 1420 total tokens · 42.3 tok/s · 0.21 s to first token".
@@ -338,6 +371,54 @@ struct MessageRow: View, Equatable {
         .padding(3)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.2)))
+    }
+}
+
+/// Before the first token: how far the server has read the prompt when it says so (Strata,
+/// llama.cpp with return_progress), else how long the request has been waiting.
+struct WaitingIndicator: View {
+    let startedAt: Date
+    let progress: PromptProgress?
+    let serverKind: InferenceServerKind?
+
+    /// From here on, a Strata server that sends nothing at all is probably loading the model.
+    static let loadingHintAfter: TimeInterval = 10
+
+    var body: some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { context in
+            let elapsed = max(0, context.date.timeIntervalSince(startedAt))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    if let progress {
+                        ProgressView(value: progress.fraction)
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(Self.statusText(progress: progress, elapsed: elapsed))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                if progress == nil, serverKind == .strata, elapsed >= Self.loadingHintAfter {
+                    Text("Strata may be loading the model; a first reply after a pause can take a few minutes.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// "Reading the prompt: 42% of 40,960 tokens (30,000 cached) · 12 s" or "Waiting for response… 12 s".
+    static func statusText(progress: PromptProgress?, elapsed: TimeInterval) -> String {
+        let seconds = elapsed >= 2 ? " · \(Int(elapsed)) s" : ""
+        guard let progress else {
+            return "Waiting for response…" + (elapsed >= 2 ? " \(Int(elapsed)) s" : "")
+        }
+        let cached = progress.cached > 0 ? " (\(TokenFormat.grouped(progress.cached)) cached)" : ""
+        return "Reading the prompt: \(Int((progress.fraction * 100).rounded(.down)))% of \(TokenFormat.grouped(progress.total)) tokens\(cached)" + seconds
     }
 }
 

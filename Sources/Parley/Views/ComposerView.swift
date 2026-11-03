@@ -46,6 +46,19 @@ struct ComposerView: View {
                 }
             }
 
+            if let warning = serverWarning {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
+                    Text(warning)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+            }
+
             if let err = session.composerError {
                 HStack(alignment: .firstTextBaseline) {
                     Label(err, systemImage: "exclamationmark.circle.fill")
@@ -132,6 +145,52 @@ struct ComposerView: View {
         .onChange(of: session.pendingEditMessageID) { _, id in
             if id != nil { focusToken += 1 }
         }
+    }
+
+    /// Before sending: what the server is known to refuse. A warning, not a block: the server's
+    /// answer may have changed (Pictures turned on in Strata) since it was learned.
+    private var serverWarning: String? {
+        let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
+        let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
+        guard let provider, !model.isEmpty, let info = appState.contextInfo(provider: provider, model: model) else { return nil }
+        // What the next request sends again (a staged edit replaces its message and the later ones).
+        let history = session.pendingEditIndex.map { Array(session.conversation.messages.prefix($0)) } ?? session.conversation.messages
+        return Self.serverWarning(info: info, providerName: provider.name, model: model, history: history,
+                                  draft: session.draftAttachments, draftText: session.draftText)
+    }
+
+    static func serverWarning(info: ModelContextInfo, providerName: String, model: String, history: [Message],
+                              draft: [Attachment], draftText: String) -> String? {
+        let isImage = { (a: Attachment) in a.kind == .image && a.data != nil }
+        let draftHasImages = draft.contains(where: isImage)
+        let historyHasImages = history.contains { $0.role == .user && $0.attachments.contains(where: isImage) }
+        if info.acceptsImages == false, historyHasImages {
+            return info.serverKind == .strata
+                ? "\(model) on \(providerName) does not read images (Pictures is off for it in Strata), and every message sends this conversation's earlier images again. Turn Pictures on in Strata, or fork from a message before the first image."
+                : "\(providerName) says \(model) does not read images, and every message sends this conversation's earlier images again. Fork from a message before the first image, or choose a model that does."
+        }
+        if info.acceptsImages == false, draftHasImages {
+            return info.serverKind == .strata
+                ? "\(model) on \(providerName) does not read images (Pictures is off for it in Strata). Remove the image, or turn Pictures on in Strata first."
+                : "\(providerName) says \(model) does not read images. Remove the image, or choose a model that does."
+        }
+        if let limit = info.maxRequestBytes, draftHasImages || history.contains(where: { !$0.attachments.isEmpty }) {
+            let bytes = estimatedRequestBytes(history, draft: draft, text: draftText)
+            if bytes > limit {
+                let mb = { (n: Int) in String(format: "%.1f MB", Double(n) / 1_048_576) }
+                return "With its images this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends the images again. Remove some, or fork from a message before the first image."
+            }
+        }
+        return nil
+    }
+
+    /// Roughly what ChatClient will send: attachments base64-encoded (4/3), text as UTF-8.
+    static func estimatedRequestBytes(_ messages: [Message], draft: [Attachment], text: String) -> Int {
+        func size(_ attachments: [Attachment]) -> Int {
+            attachments.reduce(0) { $0 + ($1.data?.count ?? 0) * 4 / 3 + ($1.text?.utf8.count ?? 0) }
+        }
+        let history = messages.reduce(0) { $0 + $1.content.utf8.count + 32 + ($1.role == .user ? size($1.attachments) : 0) }
+        return history + text.utf8.count + size(draft)
     }
 
     private func remove(_ a: Attachment) {

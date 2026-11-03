@@ -81,8 +81,9 @@ public enum ContextBudget {
     }
 
     /// Tokens the conversation occupies. Starts from the newest reply the server counted
-    /// (prompt + completion, minus reasoning tokens when the server reports them, since reasoning
-    /// is never sent back) and estimates only what came after it. Without any count, everything
+    /// (prompt + completion, minus its reasoning, which is never sent back: the server's
+    /// reasoning_tokens when it reports them, else an estimate from the reasoning text) and
+    /// estimates only what came after it. Without any count, everything
     /// is estimated, system prompt included. `inFlightID` (the reply being streamed) is left
     /// out; its tokens so far are `liveCompletionTokens`.
     public static func usage(
@@ -96,8 +97,8 @@ public enum ContextBudget {
         var estimated = false
         var start = messages.startIndex
 
-        if let i = messages.lastIndex(where: { $0.id != inFlightID && $0.role == .assistant && counted($0.usage) != nil }),
-           let counted = counted(messages[i].usage) {
+        if let i = messages.lastIndex(where: { $0.id != inFlightID && $0.role == .assistant && counted($0) != nil }),
+           let counted = counted(messages[i]) {
             tokens = counted
             start = messages.index(after: i)
         } else {
@@ -120,8 +121,8 @@ public enum ContextBudget {
         return ContextUsage(tokens: tokens, isEstimated: estimated)
     }
 
-    private static func counted(_ usage: TokenUsage?) -> Int? {
-        guard let usage else { return nil }
+    private static func counted(_ message: Message) -> Int? {
+        guard let usage = message.usage else { return nil }
         let total: Int
         if let prompt = usage.promptTokens {
             total = prompt + (usage.completionTokens ?? 0)
@@ -130,26 +131,68 @@ public enum ContextBudget {
         } else {
             return nil
         }
-        return max(0, total - (usage.reasoningTokens ?? 0))
+        return max(0, total - reasoningTokens(in: message))
+    }
+
+    /// The reply's thinking tokens, which the next request leaves out: the server's count, else
+    /// (llama.cpp, LM Studio, Strata report none) an estimate from the streamed reasoning text,
+    /// never more than the reply's completion tokens.
+    static func reasoningTokens(in message: Message) -> Int {
+        guard let usage = message.usage else { return 0 }
+        if let reported = usage.reasoningTokens { return reported }
+        guard let reasoning = message.reasoning, !reasoning.isEmpty else { return 0 }
+        let estimate = estimateTokens(reasoning)
+        if let completion = usage.completionTokens { return min(estimate, completion) }
+        return estimate
     }
 
     /// The context size named in an overflow error, if any:
     /// llama.cpp `"n_ctx": M` / "available context size (M tokens)", vLLM and OpenAI
-    /// "maximum context length is M tokens".
+    /// "maximum context length is M tokens", Strata "exceeds the context window: … the context (M)".
     public static func contextLength(fromError text: String) -> Int? {
         let patterns = [
             #""n_ctx"\s*:\s*(\d+)"#,
             #"available context size \((\d+) tokens\)"#,
             #"maximum context length is (\d+) tokens"#,
+            #"exceeds the context window:.*?the context \((\d+)\)"#,
         ]
         for pattern in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
-                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-                  let range = Range(match.range(at: 1), in: text),
-                  let n = Int(text[range]), n > 0 else { continue }
-            return n
+            if let n = firstNumber(pattern, in: text) { return n }
         }
         return nil
+    }
+
+    /// Strata's context overflow (HTTP 400 invalid_request_error), parsed:
+    ///  - "request exceeds the context window: prompt (P tokens) leaves no room to answer in the
+    ///    context (C); requests are never truncated"
+    ///  - with fit_max_tokens off: "… prompt (P tokens) + max tokens (M) exceeds the context (C);
+    ///    … Send a smaller max_tokens (at most R here), or …"
+    public struct Overflow: Sendable, Equatable {
+        public var promptTokens: Int?
+        public var contextLength: Int
+        /// Set when the request's max_tokens (not the prompt alone) made it overflow.
+        public var maxTokens: Int?
+        /// The largest max_tokens that would have fit.
+        public var room: Int?
+    }
+
+    public static func strataOverflow(fromError text: String) -> Overflow? {
+        guard text.contains("exceeds the context window"),
+              let context = firstNumber(#"the context \((\d+)\)"#, in: text) else { return nil }
+        return Overflow(
+            promptTokens: firstNumber(#"prompt \((\d+) tokens\)"#, in: text),
+            contextLength: context,
+            maxTokens: firstNumber(#"max tokens \((\d+)\)"#, in: text),
+            room: firstNumber(#"at most (\d+) here"#, in: text, allowZero: true)
+        )
+    }
+
+    private static func firstNumber(_ pattern: String, in text: String, allowZero: Bool = false) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text),
+              let n = Int(text[range]), n > 0 || (allowZero && n == 0) else { return nil }
+        return n
     }
 
     private static func isCJK(_ s: Unicode.Scalar) -> Bool {

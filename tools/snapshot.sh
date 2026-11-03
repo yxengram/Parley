@@ -7,7 +7,8 @@
 # - builds the debug app (./build.sh debug)
 # - starts tools/mock_server.py on a free 127.0.0.1 port (killed afterwards)
 # - runs the app binary with PARLEY_SNAPSHOT_DIR / PARLEY_SNAPSHOT_MOCK_URL; it never activates,
-#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 90 s otherwise)
+#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 160 s otherwise)
+# - a second mock (flavor strata-share, no API key) backs the Strata states
 # - checks that the user's real settings, conversations and saved state were not touched
 #
 # The binary runs from a temporary copy of the bundle with the identifier
@@ -55,10 +56,12 @@ echo "==> Building debug app"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/parley-snapshot.XXXXXX")"
 MOCK_PID=""
+STRATA_PID=""
 APP_PID=""
 cleanup() {
     [[ -n "$APP_PID" ]] && kill "$APP_PID" 2>/dev/null || true
     [[ -n "$MOCK_PID" ]] && kill "$MOCK_PID" 2>/dev/null || true
+    [[ -n "$STRATA_PID" ]] && kill "$STRATA_PID" 2>/dev/null || true
     rm -rf "$WORK"
 }
 trap cleanup EXIT INT TERM
@@ -90,26 +93,39 @@ for _ in {1..100}; do
 done
 curl -fsS "http://127.0.0.1:$PORT/v1/models" >/dev/null || { echo "mock server did not start" >&2; exit 1; }
 
-echo "==> Running snapshot harness (exits on its own; hard limit 90 s)"
+STRATA_PORT="$(/usr/bin/python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
+echo "==> Starting Strata mock (shared port) on 127.0.0.1:$STRATA_PORT"
+/usr/bin/python3 -I -u "$ROOT/tools/mock_server.py" "$STRATA_PORT" strata-share >/dev/null 2>&1 &
+STRATA_PID=$!
+for _ in {1..100}; do
+    curl -fsS "http://127.0.0.1:$STRATA_PORT/v1/models" >/dev/null 2>&1 && break
+    sleep 0.1
+done
+curl -fsS "http://127.0.0.1:$STRATA_PORT/v1/models" >/dev/null || { echo "Strata mock did not start" >&2; exit 1; }
+
+echo "==> Running snapshot harness (exits on its own; hard limit 160 s)"
 NO_GLASS=""
 [[ -n "${PARLEY_SNAPSHOT_SDK:-}" ]] && NO_GLASS=1
-PARLEY_SNAPSHOT_DIR="$OUT" PARLEY_SNAPSHOT_MOCK_URL="http://127.0.0.1:$PORT/v1" PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
+PARLEY_SNAPSHOT_DIR="$OUT" PARLEY_SNAPSHOT_MOCK_URL="http://127.0.0.1:$PORT/v1" PARLEY_SNAPSHOT_STRATA_URL="http://127.0.0.1:$STRATA_PORT/v1" \
+    PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
 APP_PID=$!
 STATUS=0
-for _ in {1..900}; do
+for _ in {1..1600}; do
     kill -0 "$APP_PID" 2>/dev/null || break
     sleep 0.1
 done
 if kill -0 "$APP_PID" 2>/dev/null; then
-    echo "harness did not exit within 90 s; killing it" >&2
+    echo "harness did not exit within 160 s; killing it" >&2
     kill -9 "$APP_PID" 2>/dev/null || true
     STATUS=1
 fi
 wait "$APP_PID" 2>/dev/null || STATUS=$?
 APP_PID=""
-kill "$MOCK_PID" 2>/dev/null || true
+kill "$MOCK_PID" "$STRATA_PID" 2>/dev/null || true
 wait "$MOCK_PID" 2>/dev/null || true
+wait "$STRATA_PID" 2>/dev/null || true
 MOCK_PID=""
+STRATA_PID=""
 
 grep -v -e '^\[snapshot\]' -e '^    ' "$WORK/stderr.txt" | sed 's/^/    app: /' | head -20 || true
 

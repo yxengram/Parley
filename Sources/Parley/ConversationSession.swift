@@ -31,6 +31,8 @@ final class ConversationSession: Identifiable {
         var tokens: Int
         /// True while counted from chunks rather than reported by the server.
         var isEstimated: Bool
+        /// How far the server has read the prompt, until the first token (Strata, llama.cpp).
+        var promptProgress: PromptProgress? = nil
     }
 
     // Composer state (memory only, never persisted).
@@ -55,6 +57,9 @@ final class ConversationSession: Identifiable {
     @ObservationIgnored private(set) var isClosed = false
     /// Called on the main actor after each save is enqueued (library bookkeeping).
     @ObservationIgnored var didEnqueueSave: ((ConversationSession) -> Void)?
+    /// What AppState knows about a provider's model (server kind, context length, limits); set
+    /// when the session is registered. Nil (or a nil answer) sends a plain OpenAI-style request.
+    @ObservationIgnored var serverInfo: ((Provider, String) -> ModelContextInfo?)?
     /// What is known to be on disk: set only after a write succeeded (or on load). Lets
     /// Lock/quit skip rewriting an unchanged file, and never skip after a failed save.
     /// Copy-on-write keeps this cheap.
@@ -252,6 +257,9 @@ final class ConversationSession: Identifiable {
 
         var options = ChatRequestOptions(settings: conversation.settings)
         options.model = model
+        let info = serverInfo?(provider, model)
+        options.serverKind = info?.serverKind
+        options.maxRequestBytes = info?.maxRequestBytes
 
         conversation.messages.append(placeholder)
         conversation.updatedAt = Date()
@@ -379,7 +387,8 @@ final class ConversationSession: Identifiable {
         let live = LiveGeneration(
             tokensPerSecond: liveMeter.tokensPerSecond,
             tokens: liveMeter.generatedTokens,
-            isEstimated: liveMeter.isEstimated
+            isEstimated: liveMeter.isEstimated,
+            promptProgress: liveMeter.promptProgress
         )
         if live != liveGeneration { liveGeneration = live }
     }
