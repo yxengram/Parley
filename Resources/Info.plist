@@ -34,9 +34,10 @@
     <string>Parley connects to the LLM server you configure, which may be on your local network.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
+        <!-- Plain HTTP to any host the user configures (LAN, Tailscale 100.x, etc.).
+             Do not add NSAllowsLocalNetworking here: its presence makes ATS ignore
+             NSAllowsArbitraryLoads, which blocks http to non-RFC1918 addresses. -->
         <key>NSAllowsArbitraryLoads</key>
-        <true/>
-        <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
 </dict>
