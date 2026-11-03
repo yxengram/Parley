@@ -233,18 +233,38 @@ struct MessageRow: View, Equatable {
 
     @ViewBuilder
     private var footer: some View {
-        if showUsage, let usage = message.usage {
+        if showUsage, let line = Self.footerText(usage: message.usage, stats: message.stats) {
+            Text(line)
+                .font(.caption2)
+                .foregroundStyle(.secondary.opacity(0.8))
+        }
+    }
+
+    /// "1184 prompt · 236 completion · 1420 total tokens · 42.3 tok/s · 0.21 s to first token".
+    /// Without server usage, the chunk count stands in, marked "≈".
+    static func footerText(usage: TokenUsage?, stats: GenerationStats?) -> String? {
+        var groups: [String] = []
+        if let usage {
             let parts: [String] = [
                 usage.promptTokens.map { "\($0) prompt" },
                 usage.completionTokens.map { "\($0) completion" },
                 usage.totalTokens.map { "\($0) total" },
             ].compactMap { $0 }
-            if !parts.isEmpty {
-                Text(parts.joined(separator: " · ") + " tokens")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary.opacity(0.8))
+            if !parts.isEmpty { groups.append(parts.joined(separator: " · ") + " tokens") }
+        }
+        if let stats {
+            let approx = (stats.isEstimated ?? false) ? "≈" : ""
+            if groups.isEmpty, let n = stats.completionTokens {
+                groups.append("\(approx)\(n) tokens")
+            }
+            if let r = stats.tokensPerSecond {
+                groups.append(approx + TokenFormat.rate(r) + " tok/s")
+            }
+            if let t = stats.timeToFirstToken {
+                groups.append(TokenFormat.seconds(t) + " to first token")
             }
         }
+        return groups.isEmpty ? nil : groups.joined(separator: " · ")
     }
 
     // MARK: Actions

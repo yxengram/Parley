@@ -17,6 +17,7 @@ final class AppSettings {
         static let extraConversationPaths = "extraConversationPaths"
         static let hiddenConversationPaths = "hiddenConversationPaths"
         static let showTokenUsage = "showTokenUsage"
+        static let contextLengthOverrides = "contextLengthOverrides"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -46,6 +47,30 @@ final class AppSettings {
     /// UI preference: show token usage under assistant messages.
     var showTokenUsage: Bool {
         didSet { defaults.set(showTokenUsage, forKey: Key.showTokenUsage) }
+    }
+
+    /// Context lengths the user entered, keyed by `contextKey(providerID:model:)`. Only a
+    /// provider id, a model id and a number are stored.
+    private(set) var contextLengthOverrides: [String: Int] {
+        didSet { defaults.set(contextLengthOverrides, forKey: Key.contextLengthOverrides) }
+    }
+
+    static func contextKey(providerID: UUID, model: String) -> String {
+        providerID.uuidString + "|" + model
+    }
+
+    func manualContextLength(providerID: UUID, model: String) -> Int? {
+        contextLengthOverrides[Self.contextKey(providerID: providerID, model: model)]
+    }
+
+    /// nil (or a value below 1) removes the override.
+    func setManualContextLength(_ value: Int?, providerID: UUID, model: String) {
+        let key = Self.contextKey(providerID: providerID, model: model)
+        if let value, value > 0 {
+            contextLengthOverrides[key] = value
+        } else {
+            contextLengthOverrides[key] = nil
+        }
     }
 
     static var builtInDefaultDirectory: URL {
@@ -84,6 +109,8 @@ final class AppSettings {
         self.extraConversationPaths = defaults.stringArray(forKey: Key.extraConversationPaths) ?? []
         self.hiddenConversationPaths = defaults.stringArray(forKey: Key.hiddenConversationPaths) ?? []
         self.showTokenUsage = defaults.object(forKey: Key.showTokenUsage) as? Bool ?? true
+        self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
+            .compactMapValues { ($0 as? NSNumber)?.intValue }
 
         if firstLaunch {
             persistProviders()

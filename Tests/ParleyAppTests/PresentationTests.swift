@@ -62,3 +62,38 @@ import ParleyCore
     #expect(p.suggestsSettings)
     #expect(!ErrorPresentation.make("API error: something else").suggestsSettings)
 }
+
+@Test func footerShowsUsageAndSpeed() {
+    let usage = TokenUsage(promptTokens: 1184, completionTokens: 236, totalTokens: 1420)
+    let exact = GenerationStats(tokensPerSecond: 42.34, completionTokens: 236, timeToFirstToken: 0.214, isEstimated: false)
+    #expect(MessageRow.footerText(usage: usage, stats: exact)
+            == "1184 prompt · 236 completion · 1420 total tokens · 42.3 tok/s · 0.21 s to first token")
+    let estimated = GenerationStats(tokensPerSecond: 130.6, completionTokens: 90, isEstimated: true)
+    #expect(MessageRow.footerText(usage: nil, stats: estimated) == "≈90 tokens · ≈131 tok/s")
+    #expect(MessageRow.footerText(usage: nil, stats: nil) == nil)
+    #expect(MessageRow.footerText(usage: usage, stats: nil) == "1184 prompt · 236 completion · 1420 total tokens")
+}
+
+@Test func tokenFormatting() {
+    // One unit (k = 1024) for counts and limits alike.
+    #expect(TokenFormat.tokens(950) == "950")
+    #expect(TokenFormat.tokens(12_431) == "12.1k")
+    #expect(TokenFormat.tokens(8_100) == "7.9k")
+    #expect(TokenFormat.tokens(8_192) == "8k")
+    #expect(TokenFormat.tokens(32_768) == "32k")
+    #expect(TokenFormat.tokens(32_500) == "31.7k")
+    #expect(TokenFormat.tokens(262_144) == "256k")
+    #expect(TokenFormat.tokens(1_048_576) == "1M")
+    #expect(TokenFormat.tokens(8_190) == TokenFormat.tokens(8_192))   // never reads as over the limit
+    #expect(TokenFormat.parse("32768") == 32768)
+    #expect(TokenFormat.parse(" 32,768 ") == 32768)
+    #expect(TokenFormat.parse("32 768") == 32768)
+    #expect(TokenFormat.parse("") == nil)
+    #expect(TokenFormat.parse("0") == nil)
+    #expect(TokenFormat.parse("32k") == nil)
+    #expect(TokenFormat.parse("-5") == nil)
+    #expect(TokenFormat.percent(39.4) == "39%")
+    #expect(TokenFormat.percent(0.42) == "0.4%")
+    #expect(TokenFormat.rate(9.96) == "10.0")
+    #expect(TokenFormat.rate(123.4) == "123")
+}

@@ -20,7 +20,18 @@ final class ConversationSession: Identifiable {
     private(set) var streamIsReasoning = false
     /// When the in-flight message started reasoning (for the live "Thinking… N s" label).
     private(set) var streamReasoningStartedAt: Date?
+    /// Live speed of the in-flight reply, refreshed a few times per second (not per chunk), so
+    /// only the views that show it re-render. Nil when nothing is streaming.
+    private(set) var liveGeneration: LiveGeneration?
     var isStreaming: Bool { streamingMessageID != nil }
+
+    struct LiveGeneration: Equatable {
+        var tokensPerSecond: Double?
+        /// Generated so far (reasoning + content).
+        var tokens: Int
+        /// True while counted from chunks rather than reported by the server.
+        var isEstimated: Bool
+    }
 
     // Composer state (memory only, never persisted).
     var draftText: String = ""
@@ -247,6 +258,8 @@ final class ConversationSession: Identifiable {
         // Reset before the stream task can run: a Stop/Lock/quit in between must not apply
         // the previous reply's accumulator to this new message.
         liveAccumulator = StreamAccumulator()
+        liveMeter = GenerationMeter(requestStartedAt: Date())
+        liveGeneration = LiveGeneration(tokensPerSecond: nil, tokens: 0, isEstimated: true)
         streamingMessageID = placeholder.id
         streamIsReasoning = false
         streamReasoningStartedAt = nil
@@ -265,6 +278,9 @@ final class ConversationSession: Identifiable {
     }
 
     @ObservationIgnored private var liveAccumulator = StreamAccumulator()
+    @ObservationIgnored private var liveMeter = GenerationMeter()
+    /// How often the live speed is published.
+    static let liveStatsInterval: TimeInterval = 0.25
 
     private func runStream(client: ChatClient, history: [Message], options: ChatRequestOptions, messageID: UUID) async {
         // Stopped (or closed) before the task first ran: never open the request.
@@ -274,12 +290,18 @@ final class ConversationSession: Identifiable {
             return
         }
         var lastFlush = Date.distantPast
+        var lastStats = Date.distantPast
         var failure: Error?
         do {
             for try await delta in client.streamChat(messages: history, options: options) {
                 if Task.isCancelled { break }
-                liveAccumulator.apply(delta)
                 let now = Date()
+                liveAccumulator.apply(delta, now: now)
+                liveMeter.record(delta, now: now)
+                if now.timeIntervalSince(lastStats) >= Self.liveStatsInterval {
+                    lastStats = now
+                    publishLiveGeneration()
+                }
                 if now.timeIntervalSince(lastFlush) >= 0.05 {
                     lastFlush = now
                     applyAccumulator(to: messageID)
@@ -320,6 +342,46 @@ final class ConversationSession: Identifiable {
             }
             endStreaming()
         }
+    }
+
+    /// Context tokens in use (ContextBudget.usage), the in-flight reply's live count included.
+    /// While streaming, the history part is computed once per reply: the status strip
+    /// re-renders on every message flush (20 Hz), and a long conversation or a large text
+    /// attachment would otherwise be re-estimated each time.
+    func contextUsage() -> ContextUsage {
+        let history: ContextUsage
+        if let id = streamingMessageID {
+            let key = HistoryUsageKey(inFlightID: id, messageCount: conversation.messages.count,
+                                      systemPrompt: conversation.settings.systemPrompt)
+            if let cached = historyUsageCache, cached.key == key {
+                history = cached.usage
+            } else {
+                history = ContextBudget.usage(messages: conversation.messages, systemPrompt: key.systemPrompt, inFlightID: id)
+                historyUsageCache = (key, history)
+            }
+        } else {
+            historyUsageCache = nil
+            history = ContextBudget.usage(messages: conversation.messages, systemPrompt: conversation.settings.systemPrompt)
+        }
+        guard let live = liveGeneration, live.tokens > 0 else { return history }
+        return ContextUsage(tokens: history.tokens + live.tokens, isEstimated: history.isEstimated || live.isEstimated)
+    }
+
+    private struct HistoryUsageKey: Equatable {
+        let inFlightID: UUID
+        let messageCount: Int
+        let systemPrompt: String
+    }
+
+    @ObservationIgnored private var historyUsageCache: (key: HistoryUsageKey, usage: ContextUsage)?
+
+    private func publishLiveGeneration() {
+        let live = LiveGeneration(
+            tokensPerSecond: liveMeter.tokensPerSecond,
+            tokens: liveMeter.generatedTokens,
+            isEstimated: liveMeter.isEstimated
+        )
+        if live != liveGeneration { liveGeneration = live }
     }
 
     private static func isCancellation(_ error: Error?) -> Bool {
@@ -365,6 +427,10 @@ final class ConversationSession: Identifiable {
     }
 
     private func endStreaming() {
+        if let id = streamingMessageID, let idx = index(of: id) {
+            conversation.messages[idx].stats = liveMeter.finalStats()
+        }
+        liveGeneration = nil
         streamTask = nil
         streamingMessageID = nil
         streamIsReasoning = false

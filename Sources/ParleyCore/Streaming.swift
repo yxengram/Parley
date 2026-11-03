@@ -13,12 +13,15 @@ public struct ChatDelta: Sendable, Equatable {
     public var reasoning: String?
     public var usage: TokenUsage?
     public var finishReason: String?
+    /// llama.cpp's `timings` block (server-measured speed), when present.
+    public var timings: ServerTimings?
 
-    public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil) {
+    public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil, timings: ServerTimings? = nil) {
         self.content = content
         self.reasoning = reasoning
         self.usage = usage
         self.finishReason = finishReason
+        self.timings = timings
     }
 }
 
@@ -209,17 +212,32 @@ public enum ChunkParser {
         }
 
         if let usage = root["usage"] as? [String: Any] {
+            let details = usage["completion_tokens_details"] as? [String: Any]
             let parsed = TokenUsage(
                 promptTokens: intValue(usage["prompt_tokens"]),
                 completionTokens: intValue(usage["completion_tokens"]),
-                totalTokens: intValue(usage["total_tokens"])
+                totalTokens: intValue(usage["total_tokens"]),
+                reasoningTokens: intValue(details?["reasoning_tokens"])
             )
             if parsed.promptTokens != nil || parsed.completionTokens != nil || parsed.totalTokens != nil {
                 delta.usage = parsed
             }
         }
 
-        if delta.content == nil, delta.reasoning == nil, delta.usage == nil, delta.finishReason == nil {
+        // llama.cpp: {"timings":{"predicted_n":…,"predicted_per_second":…,…}} on the last chunk.
+        if let t = root["timings"] as? [String: Any] {
+            let parsed = ServerTimings(
+                promptTokens: intValue(t["prompt_n"]),
+                promptMilliseconds: doubleValue(t["prompt_ms"]),
+                cachedTokens: intValue(t["cache_n"]),
+                predictedTokens: intValue(t["predicted_n"]),
+                predictedMilliseconds: doubleValue(t["predicted_ms"]),
+                predictedPerSecond: doubleValue(t["predicted_per_second"])
+            )
+            if !parsed.isEmpty { delta.timings = parsed }
+        }
+
+        if delta.content == nil, delta.reasoning == nil, delta.usage == nil, delta.finishReason == nil, delta.timings == nil {
             return nil
         }
         return delta
@@ -236,9 +254,15 @@ public enum ChunkParser {
         return "Unknown error"
     }
 
-    private static func intValue(_ any: Any?) -> Int? {
+    static func intValue(_ any: Any?) -> Int? {
         if let n = any as? NSNumber { return n.intValue }
         if let s = any as? String { return Int(s) }
+        return nil
+    }
+
+    static func doubleValue(_ any: Any?) -> Double? {
+        if let n = any as? NSNumber { return n.doubleValue }
+        if let s = any as? String { return Double(s) }
         return nil
     }
 }

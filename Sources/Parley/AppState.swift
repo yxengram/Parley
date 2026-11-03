@@ -37,6 +37,49 @@ final class AppState {
         case idle, loading, loaded, failed(String)
     }
 
+    /// What each provider's server said about a model's context window (memory only). A probe
+    /// that learned nothing (server not running, 401, timeout) is not cached, so a later one retries.
+    private(set) var contextInfo: [ContextKey: ModelContextInfo] = [:]
+    /// Probes and reloads in flight.
+    private(set) var contextProbing: Set<ContextKey> = []
+    /// AppState owns each probe, so a view's cancelled .task does not lose its result, and a
+    /// second caller waits for the first instead of returning empty-handed.
+    @ObservationIgnored private var probeTasks: [ContextKey: Task<Void, Never>] = [:]
+    /// When a probe last learned nothing: non-forced retries wait `emptyProbeRetryInterval`.
+    @ObservationIgnored private var emptyProbeAt: [ContextKey: Date] = [:]
+    static let emptyProbeRetryInterval: TimeInterval = 30
+    /// The running reload, or how the last one ended until the context popover has shown it.
+    private(set) var reloadStates: [ContextKey: ReloadState] = [:]
+    /// Server-side reloads in flight, by base URL and model key, whichever provider or
+    /// conversation started them: a second load of a model that is not loaded yet would add
+    /// another copy on the server.
+    @ObservationIgnored private var reloadsInFlight: Set<String> = []
+
+    enum ReloadState: Equatable {
+        case running(contextLength: Int)
+        case failed(String)
+        /// `note` when the outcome differs from what was asked for.
+        case finished(note: String?)
+
+        var isRunning: Bool {
+            if case .running = self { return true }
+            return false
+        }
+    }
+
+    /// Cache key: the provider's base URL is part of it, so editing the URL re-probes.
+    struct ContextKey: Hashable {
+        let providerID: UUID
+        let baseURL: String
+        let model: String
+
+        init(provider: Provider, model: String) {
+            providerID = provider.id
+            baseURL = provider.baseURL
+            self.model = model
+        }
+    }
+
     /// Requests from menu commands that the sidebar carries out (it owns the sheets and dialogs).
     var sidebarRequest: SidebarRequest?
     /// Set by the Conversation menu: ChatView opens its settings popover for this conversation.
@@ -430,6 +473,163 @@ final class AppState {
         modelsByProvider[provider.id] = models
         modelsFetchedFrom[provider.id] = provider.baseURL
         modelLoadState[provider.id] = .loaded
+    }
+
+    // MARK: - Context length
+
+    func contextInfo(provider: Provider, model: String) -> ModelContextInfo? {
+        contextInfo[ContextKey(provider: provider, model: model)]
+    }
+
+    func isProbingContext(provider: Provider, model: String) -> Bool {
+        contextProbing.contains(ContextKey(provider: provider, model: model))
+    }
+
+    /// Asks this provider's own server about the model's context length (read-only GETs; see
+    /// ChatClient.fetchModelInfo). Cached per provider, base URL and model; `force` re-reads.
+    func refreshContextInfo(provider: Provider, model: String, force: Bool = false) async {
+        let key = ContextKey(provider: provider, model: model)
+        guard !model.isEmpty else { return }
+        if let running = probeTasks[key] {
+            await running.value
+            return
+        }
+        // A reload re-reads the server itself when it is done.
+        if reloadStates[key]?.isRunning == true { return }
+        if !force {
+            if contextInfo[key] != nil { return }
+            if let at = emptyProbeAt[key], Date().timeIntervalSince(at) < Self.emptyProbeRetryInterval { return }
+        }
+        guard let client = try? ChatClient(baseURL: provider.baseURL, apiKey: try? KeychainStore.apiKey(for: provider.id)) else { return }
+        contextProbing.insert(key)
+        let task = Task { [weak self] in
+            let info = await client.fetchModelInfo(model: model)
+            guard let self else { return }
+            self.probeTasks[key] = nil
+            self.contextProbing.remove(key)
+            self.store(info, for: key)
+        }
+        probeTasks[key] = task
+        await task.value
+    }
+
+    private func store(_ info: ModelContextInfo, for key: ContextKey) {
+        if info == ModelContextInfo(model: info.model) {
+            emptyProbeAt[key] = Date()
+        } else {
+            emptyProbeAt[key] = nil
+            contextInfo[key] = info
+        }
+    }
+
+    func reloadState(provider: Provider, model: String) -> ReloadState? {
+        reloadStates[ContextKey(provider: provider, model: model)]
+    }
+
+    /// Forgets how the last reload ended (once the popover has shown it). A running one stays.
+    func clearReloadState(provider: Provider, model: String) {
+        let key = ContextKey(provider: provider, model: model)
+        if reloadStates[key]?.isRunning == false { reloadStates[key] = nil }
+    }
+
+    /// Starts a reload that outlives the popover; its progress and outcome are in reloadStates.
+    func startReload(provider: Provider, model: String, contextLength: Int, session: ConversationSession?) {
+        Task {
+            do {
+                try await reloadModel(provider: provider, model: model, contextLength: contextLength, session: session)
+            } catch {
+                // Refused before it started (another reload running, no client): still say so.
+                let key = ContextKey(provider: provider, model: model)
+                if reloadStates[key]?.isRunning != true {
+                    reloadStates[key] = .failed("Reload failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// LM Studio: unloads the model and loads it again with `contextLength`. Only ever called
+    /// after the user confirmed it in the context popover. Refuses while a reload of the same
+    /// model on the same server is running. When the conversation used an instance id that the
+    /// reload replaced, `session` switches to the id that exists now.
+    @discardableResult
+    func reloadModel(provider: Provider, model: String, contextLength: Int, session: ConversationSession? = nil) async throws -> ModelContextInfo {
+        let key = ContextKey(provider: provider, model: model)
+        let serverKey = Self.normalizedBaseURL(provider.baseURL) + "\n" + (contextInfo[key]?.modelKey ?? model)
+        guard reloadStates[key]?.isRunning != true, !reloadsInFlight.contains(serverKey) else {
+            throw ParleyError.api("\(model) is already being reloaded.")
+        }
+        let client = try ChatClient(baseURL: provider.baseURL, apiKey: try KeychainStore.apiKey(for: provider.id))
+        // Claimed before the first await, so a second call is refused deterministically.
+        reloadsInFlight.insert(serverKey)
+        reloadStates[key] = .running(contextLength: contextLength)
+        defer { reloadsInFlight.remove(serverKey) }
+        // A probe that started earlier must not land after the reload and overwrite its result.
+        if let probe = probeTasks[key] { await probe.value }
+        contextProbing.insert(key)
+        defer { contextProbing.remove(key) }
+        do {
+            let info = try await client.reloadModel(model, contextLength: contextLength)
+            var notes: [String] = []
+            if let applied = info.loadedContextLength, applied != contextLength {
+                notes.append("The server loaded the model with \(applied.formatted()) tokens instead.")
+            }
+            let newKey = ContextKey(provider: provider, model: info.model)
+            if info.model != model {
+                // The old instance id no longer exists on the server.
+                contextInfo[key] = nil
+                if let session, ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider) == model {
+                    session.conversation.settings.model = info.model
+                    session.settingsChanged(debounced: false)
+                    notes.append("This conversation now uses \(info.model).")
+                }
+            }
+            store(info, for: newKey)
+            let outcome = ReloadState.finished(note: notes.isEmpty ? nil : notes.joined(separator: " "))
+            reloadStates[key] = outcome
+            if newKey != key { reloadStates[newKey] = outcome }
+            return info
+        } catch {
+            // The model may now be unloaded: show what the server says, then report the failure.
+            store(await client.fetchModelInfo(model: model), for: key)
+            reloadStates[key] = .failed("Reload failed: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private static func normalizedBaseURL(_ s: String) -> String {
+        var t = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        while t.hasSuffix("/") { t.removeLast() }
+        return t
+    }
+
+    /// After a reply: a model that was not loaded has been loaded by the request (JIT), so its
+    /// context length is known now; an overflow error may name the real limit. Also retries
+    /// when no probe has learned anything yet (the server was not running when the chat opened,
+    /// or the API key was fixed since).
+    func replyFinished(in session: ConversationSession) {
+        guard let provider = settings.resolvedProvider(for: session.conversation.settings) else { return }
+        let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
+        guard !model.isEmpty, let last = session.conversation.messages.last, last.role == .assistant else { return }
+        let key = ContextKey(provider: provider, model: model)
+        if let error = last.error {
+            if let n = ContextBudget.contextLength(fromError: error) {
+                var info = contextInfo[key] ?? ModelContextInfo(model: model)
+                if info.loadedContextLength == nil {
+                    info.loadedContextLength = n
+                    contextInfo[key] = info
+                }
+            }
+            return
+        }
+        // A successful reply shows the server is reachable now: retry even within the
+        // empty-probe interval.
+        guard let info = contextInfo[key] else {
+            Task { await refreshContextInfo(provider: provider, model: model, force: true) }
+            return
+        }
+        if info.loadedContextLength == nil, info.serverKind == .lmStudio || info.serverKind == .ollama {
+            Task { await refreshContextInfo(provider: provider, model: model, force: true) }
+        }
     }
 
     // MARK: - Lifecycle

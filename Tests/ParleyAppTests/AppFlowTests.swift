@@ -739,4 +739,157 @@ struct AppFlowTests {
             for s in relaunched.sessions.values { s.close(saving: false) }
         }
     }
+
+    // Speed and context: stats land on the reply (and on disk), the probe fills the cache,
+    // a manual value persists, and a reload goes through the mock's LM Studio endpoints.
+    @Test func replyStoresGenerationStats() async throws {
+        try await withFixture { fx in
+            let session = try await fx.create()
+            try await fx.send("speed", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            let stats = try #require(reply.stats)
+            // The mock streams usage (stream_options was sent), so the count is the server's.
+            #expect(stats.isEstimated == false)
+            #expect(stats.completionTokens == reply.usage?.completionTokens)
+            #expect(stats.timeToFirstToken != nil)
+            #expect(session.liveGeneration == nil)
+            #expect(try readPlain(session.fileURL).messages.last?.stats == stats)
+        }
+    }
+
+    @Test func liveGenerationWhileStreaming() async throws {
+        try await withFixture(model: "mock-slow") { fx in
+            let session = try await fx.create()
+            session.send(text: "slow", attachments: [], settings: fx.settings)
+            #expect(session.liveGeneration != nil)
+            try #require(await waitUntil { (session.liveGeneration?.tokensPerSecond ?? 0) > 0 })
+            let live = try #require(session.liveGeneration)
+            #expect(live.isEstimated)           // usage arrives only at the end
+            #expect(live.tokens >= 2)
+            // The strip's usage: cached history plus the live count.
+            let history = ContextBudget.usage(messages: session.conversation.messages, systemPrompt: "",
+                                              inFlightID: session.streamingMessageID)
+            #expect(session.contextUsage().tokens == history.tokens + (session.liveGeneration?.tokens ?? 0))
+            session.stop()
+            #expect(session.liveGeneration == nil)
+            // Stopped replies keep what was measured.
+            #expect(session.conversation.messages.last?.stats?.tokensPerSecond != nil)
+        }
+    }
+
+    @Test func contextProbeAndManualValue() async throws {
+        try await withFixture { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain")
+            let info = try #require(fx.state.contextInfo(provider: fx.provider, model: "mock-plain"))
+            #expect(info.serverKind == .lmStudio)
+            #expect(info.loadedContextLength == 8192)
+            #expect(ContextBudget.limit(info: info, manual: 4096)?.source == .server)
+
+            fx.settings.setManualContextLength(24000, providerID: fx.provider.id, model: "mock-notloaded")
+            // Stored in the same defaults suite: a relaunch sees it.
+            let reread = AppSettings(defaults: fx.defaults)
+            #expect(reread.manualContextLength(providerID: fx.provider.id, model: "mock-notloaded") == 24000)
+            #expect(reread.manualContextLength(providerID: UUID(), model: "mock-notloaded") == nil)
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-notloaded")
+            let idle = fx.state.contextInfo(provider: fx.provider, model: "mock-notloaded")
+            #expect(ContextBudget.limit(info: idle, manual: reread.manualContextLength(providerID: fx.provider.id, model: "mock-notloaded"))
+                    == ContextLimit(tokens: 24000, source: .manual))
+            fx.settings.setManualContextLength(nil, providerID: fx.provider.id, model: "mock-notloaded")
+            #expect(AppSettings(defaults: fx.defaults).contextLengthOverrides.isEmpty)
+        }
+    }
+
+    @Test func reloadModelThroughAppState() async throws {
+        try await withFixture { fx in
+            try await fx.state.reloadModel(provider: fx.provider, model: "mock-plain", contextLength: 12000)
+            let info = try #require(fx.state.contextInfo(provider: fx.provider, model: "mock-plain"))
+            #expect(info.loadedContextLength == 12000)
+            #expect(info.instanceIDs == ["mock-plain"])
+            // A refused reload still refreshes what the server reports.
+            await #expect(throws: (any Error).self) {
+                try await fx.state.reloadModel(provider: fx.provider, model: "mock-plain", contextLength: 10_000_000)
+            }
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-plain")?.loadedContextLength == 12000)
+            #expect(!fx.state.isProbingContext(provider: fx.provider, model: "mock-plain"))
+            // The failure is kept in AppState (the popover may have been closed meanwhile).
+            guard case .failed(let message) = fx.state.reloadState(provider: fx.provider, model: "mock-plain") else {
+                Issue.record("no failed reload state")
+                return
+            }
+            #expect(message.hasPrefix("Reload failed"))
+            fx.state.clearReloadState(provider: fx.provider, model: "mock-plain")
+            #expect(fx.state.reloadState(provider: fx.provider, model: "mock-plain") == nil)
+        }
+    }
+
+    // A view's .task is cancelled when the user switches conversations mid-probe: the probe
+    // belongs to AppState, so its result still lands (the old code cached an empty result here).
+    @Test func cancelledCallerDoesNotLoseTheProbe() async throws {
+        try await withFixture { fx in
+            let cancelled = Task { await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain") }
+            cancelled.cancel()
+            await cancelled.value
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-plain")?.loadedContextLength == 8192)
+            #expect(!fx.state.isProbingContext(provider: fx.provider, model: "mock-plain"))
+
+            // A second caller while a probe runs joins it and sees its result.
+            async let first: Void = fx.state.refreshContextInfo(provider: fx.provider, model: "mock-notloaded")
+            async let second: Void = fx.state.refreshContextInfo(provider: fx.provider, model: "mock-notloaded")
+            _ = await (first, second)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-notloaded")?.maxContextLength != nil)
+        }
+    }
+
+    // Nothing learned (server not running): nothing cached, and the next successful reply asks again.
+    @Test func emptyProbeIsNotCachedAndAReplyRetries() async throws {
+        try await withFixture { fx in
+            let down = Provider(name: "Down", baseURL: "http://127.0.0.1:1/v1", defaultModel: "mock-plain")
+            await fx.state.refreshContextInfo(provider: down, model: "mock-plain")
+            #expect(fx.state.contextInfo(provider: down, model: "mock-plain") == nil)
+            #expect(!fx.state.isProbingContext(provider: down, model: "mock-plain"))
+
+            // A successful reply proves the server is up now: it retries even within the
+            // empty-probe interval (same key: "Down" pointed at the mock from here on).
+            let session = try await fx.create()
+            try await fx.send("hello", in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-plain") == nil)
+            fx.state.replyFinished(in: session)
+            #expect(await waitUntil { fx.state.contextInfo(provider: fx.provider, model: "mock-plain")?.loadedContextLength == 8192 })
+        }
+    }
+
+    // Two reloads of a model that is not loaded would both load it (two copies on the server).
+    @Test func concurrentReloadIsRefused() async throws {
+        try await withFixture { fx in
+            async let first: Bool = { (try? await fx.state.reloadModel(provider: fx.provider, model: "mock-notloaded", contextLength: 12000)) != nil }()
+            async let second: Bool = { (try? await fx.state.reloadModel(provider: fx.provider, model: "mock-notloaded", contextLength: 16000)) != nil }()
+            let results = await [first, second]
+            #expect(results.filter { $0 }.count == 1)
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-notloaded", force: true)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "mock-notloaded")?.instanceIDs == ["mock-notloaded"])
+        }
+    }
+
+    // A conversation on instance "mock-plain:2" switches to the instance the reload created.
+    @Test func reloadOfAnInstanceSwitchesTheConversation() async throws {
+        try await withFixture { fx in
+            var load = URLRequest(url: URL(string: fx.provider.baseURL.replacingOccurrences(of: "/v1", with: "") + "/api/v1/models/load")!)
+            load.httpMethod = "POST"
+            load.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            load.httpBody = Data(#"{"model":"mock-plain","context_length":4096}"#.utf8)
+            _ = try await URLSession(configuration: .ephemeral).data(for: load)
+            let session = try await fx.create()
+            session.conversation.settings.model = "mock-plain:2"
+
+            try await fx.state.reloadModel(provider: fx.provider, model: "mock-plain:2", contextLength: 12000, session: session)
+            #expect(session.conversation.settings.model == "mock-plain")
+            let info = try #require(fx.state.contextInfo(provider: fx.provider, model: "mock-plain"))
+            #expect(info.loadedContextLength == 12000 && info.instanceIDs == ["mock-plain"])
+            guard case .finished(let note?) = fx.state.reloadState(provider: fx.provider, model: "mock-plain") else {
+                Issue.record("no finished reload state for the new id")
+                return
+            }
+            #expect(note.contains("now uses mock-plain"))
+        }
+    }
 }

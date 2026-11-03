@@ -123,7 +123,8 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
-        .padding(.bottom, 14)
+        // The context status strip sits right below.
+        .padding(.bottom, 6)
         // Lines the composer up with the message text (rows have 20 pt of side padding).
         .frame(maxWidth: Layout.contentMaxWidth - 8)
         .frame(maxWidth: .infinity)

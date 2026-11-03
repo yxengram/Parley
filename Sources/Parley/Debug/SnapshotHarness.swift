@@ -59,6 +59,12 @@ enum SnapshotHarness {
     /// Observed by ChatView: opens the per-conversation settings popover.
     nonisolated static let showConversationSettingsNotification = Notification.Name("ParleySnapshotShowConversationSettings")
 
+    /// Observed by ContextStatusBar: opens the context popover.
+    nonisolated static let showContextPopoverNotification = Notification.Name("ParleySnapshotShowContextPopover")
+
+    /// Read by ContextPopover when it appears: starts in the reload confirmation (for 16,384 tokens).
+    static var showsReloadConfirmation = false
+
     private static var root: URL?
     private static var defaultDirectory: URL!
     private static var settingsSuiteName = ""
@@ -112,8 +118,8 @@ enum SnapshotHarness {
 
         // Hard stop, on a background queue so a modal on the main thread cannot block it.
         let rootPath = tmp.path
-        DispatchQueue.global().asyncAfter(deadline: .now() + 55) {
-            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 55 s\n".utf8))
+        DispatchQueue.global().asyncAfter(deadline: .now() + 85) {
+            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 85 s\n".utf8))
             try? FileManager.default.removeItem(atPath: rootPath)
             exit(3)
         }
@@ -193,6 +199,8 @@ enum SnapshotHarness {
         settings.providers = [p, Provider(name: "Studio Mac (LAN)", baseURL: "http://192.168.1.20:1234/v1", defaultModel: "qwen3-14b-instruct")]
         settings.defaultProviderID = p.id
         settings.defaultDirectoryPath = defaultDirectory.path
+        // The main sample chat's model is not on the mock server: its limit is the user's own value.
+        settings.setManualContextLength(32768, providerID: p.id, model: "qwen3-14b-instruct")
         do {
             try seed()
         } catch {
@@ -390,15 +398,43 @@ enum SnapshotHarness {
         // mock-slow-think: reasoning for ~2.4 s, then content.
         await wait(1.4)
         capture(appearance, "streaming-thinking")
-        if appearance == "light" {
-            await waitFor(seconds: 4) {
-                session.conversation.messages.last.map { !$0.content.isEmpty } ?? false
-            }
-            await wait(0.8)
-            capture(appearance, "streaming-reply")
+        // The status strip shows the live speed and the context in use (bottom right).
+        await waitFor(seconds: 4) {
+            session.conversation.messages.last.map { !$0.content.isEmpty } ?? false
         }
+        await wait(0.8)
+        capture(appearance, "streaming-reply")
         session.stop()
-        await wait(0.3)
+        await wait(0.6)
+
+        // Context popover for an LM Studio model (the mock's), then its reload confirmation.
+        await captureContextPopover(appearance, "context-popover")
+        if appearance == "light" {
+            showsReloadConfirmation = true
+            await captureContextPopover(appearance, "context-reload-confirm")
+            showsReloadConfirmation = false
+        }
+    }
+
+    /// Opens the context popover through its DEBUG seam and composites it above the status strip
+    /// at the bottom right, where it opens (arrowEdge .top; the frame view's origin is its
+    /// bottom-left corner). See capturePopover for why the live position cannot be used.
+    private static func captureContextPopover(_ appearance: String, _ state: String) async {
+        guard let window = mainWindow else { return }
+        NotificationCenter.default.post(name: showContextPopoverNotification, object: nil)
+        await wait(1.0)
+        guard let popover = NSApp.windows.first(where: { isPopover($0) && $0.isVisible }),
+              let popoverView = popover.contentView?.superview ?? popover.contentView,
+              let frameView = window.contentView?.superview ?? window.contentView else {
+            skip("\(appearance) \(state) (no popover window appeared)")
+            return
+        }
+        let size = popoverView.bounds.size
+        let origin = NSPoint(x: frameView.bounds.width - size.width - 8, y: 40)
+        log("context popover size=\(size); composited at \(origin)")
+        capture(appearance, state, overlays: [(popoverView, origin)])
+        closePopovers()
+        await wait(0.6)
     }
 
     // MARK: Popover
@@ -766,7 +802,8 @@ enum SnapshotHarness {
             """,
             createdAt: ago(31),
             model: "qwen3-14b-instruct",
-            usage: TokenUsage(promptTokens: 1184, completionTokens: 236, totalTokens: 1420)
+            usage: TokenUsage(promptTokens: 1184, completionTokens: 236, totalTokens: 1420),
+            stats: GenerationStats(tokensPerSecond: 42.3, completionTokens: 236, timeToFirstToken: 0.31, generationDuration: 5.6, isEstimated: false)
         )
         ids.lastAssistantInMain = lastAssistant.id
         let main = Conversation(
@@ -818,7 +855,8 @@ enum SnapshotHarness {
                     reasoningDuration: 7.4,
                     createdAt: ago(47),
                     model: "qwen3-14b-instruct",
-                    usage: TokenUsage(promptTokens: 912, completionTokens: 188, totalTokens: 1100)
+                    usage: TokenUsage(promptTokens: 912, completionTokens: 188, totalTokens: 1100),
+                    stats: GenerationStats(tokensPerSecond: 44.8, completionTokens: 188, timeToFirstToken: 1.12, generationDuration: 4.2, isEstimated: false)
                 ),
                 Message(role: .user, content: "Why does it only crash for some users?", createdAt: ago(40)),
                 Message(
@@ -878,13 +916,15 @@ enum SnapshotHarness {
             ))
         }
 
-        // (d) Chinese title and content.
+        // (d) Chinese title and content. Its model has no known context length (strip shows "unknown").
+        var chineseSettings = settings
+        chineseSettings.model = "qwen2.5-7b-instruct"
         try write(Conversation(
             id: ids.chinese,
             title: "周末杭州两日游行程规划",
             createdAt: ago(95),
             updatedAt: ago(90),
-            settings: settings,
+            settings: chineseSettings,
             messages: [
                 Message(role: .user, content: "帮我规划一个周末两天的杭州行程，预算大概两千元，喜欢自然风景和本地小吃。", createdAt: ago(95)),
                 Message(
@@ -906,14 +946,14 @@ enum SnapshotHarness {
                     reasoning: "用户想要两天的行程，预算两千元，偏好自然风景和小吃。西湖和龙井、九溪都符合，路线按地理位置分成两天，避免来回奔波。",
                     reasoningDuration: 3.2,
                     createdAt: ago(94),
-                    model: "qwen3-14b-instruct"
+                    model: "qwen2.5-7b-instruct"
                 ),
                 Message(role: .user, content: "九溪十八涧的路好走吗？带老人去可以吗？", createdAt: ago(91)),
                 Message(
                     role: .assistant,
                     content: "整体是平缓的石板路和溪边步道，全程约 6 公里，大部分路段坡度很小。带老人可以去，但建议从九溪烟树一侧进入、只走一半，再打车返回。雨后石头比较滑，记得穿防滑鞋。",
                     createdAt: ago(90),
-                    model: "qwen3-14b-instruct"
+                    model: "qwen2.5-7b-instruct"
                 ),
             ]
         ))

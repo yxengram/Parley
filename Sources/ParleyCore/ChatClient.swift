@@ -33,9 +33,10 @@ public struct ChatRequestOptions: Sendable {
 public final class ChatClient: @unchecked Sendable {
     public let baseURL: URL
     private let apiKey: String?
-    private let session: URLSession
+    /// Shared with ModelInfo.swift: every request this client makes goes through this session.
+    let session: URLSession
     private let chatURL: URL
-    private let modelsURL: URL
+    let modelsURL: URL
 
     private static let maxErrorBodyChars = 2000
 
@@ -153,10 +154,15 @@ public final class ChatClient: @unchecked Sendable {
 
     /// POST {base}/chat/completions with stream:true. Non-2xx → ParleyError.http(status, body ≤ 2000 chars).
     /// Cancelling the consuming Task cancels the request.
+    ///
+    /// Asks for `stream_options: {include_usage: true}` (a final usage chunk). A server that
+    /// rejects that field with HTTP 400/422 gets the same request once more without it, and is
+    /// remembered (per base URL, in memory) so later requests leave it out.
     public func streamChat(messages: [Message], options: ChatRequestOptions) -> AsyncThrowingStream<ChatDelta, Error> {
+        let includeUsage = !StreamOptionsSupport.isRejected(by: baseURL)
         let request: URLRequest
         do {
-            request = try makeChatRequest(messages: messages, options: options)
+            request = try makeChatRequest(messages: messages, options: options, includeUsage: includeUsage)
         } catch {
             return AsyncThrowingStream { $0.finish(throwing: error) }
         }
@@ -165,7 +171,14 @@ public final class ChatClient: @unchecked Sendable {
             // caller drops its reference to the client.
             let task = Task {
                 do {
-                    try await self.runStream(request: request, continuation: continuation)
+                    do {
+                        try await self.runStream(request: request, rejectsStreamOptions: includeUsage, continuation: continuation)
+                    } catch is StreamOptionsRejected {
+                        // Nothing was yielded yet (the server answered with an error status).
+                        StreamOptionsSupport.markRejected(by: self.baseURL)
+                        let retry = try self.makeChatRequest(messages: messages, options: options, includeUsage: false)
+                        try await self.runStream(request: retry, rejectsStreamOptions: false, continuation: continuation)
+                    }
                     continuation.finish()
                 } catch {
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
@@ -181,8 +194,11 @@ public final class ChatClient: @unchecked Sendable {
         }
     }
 
+    /// With `rejectsStreamOptions`, an HTTP 400/422 whose body blames `stream_options` throws
+    /// StreamOptionsRejected instead of the HTTP error, so the caller can retry without it.
     private func runStream(
         request: URLRequest,
+        rejectsStreamOptions: Bool,
         continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
     ) async throws {
         let (bytes, response) = try await session.bytes(for: request)
@@ -195,7 +211,11 @@ public final class ChatClient: @unchecked Sendable {
                 collected.append(byte)
                 if collected.count >= Self.maxErrorBodyChars * 4 { break }
             }
-            throw ParleyError.http(status: status, body: Self.truncatedBody(collected))
+            let body = Self.truncatedBody(collected)
+            if rejectsStreamOptions, StreamOptionsSupport.isRejection(status: status, body: body) {
+                throw StreamOptionsRejected()
+            }
+            throw ParleyError.http(status: status, body: body)
         }
 
         // A server that ignores stream:true answers with one plain JSON completion.
@@ -242,8 +262,8 @@ public final class ChatClient: @unchecked Sendable {
         return false
     }
 
-    private func makeChatRequest(messages: [Message], options: ChatRequestOptions) throws -> URLRequest {
-        let body = Self.buildRequestBody(messages: messages, options: options)
+    private func makeChatRequest(messages: [Message], options: ChatRequestOptions, includeUsage: Bool) throws -> URLRequest {
+        let body = Self.buildRequestBody(messages: messages, options: options, includeUsage: includeUsage)
         var request = URLRequest(url: chatURL)
         request.httpMethod = "POST"
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -270,21 +290,22 @@ public final class ChatClient: @unchecked Sendable {
         }
     }
 
-    private func applyAuthorization(to request: inout URLRequest) {
+    func applyAuthorization(to request: inout URLRequest) {
         if let apiKey, !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
     }
 
-    private static func truncatedBody(_ data: Data) -> String {
+    static func truncatedBody(_ data: Data) -> String {
         let text = String(decoding: data, as: UTF8.self)
         return text.count > maxErrorBodyChars ? String(text.prefix(maxErrorBodyChars)) : text
     }
 
     // MARK: Request body
 
-    /// Pure, for tests. Returns the JSON body dictionary.
-    public static func buildRequestBody(messages: [Message], options: ChatRequestOptions) -> [String: Any] {
+    /// Pure, for tests. Returns the JSON body dictionary. With `includeUsage`, adds
+    /// `stream_options: {include_usage: true}` (what streamChat sends unless the server refused it).
+    public static func buildRequestBody(messages: [Message], options: ChatRequestOptions, includeUsage: Bool = false) -> [String: Any] {
         var apiMessages: [[String: Any]] = []
 
         if !options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -338,6 +359,7 @@ public final class ChatClient: @unchecked Sendable {
         if let t = options.temperature { body["temperature"] = t }
         if let m = options.maxTokens { body["max_tokens"] = m }
         if let r = options.reasoningEffort { body["reasoning_effort"] = r.rawValue }
+        if includeUsage { body["stream_options"] = ["include_usage": true] }
         return body
     }
 
@@ -395,6 +417,35 @@ public final class ChatClient: @unchecked Sendable {
         case (100, let x) where (x & 0xC0) == 64: return true   // 100.64.0.0/10
         default: return false
         }
+    }
+}
+
+/// Thrown inside runStream when the server refused `stream_options`; never escapes streamChat.
+struct StreamOptionsRejected: Error {}
+
+/// Base URLs whose server rejected `stream_options`. Process-wide and memory only: clients are
+/// short-lived (one per request), so the knowledge cannot live on an instance.
+enum StreamOptionsSupport {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var rejected: Set<String> = []
+
+    static func isRejected(by baseURL: URL) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return rejected.contains(baseURL.absoluteString)
+    }
+
+    static func markRejected(by baseURL: URL) {
+        lock.lock(); defer { lock.unlock() }
+        rejected.insert(baseURL.absoluteString)
+    }
+
+    /// HTTP 400/422 whose body names the field (OpenAI: "Unrecognized request argument supplied:
+    /// stream_options"; pydantic servers: "Extra inputs are not permitted" with loc
+    /// ["body","stream_options"]). Other 400s (context overflow, bad model) are not retried.
+    static func isRejection(status: Int, body: String) -> Bool {
+        guard status == 400 || status == 422 else { return false }
+        let lower = body.lowercased()
+        return lower.contains("stream_options") || lower.contains("include_usage")
     }
 }
 

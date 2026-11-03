@@ -39,11 +39,15 @@ public struct TokenUsage: Codable, Hashable, Sendable {
     public var promptTokens: Int?
     public var completionTokens: Int?
     public var totalTokens: Int?
+    /// completion_tokens_details.reasoning_tokens, when the server reports it. Part of
+    /// completionTokens. Optional, so files written before it existed still decode.
+    public var reasoningTokens: Int?
 
-    public init(promptTokens: Int? = nil, completionTokens: Int? = nil, totalTokens: Int? = nil) {
+    public init(promptTokens: Int? = nil, completionTokens: Int? = nil, totalTokens: Int? = nil, reasoningTokens: Int? = nil) {
         self.promptTokens = promptTokens
         self.completionTokens = completionTokens
         self.totalTokens = totalTokens
+        self.reasoningTokens = reasoningTokens
     }
 }
 
@@ -65,6 +69,9 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     /// Error text if the request failed; shown in the UI under the message.
     public var error: String?
     public var usage: TokenUsage?
+    /// Generation speed of an assistant reply (see GenerationStats). Optional, so files
+    /// written before it existed still decode.
+    public var stats: GenerationStats?
 
     public init(
         id: UUID = UUID(),
@@ -77,7 +84,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
         model: String? = nil,
         isComplete: Bool = true,
         error: String? = nil,
-        usage: TokenUsage? = nil
+        usage: TokenUsage? = nil,
+        stats: GenerationStats? = nil
     ) {
         self.id = id
         self.role = role
@@ -90,6 +98,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
         self.isComplete = isComplete
         self.error = error
         self.usage = usage
+        self.stats = stats
     }
 }
 

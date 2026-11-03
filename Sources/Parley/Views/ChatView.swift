@@ -19,7 +19,10 @@ struct ChatView: View {
             }
             MessageListView(session: session)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    ComposerView(session: session)
+                    VStack(spacing: 0) {
+                        ComposerView(session: session)
+                        ContextStatusBar(session: session)
+                    }
                 }
         }
         .overlay {
@@ -45,6 +48,14 @@ struct ChatView: View {
             guard let provider else { return }
             await appState.loadModelsIfNeeded(for: provider)
             preselectModelIfNeeded(provider: provider)
+        }
+        // Context length of the selected model: read-only GETs to the same server, cached.
+        .task(id: ContextTaskID(providerID: provider?.id, baseURL: provider?.baseURL, model: currentModel(provider))) {
+            guard let provider else { return }
+            await appState.refreshContextInfo(provider: provider, model: currentModel(provider))
+        }
+        .onChange(of: session.isStreaming) { wasStreaming, isStreaming in
+            if wasStreaming && !isStreaming { appState.replyFinished(in: session) }
         }
         .onChange(of: appState.conversationSettingsRequest) { _, id in
             guard id == session.id else { return }
@@ -83,6 +94,16 @@ struct ChatView: View {
     private struct ModelTaskID: Hashable {
         let providerID: UUID?
         let baseURL: String?
+    }
+
+    private struct ContextTaskID: Hashable {
+        let providerID: UUID?
+        let baseURL: String?
+        let model: String
+    }
+
+    private func currentModel(_ provider: Provider?) -> String {
+        ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
     }
 
     /// "Encrypted", plus the folder name when the file is outside the default folder.
