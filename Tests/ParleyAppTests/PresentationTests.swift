@@ -251,3 +251,114 @@ import ParleyCore
     let text = ContextPopover.promptText(snap) ?? ""
     #expect(text.contains("read at 850 tok/s") && text.hasSuffix("cached"))
 }
+
+// MARK: - Cloudflare, redirects, broken streams
+
+@Test func cloudflareErrorsReadAsNextSteps() {
+    let timeout = ErrorPresentation.make("HTTP 524: Cloudflare error 524: A timeout occurred · Ray ID a54c823f3e275e92-BNE",
+                                         providerName: "Strata (Cloudflare)", serverKind: .strata)
+    #expect(timeout.title == "No answer within Cloudflare's 100-second limit")
+    #expect(timeout.detail == "Strata didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; Strata's Tailscale or LAN address has no such limit.")
+    #expect(timeout.status == "HTTP 524" && timeout.retryable)
+    #expect(timeout.raw == "HTTP 524: Cloudflare error 524: A timeout occurred · Ray ID a54c823f3e275e92-BNE")
+    // Any server behind Cloudflare, without Strata in the wording.
+    let generic = ErrorPresentation.make("HTTP 524: Cloudflare error 524: A timeout occurred", providerName: "My API")
+    #expect(generic.detail?.hasPrefix("My API didn't start answering") == true && generic.detail?.contains("Strata") == false)
+
+    let tunnel = ErrorPresentation.make("HTTP 530: Cloudflare error 1033: Cloudflare Tunnel error", serverKind: .strata)
+    #expect(tunnel.title == "The Cloudflare Tunnel is not connected to Strata's computer")
+    #expect(tunnel.detail?.contains("cloudflared or the Strata app isn't running") == true)
+    #expect(ErrorPresentation.make("HTTP 530: Cloudflare error 1033").title == "The Cloudflare Tunnel is not connected to the server")
+
+    let access = ErrorPresentation.make("HTTP 302: Cloudflare Access sign-in at team.cloudflareaccess.com (redirect not followed)")
+    #expect(access.title == "This address is protected by Cloudflare Access" && access.suggestsSettings)
+    let challenge = ErrorPresentation.make("HTTP 403: Cloudflare challenge: Just a moment...", providerName: "Strata")
+    #expect(challenge.title == "Cloudflare's bot protection blocks Parley" && !challenge.suggestsSettings)
+    #expect(ErrorPresentation.make("HTTP 403: Cloudflare error 1020: Access denied").title == "Cloudflare's bot protection blocks Parley")
+    #expect(ErrorPresentation.make("HTTP 429: Cloudflare error 1015").title == "Cloudflare is rate limiting this address")
+    #expect(ErrorPresentation.make("HTTP 521: Cloudflare error 521: Web server is down", serverKind: .strata).title == "Cloudflare can't reach Strata")
+    #expect(ErrorPresentation.make("HTTP 502: Cloudflare error 502: Bad gateway", providerName: "Strata").detail?.contains("didn't answer") == true)
+    #expect(ErrorPresentation.make("HTTP 526: Cloudflare error 526: Invalid SSL certificate").title.hasPrefix("Cloudflare could not open a secure connection"))
+
+    // Strata's own errors through the tunnel keep their reading (a 401 is still about the key).
+    #expect(ErrorPresentation.make(#"HTTP 401: {"error":"Invalid API key"}"#, serverKind: .strata).title == "The server rejected the API key")
+}
+
+// Conversations saved before Parley knew Cloudflare hold the raw page: never shown as markup.
+@Test func storedHTMLPagesAreNeverShown() {
+    let style = String(repeating: ".cf{margin:0}", count: 300)
+    let page = "<!DOCTYPE html><html><head><title>strata.example.net | 524: A timeout occurred</title><link href=\"/cdn-cgi/styles/main.css\"><style>\(style)</style></head><body>"
+    let old = "HTTP 524: " + String(page.prefix(1990))
+    let p = ErrorPresentation.make(old, serverKind: .strata)
+    #expect(p.title == "No answer within Cloudflare's 100-second limit")
+    #expect(p.raw?.contains("<") == false)
+    #expect(ErrorPresentation.displayText(old) == "HTTP 524: Cloudflare error 524: A timeout occurred")
+
+    let nginx = "HTTP 502: <html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>"
+    let n = ErrorPresentation.make(nginx)
+    #expect(n.title == "502 Bad Gateway" && n.raw == "HTTP 502: 502 Bad Gateway")
+    #expect(ErrorPresentation.displayText(nginx) == "HTTP 502: 502 Bad Gateway")
+    #expect(ErrorPresentation.displayText("HTTP 400: plain") == "HTTP 400: plain")
+}
+
+@Test func redirectsSayWhereToGo() {
+    let https = ErrorPresentation.make("HTTP 301: Redirect to https://strata.example.net/v1/models (not followed)",
+                                       providerName: "Strata", baseURL: "http://strata.example.net/v1")
+    #expect(https.title == "Strata only answers over https")
+    #expect(https.detail?.contains("https://strata.example.net/v1") == true && https.suggestsSettings)
+    let elsewhere = ErrorPresentation.make("HTTP 307: Redirect to http://other.example/v1 (not followed)", providerName: "Proxy",
+                                           baseURL: "http://192.168.1.2:8080/v1")
+    #expect(elsewhere.title == "Proxy redirected the request to other.example")
+    #expect(ErrorPresentation.connectionTestText("HTTP 530: Cloudflare error 1033").hasPrefix("The Cloudflare Tunnel is not connected"))
+    #expect(ErrorPresentation.connectionTestText(#"HTTP 401: {"error":"Invalid API key"}"#) == #"HTTP 401: {"error":"Invalid API key"}"#)
+}
+
+@Test func interruptedRepliesKeepTheirText() {
+    let viaCloudflare = "API error: The connection closed before the reply finished (through Cloudflare): The network connection was lost."
+    let p = ErrorPresentation.make(viaCloudflare, providerName: "Strata (Cloudflare)", serverKind: .strata, partialReply: true)
+    #expect(p.title == "The connection dropped before the reply finished")
+    #expect(p.detail?.hasPrefix("The text received so far is kept. Cloudflare dropped the connection mid-reply") == true)
+    #expect(p.raw == viaCloudflare && p.retryable && !p.suggestsSettings)
+    let direct = ErrorPresentation.make("API error: The connection closed before the reply finished.", providerName: "LM Studio")
+    #expect(direct.detail == "LM Studio stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN). Retry asks for the whole reply again.")
+    let openAI = ErrorPresentation.make("API error: The connection closed before the reply finished (through Cloudflare).", providerName: "OpenAI")
+    #expect(openAI.detail?.contains("tunnel") == false && openAI.detail?.contains("through Cloudflare closed") == true)
+    // A connection lost before any answer is still "can't reach".
+    #expect(ErrorPresentation.make("The network connection was lost.", providerName: "LM Studio").title.hasPrefix("Can't reach"))
+}
+
+// A JSON error that quotes markup is the server's message, not an HTML page.
+@Test func jsonErrorQuotingMarkupIsShownAsIs() {
+    let stored = #"HTTP 400: {"error":{"message":"Invalid content: <title>x</title> in message"}}"#
+    #expect(ErrorPresentation.displayText(stored) == stored)
+    #expect(ErrorPresentation.sanitizedBody(#"{"error":"<body> is not allowed"}"#) == #"{"error":"<body> is not allowed"}"#)
+    #expect(ErrorPresentation.make(stored, providerName: "Strata").title == "Invalid content: <title>x</title> in message")
+}
+
+@Test func plainHTTPOverTheInternetWarns() {
+    let warning = ProviderEditor.urlWarning("http://strata.example.net/v1")
+    #expect(warning?.contains("API key and chats travel unencrypted") == true)
+    #expect(warning?.contains("https://strata.example.net/v1") == true)
+    #expect(ProviderEditor.urlWarning("http://strata.example.net:8080/v1")?.contains("(https://strata.example.net/v1)") == true)
+    // Tailscale (WireGuard), LAN, loopback and https stay quiet.
+    #expect(ProviderEditor.urlWarning("http://100.101.102.103:47832/v1") == nil)
+    #expect(ProviderEditor.urlWarning("http://192.168.1.20:1234/v1") == nil)
+    #expect(ProviderEditor.urlWarning("http://localhost:1234/v1") == nil)
+    #expect(ProviderEditor.urlWarning("https://strata.example.net/v1") == nil)
+    // Tailscale MagicDNS names are in the tailnet too.
+    #expect(ProviderEditor.urlWarning("http://mac.tailnet-1234.ts.net:47832/v1") == nil)
+    #expect(ProviderEditor.urlWarning("http://MAC.tailnet-1234.TS.NET.:47832/v1") == nil)
+    #expect(ProviderEditor.urlWarning("http://ts.net.example.com/v1") != nil)
+    // The port hint is for local Strata addresses only.
+    #expect(ErrorPresentation.make("A server with the specified hostname could not be found.", providerName: "Strata",
+                                   baseURL: "https://strata.example.net/v1", serverKind: .strata).detail?.contains("another port") == false)
+}
+
+@Test func learnedLimitSaysWhereItCameFrom() {
+    #expect(ContextPopover.sourceText(.learned, serverKind: .strata) == "learned from Strata's error")
+    #expect(ContextPopover.sourceText(.learned) == "learned from the server's error")
+    let info = ModelContextInfo(model: "m", maxContextLength: 262144)
+    #expect(ContextBudget.limit(info: info, manual: nil, learned: 131072) == ContextLimit(tokens: 131072, source: .learned))
+    #expect(ContextBudget.limit(info: info, manual: 65536, learned: 131072) == ContextLimit(tokens: 65536, source: .manual))
+    #expect(ContextBudget.limit(info: ModelContextInfo(model: "m", loadedContextLength: 8192), manual: nil, learned: 131072)?.source == .server)
+}

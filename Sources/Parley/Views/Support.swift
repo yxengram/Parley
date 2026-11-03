@@ -71,18 +71,33 @@ struct ErrorPresentation: Equatable {
     }
 
     /// `serverKind` is what the app learned about the server (only a few messages need it; the
-    /// Strata texts below are recognized by their wording).
+    /// Strata texts below are recognized by their wording). `partialReply`: the failed reply
+    /// already shows some text or thinking.
     static func make(_ error: String, providerName: String? = nil, baseURL: String? = nil,
-                     serverKind: InferenceServerKind? = nil) -> ErrorPresentation {
+                     serverKind: InferenceServerKind? = nil, partialReply: Bool = false) -> ErrorPresentation {
         let text = error.trimmingCharacters(in: .whitespacesAndNewlines)
         let server = providerName.map { "\($0)" } ?? "the server"
         let host = baseURL.flatMap { URLComponents(string: $0)?.host }
         let place = host.map { "\(server) at \($0)" } ?? server
         let isStrata = serverKind == .strata
 
-        if let (status, body) = splitHTTP(text) {
-            let message = serverMessage(body)
+        if let (status, rawBody) = splitHTTP(text) {
             let statusText = "HTTP \(status)"
+            // Cloudflare's own pages first: a challenge is a 403 that is not about the API key, and
+            // a 52x page says more than "the server had a problem".
+            if let cloudflare = CloudflareError.parse(status: status, body: rawBody) {
+                var p = cloudflarePresentation(cloudflare, server: server, isStrata: isStrata)
+                p.status = statusText
+                p.raw = "HTTP \(status): \(cloudflare.summary)"
+                return p
+            }
+            // Pages stored before Parley summarized HTML: never show the markup.
+            let body = sanitizedBody(rawBody)
+            let text = body == rawBody ? text : "HTTP \(status): \(body)"
+            if (300..<400).contains(status) {
+                return redirectPresentation(status: status, body: body, server: server, baseURL: baseURL, raw: text)
+            }
+            let message = serverMessage(body)
             if let message, var strata = strataPresentation(message) {
                 strata.status = statusText
                 strata.raw = text
@@ -131,6 +146,9 @@ struct ErrorPresentation: Equatable {
                     status: statusText, raw: text)
             }
         }
+        if let interruption = StreamInterruption.parse(text) {
+            return interruptedPresentation(interruption, server: server, isStrata: isStrata, partialReply: partialReply, raw: text)
+        }
         if text.hasPrefix("API error: ") {
             let message = String(text.dropFirst("API error: ".count))
             if let size = ChatClient.requestTooLarge(in: message) {
@@ -154,8 +172,10 @@ struct ErrorPresentation: Equatable {
             || lower.contains("appears to be offline") {
             return ErrorPresentation(
                 title: "Can't reach \(place)",
-                detail: isStrata
+                detail: isStrata && host.map(ChatClient.isLocalHost) ?? false
                     ? "Is Strata running, with sharing on the network turned on? It may also be using another port now (Strata picks a free one when its usual port is taken). \(text)"
+                    : isStrata
+                    ? "Is this Mac online, and is Strata (and its tunnel, if any) running? \(text)"
                     : "Is the server running? \(text)",
                 raw: nil, suggestsSettings: true)
         }
@@ -233,6 +253,126 @@ struct ErrorPresentation: Equatable {
                                      detail: "This takes a minute or two. Retry shortly.")
         }
         return nil
+    }
+
+    // MARK: Cloudflare, redirects, broken streams
+
+    /// Cloudflare's own errors (any server behind Cloudflare; the wording names Strata when the
+    /// server is known to be Strata). The stored line is in `raw` (Details).
+    static func cloudflarePresentation(_ error: CloudflareError, server: String, isStrata: Bool) -> ErrorPresentation {
+        let name = isStrata ? "Strata" : server
+        let Name = name.prefix(1).uppercased() + name.dropFirst()
+        let direct = isStrata ? "Strata's Tailscale or LAN address" : "a direct address (Tailscale, LAN)"
+        switch error.kind {
+        case .timeout:
+            return ErrorPresentation(
+                title: "No answer within Cloudflare's 100-second limit",
+                detail: "\(Name) didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; \(direct) has no such limit.")
+        case .tunnelDown:
+            return ErrorPresentation(
+                title: "The Cloudflare Tunnel is not connected to \(isStrata ? "Strata's computer" : name)",
+                detail: isStrata
+                    ? "cloudflared or the Strata app isn't running on Strata's computer, or that computer is asleep or offline. Start them, then retry."
+                    : "cloudflared isn't running on the server's computer, or that computer is asleep or offline. Start it, then retry.")
+        case .originUnreachable:
+            let why: String
+            switch error.code ?? error.status {
+            case 521: why = "it refused the connection"
+            case 522: why = "the connection timed out"
+            case 523: why = "it is unreachable"
+            case 520: why = "it gave an answer Cloudflare could not read"
+            case 504: why = "it took too long"
+            default: why = "no usable answer came back"
+            }
+            return ErrorPresentation(
+                title: "Cloudflare can't reach \(name)",
+                detail: isStrata
+                    ? "Cloudflare is up, but Strata behind it didn't answer (\(why)). Check that the Strata app is running with network sharing on and that the tunnel points at its port, then retry."
+                    : "Cloudflare is up, but \(name) behind it didn't answer (\(why)). Check that it is running and that the tunnel or DNS record points at it, then retry.")
+        case .originTLS:
+            return ErrorPresentation(
+                title: "Cloudflare could not open a secure connection to \(name)",
+                detail: "This is set up on the Cloudflare side (SSL/TLS mode or the origin certificate), not in Parley.")
+        case .challenge:
+            return ErrorPresentation(
+                title: "Cloudflare's bot protection blocks Parley",
+                detail: "This address answers apps with a browser check or a firewall block (WAF, Bot Fight Mode or Under Attack mode), which an API client can't pass. Add a Cloudflare rule that skips these checks for the API path (/v1/*), or use \(direct).")
+        case .rateLimited:
+            return ErrorPresentation(
+                title: "Cloudflare is rate limiting this address",
+                detail: "A rate-limiting rule on the Cloudflare side refused the request. Wait a minute, then retry.")
+        case .access:
+            return ErrorPresentation(
+                title: "This address is protected by Cloudflare Access",
+                detail: "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use \(direct), or a hostname without an Access policy that requires sign-in.",
+                suggestsSettings: true)
+        case .other:
+            return ErrorPresentation(
+                title: "Cloudflare error \(error.code ?? error.status)" + (error.title.map { ": \($0)" } ?? ""),
+                detail: "Cloudflare answered instead of \(name). Retry in a moment.")
+        }
+    }
+
+    /// A 3xx: Parley never follows redirects (one could send the whole conversation elsewhere).
+    static func redirectPresentation(status: Int, body: String, server: String, baseURL: String?, raw: String) -> ErrorPresentation {
+        let Server = server.prefix(1).uppercased() + server.dropFirst()
+        let base = baseURL.flatMap { URLComponents(string: $0) }
+        if let target = ResponseText.redirectTarget(body), let base, base.scheme?.lowercased() == "http",
+           target.scheme?.lowercased() == "https", target.host?.lowercased() == base.host?.lowercased() {
+            var https = base
+            https.scheme = "https"
+            if base.port != nil { https.port = target.port }
+            return ErrorPresentation(
+                title: "\(Server) only answers over https",
+                detail: "Change the base URL to \(https.string ?? "https://…") in Settings. Parley does not follow redirects, so nothing was sent to the new address.",
+                status: "HTTP \(status)", raw: raw, suggestsSettings: true)
+        }
+        let target = ResponseText.redirectTarget(body)
+        return ErrorPresentation(
+            title: "\(Server) redirected the request" + (target?.host.map { " to \($0)" } ?? ""),
+            detail: "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.",
+            status: "HTTP \(status)", raw: raw, suggestsSettings: true)
+    }
+
+    /// The server had started answering when the connection broke.
+    static func interruptedPresentation(_ interruption: (viaCloudflare: Bool, underlying: String?), server: String,
+                                        isStrata: Bool, partialReply: Bool, raw: String) -> ErrorPresentation {
+        let name = isStrata ? "Strata" : server
+        let kept = partialReply ? "The text received so far is kept. " : ""
+        // Hosted APIs sit behind Cloudflare too: the tunnel wording is for Strata only.
+        let cause = interruption.viaCloudflare
+            ? (isStrata
+               ? "Cloudflare dropped the connection mid-reply: the tunnel may have restarted, or Strata's computer went to sleep or offline."
+               : "The connection through Cloudflare closed mid-reply: the server or the network went away.")
+            : "\(name.prefix(1).uppercased() + name.dropFirst()) stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN)."
+        return ErrorPresentation(
+            title: "The connection dropped before the reply finished",
+            detail: kept + cause + " Retry asks for the whole reply again.",
+            raw: raw)
+    }
+
+    /// An HTML page in a stored error body, reduced to its title (older versions stored the page).
+    static func sanitizedBody(_ body: String) -> String {
+        ResponseText.isHTMLPage(body) ? ResponseText.htmlSummary(body) : body
+    }
+
+    /// The stored error text, safe to show in full (tooltip, Details): HTML reduced to a line.
+    static func displayText(_ error: String) -> String {
+        guard let (status, body) = splitHTTP(error.trimmingCharacters(in: .whitespacesAndNewlines)) else { return error }
+        if let cloudflare = CloudflareError.parse(status: status, body: body) { return "HTTP \(status): \(cloudflare.summary)" }
+        let clean = sanitizedBody(body)
+        return clean == body ? error : "HTTP \(status): \(clean)"
+    }
+
+    /// Settings' Test Connection: Cloudflare's and redirect errors as their readable title.
+    static func connectionTestText(_ error: String) -> String {
+        let text = error.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let (status, body) = splitHTTP(text) else { return text }
+        if CloudflareError.parse(status: status, body: body) != nil || (300..<400).contains(status) {
+            let p = make(text)
+            return [p.title + ".", p.detail].compactMap { $0 }.joined(separator: " ")
+        }
+        return displayText(text)
     }
 
     /// Strata (engine or shared port) refused a request with images: the model has no picture reader.

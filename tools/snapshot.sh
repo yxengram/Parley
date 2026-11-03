@@ -8,7 +8,9 @@
 # - starts tools/mock_server.py on a free 127.0.0.1 port (killed afterwards)
 # - runs the app binary with PARLEY_SNAPSHOT_DIR / PARLEY_SNAPSHOT_MOCK_URL; it never activates,
 #   keeps its windows off-screen at alpha 0, and exits on its own (killed after 160 s otherwise)
-# - a second mock (flavor strata-share, no API key) backs the Strata states
+# - a second mock (flavor strata-share, no API key) backs the Strata states; MOCK_STRATA_PROGRESS=1
+#   makes it send prompt progress (as Strata's engine does; the live share port sends none) so the
+#   "Reading the prompt" state can be captured
 # - checks that the user's real settings, conversations and saved state were not touched
 #
 # The binary runs from a temporary copy of the bundle with the identifier
@@ -95,7 +97,7 @@ curl -fsS "http://127.0.0.1:$PORT/v1/models" >/dev/null || { echo "mock server d
 
 STRATA_PORT="$(/usr/bin/python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
 echo "==> Starting Strata mock (shared port) on 127.0.0.1:$STRATA_PORT"
-/usr/bin/python3 -I -u "$ROOT/tools/mock_server.py" "$STRATA_PORT" strata-share >/dev/null 2>&1 &
+MOCK_STRATA_PROGRESS=1 /usr/bin/python3 -I -u "$ROOT/tools/mock_server.py" "$STRATA_PORT" strata-share >/dev/null 2>&1 &
 STRATA_PID=$!
 for _ in {1..100}; do
     curl -fsS "http://127.0.0.1:$STRATA_PORT/v1/models" >/dev/null 2>&1 && break

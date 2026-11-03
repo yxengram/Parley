@@ -61,6 +61,10 @@ struct ContextSnapshot: Equatable {
     var limit: ContextLimit?
     var info: ModelContextInfo?
     var manual: Int?
+    /// The size the server's last overflow error named (kept across launches).
+    var learned: Int? = nil
+    /// The values are shared with other providers reaching the same Strata instance.
+    var sharedInstance = false
     var isProbing: Bool
     /// Live while streaming, else the last reply's.
     var tokensPerSecond: Double?
@@ -87,11 +91,12 @@ struct ContextSnapshot: Equatable {
 
     @MainActor
     static func make(session: ConversationSession, appState: AppState) -> (ContextSnapshot, Provider?, String) {
-        let settings = appState.settings
-        let provider = settings.resolvedProvider(for: session.conversation.settings)
+        let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
         let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
         let info = provider.flatMap { model.isEmpty ? nil : appState.contextInfo(provider: $0, model: model) }
-        let manual = provider.flatMap { model.isEmpty ? nil : settings.manualContextLength(providerID: $0.id, model: model) }
+        let manual = provider.flatMap { model.isEmpty ? nil : appState.manualContextLength(provider: $0, model: model) }
+        let learned = provider.flatMap { model.isEmpty ? nil : appState.learnedContextLength(provider: $0, model: model) }
+        let instance = provider.flatMap { model.isEmpty ? nil : appState.contextInstanceID(provider: $0, model: model) }
         let live = session.liveGeneration
         let usage = session.contextUsage()
         var rate: Double?
@@ -109,9 +114,11 @@ struct ContextSnapshot: Equatable {
         }
         let snapshot = ContextSnapshot(
             usage: usage,
-            limit: ContextBudget.limit(info: info, manual: manual),
+            limit: ContextBudget.limit(info: info, manual: manual, learned: learned),
             info: info,
             manual: manual,
+            learned: learned,
+            sharedInstance: instance != nil,
             isProbing: provider.map { appState.isProbingContext(provider: $0, model: model) } ?? false,
             tokensPerSecond: rate,
             speedIsEstimated: estimated,
@@ -231,7 +238,7 @@ struct ContextStatusBar: View {
     private func helpText(_ snap: ContextSnapshot, provider: Provider?) -> String {
         var lines: [String] = []
         if let limit = snap.limit {
-            lines.append("Context limit \(TokenFormat.grouped(limit.tokens)) tokens (\(ContextPopover.sourceText(limit.source)))")
+            lines.append("Context limit \(TokenFormat.grouped(limit.tokens)) tokens (\(ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind)))")
         } else {
             lines.append("The server did not report a context length. Click to enter one.")
         }
@@ -254,7 +261,7 @@ struct ContextStatusBar: View {
         if snap.reload?.isRunning == true {
             parts.append("Reloading model")
         } else if let limit = snap.limit {
-            parts.append("Context \(about)\(snap.usage.tokens) of \(limit.tokens) tokens, \(Int((snap.percent ?? 0).rounded())) percent; limit \(ContextPopover.sourceText(limit.source))")
+            parts.append("Context \(about)\(snap.usage.tokens) of \(limit.tokens) tokens, \(Int((snap.percent ?? 0).rounded())) percent; limit \(ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind))")
         } else {
             parts.append("Context \(about)\(snap.usage.tokens) tokens, limit unknown")
         }
@@ -324,10 +331,11 @@ struct ContextPopover: View {
     @ViewState private var reloadText = ""
     @ViewState private var confirmingReload = false
 
-    static func sourceText(_ source: ContextLimitSource) -> String {
+    static func sourceText(_ source: ContextLimitSource, serverKind: InferenceServerKind? = nil) -> String {
         switch source {
         case .server: return "reported by the server"
         case .manual: return "your value"
+        case .learned: return serverKind == .strata ? "learned from Strata's error" : "learned from the server's error"
         case .serverMaximum: return "model maximum; the loaded size is unknown"
         }
     }
@@ -420,8 +428,9 @@ struct ContextPopover: View {
                 Text("Limit").foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     if let limit = snap.limit {
+                        let source = Self.sourceText(limit.source, serverKind: snap.info?.serverKind)
                         Text("\(TokenFormat.grouped(limit.tokens)) tokens")
-                        Text(Self.sourceText(limit.source).prefix(1).uppercased() + Self.sourceText(limit.source).dropFirst())
+                        Text(source.prefix(1).uppercased() + source.dropFirst())
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text(snap.isProbing ? "Checking…" : "Unknown")
@@ -430,6 +439,19 @@ struct ContextPopover: View {
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                    }
+                }
+            }
+            if let learned = snap.learned, snap.limit?.source != .learned {
+                GridRow {
+                    Text("Last error").foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(TokenFormat.grouped(learned)) tokens")
+                        Text(learned == snap.limit?.tokens
+                             ? "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named the same size."
+                             : "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named this size; \(snap.limit?.source == .manual ? "your value, entered after it," : "the reported value") is used instead.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -483,11 +505,16 @@ struct ContextPopover: View {
     /// Strata fixes the context length when it starts a model; nothing in its API changes it.
     @ViewBuilder
     private func strataNote(_ snap: ContextSnapshot) -> some View {
+        let shared = snap.sharedInstance
+            ? " It applies to every provider that reaches this Strata (for example over Tailscale and Cloudflare)."
+            : ""
         Text(snap.info?.loadedContextLength != nil
              ? "Strata sets the context length when it starts the model. To use a different size, change it in Strata's setup."
              : snap.manual != nil
-             ? "Strata's shared port does not report the context length, so your value below is used. If you change the context in Strata's setup, update it here."
-             : "Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below; it can only be changed in Strata.")
+             ? "Strata's shared port does not report the context length, so your value below is used.\(shared) If you change the context in Strata's setup, update it here."
+             : snap.learned != nil
+             ? "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.\(shared) A value below overrides it."
+             : "Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below, or Parley learns it from Strata's first overflow error; it can only be changed in Strata.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -507,12 +534,14 @@ struct ContextPopover: View {
                 if snap.manual != nil {
                     Button("Clear") {
                         manualText = ""
-                        appState.settings.setManualContextLength(nil, providerID: provider.id, model: model)
+                        appState.setManualContextLength(nil, provider: provider, model: model)
                     }
                 }
             }
             Text(snap.info?.loadedContextLength != nil && snap.manual != nil
                  ? "The value the server reports takes precedence over yours."
+                 : snap.learned != nil || snap.manual != nil
+                 ? "Used when the server does not report the loaded context length. A later overflow error naming another size replaces it."
                  : "Used when the server does not report the loaded context length.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -522,7 +551,7 @@ struct ContextPopover: View {
 
     private func saveManual() {
         guard let value = TokenFormat.parse(manualText) else { return }
-        appState.settings.setManualContextLength(value, providerID: provider.id, model: model)
+        appState.setManualContextLength(value, provider: provider, model: model)
     }
 
     @ViewBuilder

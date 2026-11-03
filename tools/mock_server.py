@@ -25,7 +25,9 @@ FLAVOR picks which native (non-OpenAI) endpoints exist, for context-length disco
   route but /health and /mock/*, and answer 401 as Strata does. Other flavors ignore the key.
 
 Strata flavors stream as Strata does: ": keep-alive" comments, prompt_progress chunks when the
-request has "return_progress": true, reasoning_content, then content, and a last chunk with
+request has "return_progress": true (strata-engine only: the live share port sends none even when
+asked; MOCK_STRATA_PROGRESS=1 in the environment turns them on there too), reasoning_content,
+then content, and a last chunk with
 finish_reason, usage (always, with prompt_tokens_details.cached_tokens) and llama.cpp timings.
 The context is STRATA_CTX tokens (prompt ≈ characters / 4); prompt + max_tokens over it is
 shortened (fit_max_tokens, the default) or, for strata-nofit, a 400 with Strata's own text; a
@@ -69,12 +71,34 @@ Usage and timing:
   mock-notloaded           listed by LM Studio endpoints as not loaded
   GET /mock/requests       counters: chat requests, stream_options rejections, loads, unloads
 
+Broken streams (every non-Strata flavor):
+  mock-drop      some content, then the connection is closed mid-body (no terminating chunk)
+  mock-cut       some content, then a clean end of the body without finish_reason or [DONE]
+
+Cloudflare (every flavor), selected by a path prefix in front of the usual paths, so a base URL
+such as http://127.0.0.1:PORT/cf-524/v1 behaves like a server behind Cloudflare:
+  /cf/...            the normal answer, plus Cloudflare's response headers (server: cloudflare,
+                     cf-ray, cf-cache-status), as through a working tunnel: the origin's own JSON
+                     errors pass through unchanged
+  /cf-520/ … /cf-526/, /cf-502/, /cf-503/, /cf-504/
+                     Cloudflare's HTML error page with that status (several KB of inline CSS first)
+  /cf-530/           530 with error 1033 "Cloudflare Tunnel error" (cloudflared not connected)
+  /cf-1033/          530 with the plain-text body "error code: 1033"
+  /cf-challenge/     403 "Just a moment..." with cf-mitigated: challenge (Bot Fight Mode)
+  /cf-block/         403 error 1020 "Sorry, you have been blocked" (a WAF rule)
+  /cf-1015/          429 "error code: 1015" (Cloudflare rate limiting)
+  /cf-access/        302 to https://team.cloudflareaccess.com/cdn-cgi/access/login/… (Cloudflare Access)
+  /cf-https/         301 to the same path over https (Always Use HTTPS)
+The edge answers come at once (the real 524 comes after 100 s without a byte).
+
 Every reply echoes the last user message text and the number of image_url parts received,
 so attachment delivery is visible. Requests are never logged.
 """
 
 import json
 import os
+import socket
+import struct
 import sys
 import threading
 import time
@@ -97,6 +121,8 @@ MODELS = [
     "mock-no-stream-options",
     "mock-timings",
     "mock-notloaded",
+    "mock-drop",
+    "mock-cut",
 ]
 
 FLAVOR = "lmstudio"
@@ -117,6 +143,12 @@ STRATA_MODELS = ["strata-qwen", "strata-nofit", "strata-slow", "strata-loading",
 STRATA_CTX = 8192
 STRATA_SLACK = 8               # serve/server.py CTX_SLACK
 STRATA_SHARE_BODY_LIMIT = 12 * 1024 * 1024
+
+
+def strata_sends_progress():
+    # Live: Strata Desktop's share port sends no prompt_progress, even for "return_progress": true.
+    return FLAVOR == "strata-engine" or os.environ.get("MOCK_STRATA_PROGRESS") == "1"
+
 STRATA_EFFORTS = {"none", "off", "minimal", "disabled", "false", "low", "medium", "high", "xhigh", "max", "maximum"}
 
 
@@ -199,13 +231,117 @@ def split_tokens(text, size=12):
     return [text[i:i + size] for i in range(0, len(text), size)] or [""]
 
 
+CF_RAY = "8f1a2b3c4d5e6f70"
+# status, Cloudflare code, title (as Cloudflare words them)
+CF_EDGE = {
+    "cf-520": (520, 520, "Web server is returning an unknown error"),
+    "cf-521": (521, 521, "Web server is down"),
+    "cf-522": (522, 522, "Connection timed out"),
+    "cf-523": (523, 523, "Origin is unreachable"),
+    "cf-524": (524, 524, "A timeout occurred"),
+    "cf-525": (525, 525, "SSL handshake failed"),
+    "cf-526": (526, 526, "Invalid SSL certificate"),
+    "cf-502": (502, 502, "Bad gateway"),
+    "cf-503": (503, 503, "Service unavailable"),
+    "cf-504": (504, 504, "Gateway time-out"),
+    "cf-530": (530, 1033, "Cloudflare Tunnel error"),
+    "cf-block": (403, 1020, "Access denied"),
+}
+
+
+def cf_error_page(status, code, title, host):
+    """Cloudflare's error page layout: title, a long inline stylesheet, then the details."""
+    style = "".join(".cf-rule-%d{margin:0 auto;padding:%dpx;color:#404040}" % (i, i % 9) for i in range(160))
+    if code >= 1000:
+        head_title = "%s | %s | Cloudflare" % (title, host)
+        heading = ('<h1><span class="cf-error-type" data-translate="error">Error</span>'
+                   '<span class="cf-error-code">%d</span></h1><h2 class="cf-subheadline">%s</h2>' % (code, title))
+    else:
+        head_title = "%s | %d: %s" % (host, code, title)
+        heading = ('<h1><span class="inline-block">%s</span> <span class="code-label">Error code %d</span></h1>'
+                   % (title, code))
+    return ("<!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n"
+            "<html class=\"no-js\" lang=\"en-US\"><head>\n<title>%s</title>\n<meta charset=\"UTF-8\" />\n"
+            "<link rel=\"stylesheet\" id=\"cf_styles-css\" href=\"/cdn-cgi/styles/main.css\" />\n<style>%s</style>\n"
+            "</head><body><div id=\"cf-wrapper\"><div id=\"cf-error-details\" class=\"p-0\"><header>%s</header>"
+            "<section><h2>What happened?</h2><p>%s</p></section>"
+            "<div class=\"cf-error-footer\"><span class=\"cf-footer-item\">Cloudflare Ray ID: "
+            "<strong class=\"font-semibold\">%s</strong></span></div></div></div></body></html>\n"
+            % (head_title, style, heading, title, CF_RAY))
+
+
+def cf_challenge_page():
+    return ("<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title>"
+            "<meta http-equiv=\"refresh\" content=\"390\"></head><body><div class=\"main-wrapper\">"
+            "<noscript>Enable JavaScript and cookies to continue</noscript></div>"
+            "<script>(function(){window._cf_chl_opt={cvId: '3',cZone: 'mock.example',cType: 'managed'};"
+            "var a = document.createElement('script');a.src = '/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1';"
+            "document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>")
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "ParleyMock/1.0"
+    # Set per request from a /cf… path prefix (see the module docstring).
+    cloudflare = False
 
     # Privacy: never log requests or content.
     def log_message(self, format, *args):  # noqa: A002
         pass
+
+    def version_string(self):
+        return "cloudflare" if self.cloudflare else BaseHTTPRequestHandler.version_string(self)
+
+    def end_headers(self):
+        if self.cloudflare:
+            self.send_header("CF-RAY", CF_RAY + "-SYD")
+            self.send_header("CF-Cache-Status", "DYNAMIC")
+        BaseHTTPRequestHandler.end_headers(self)
+
+    def cloudflare_route(self, path, length=0):
+        """Strips a /cf… prefix. Returns (path, answered): answered when the edge replied itself."""
+        self.cloudflare = False
+        first, sep, rest = path.lstrip("/").partition("/")
+        if not first.startswith("cf") or not (first == "cf" or first.startswith("cf-")):
+            return path, False
+        self.cloudflare = True
+        rest = "/" + rest if sep else "/"
+        if first == "cf":
+            return rest, False
+        self.drain(length)
+        host = (self.headers.get("Host") or "mock.example").split(":")[0]
+        if first in CF_EDGE:
+            status, code, title = CF_EDGE[first]
+            self.send_text(status, cf_error_page(status, code, title, host), "text/html; charset=UTF-8")
+        elif first == "cf-1033":
+            self.send_text(530, "error code: 1033", "text/plain; charset=UTF-8")
+        elif first == "cf-1015":
+            self.send_text(429, "error code: 1015", "text/plain; charset=UTF-8")
+        elif first == "cf-challenge":
+            body = cf_challenge_page().encode("utf-8")
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=UTF-8")
+            self.send_header("cf-mitigated", "challenge")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+        elif first in ("cf-access", "cf-https"):
+            if first == "cf-access":
+                status = 302
+                location = ("https://team.cloudflareaccess.com/cdn-cgi/access/login/%s?kid=0123456789abcdef"
+                            "&redirect_url=%%2Fv1%%2Fmodels&meta=eyJraWQiOiJzZWNyZXQifQ" % host)
+            else:
+                status = 301
+                location = "https://%s%s" % (self.headers.get("Host") or "mock.example", rest)
+            self.send_response(status)
+            self.send_header("Location", location)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            self.wfile.flush()
+        else:
+            self.send_text(404, "unknown Cloudflare mock route", "text/plain")
+        return rest, True
 
     # ---- helpers -------------------------------------------------------
 
@@ -263,7 +399,9 @@ class Handler(BaseHTTPRequestHandler):
     # ---- routing -------------------------------------------------------
 
     def do_GET(self):
-        path = self.path.split("?", 1)[0].rstrip("/")
+        path, answered = self.cloudflare_route(self.path.split("?", 1)[0].rstrip("/"))
+        if answered:
+            return
         if self.mock_control(path):
             return
         if FLAVOR.startswith("strata"):
@@ -377,8 +515,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(*result)
 
     def do_POST(self):
-        path = self.path.split("?", 1)[0].rstrip("/")
         length = int(self.headers.get("Content-Length") or 0)
+        path, answered = self.cloudflare_route(self.path.split("?", 1)[0].rstrip("/"), length)
+        if answered:
+            return
         if FLAVOR.startswith("strata"):
             self.strata_post(path, length)
             return
@@ -435,7 +575,9 @@ class Handler(BaseHTTPRequestHandler):
             options = req.get("stream_options")
             include_usage = isinstance(options, dict) and options.get("include_usage") is True
             self.start_stream()
-            self.stream(model, echo, include_usage)
+            if self.stream(model, echo, include_usage) == "drop":
+                self.drop_connection()
+                return
             self.end_stream()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             # The client stopped reading (e.g. the user pressed Stop).
@@ -453,6 +595,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, dict(LAST_REQUEST))
             return True
         return False
+
+    def drop_connection(self):
+        """Resets the connection in the middle of a chunked body (a dead origin or tunnel)."""
+        self.close_connection = True
+        try:
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            self.connection.close()
+        except OSError:
+            pass
 
     def send_text(self, status, text, content_type=None):
         body = text.encode("utf-8")
@@ -660,7 +811,7 @@ class Handler(BaseHTTPRequestHandler):
         steps = 8 if slow else 2
         for i in range(1, steps + 1):
             # One keep-alive per prompt-reading line; the progress fills it in when asked for.
-            if req.get("return_progress"):
+            if req.get("return_progress") and strata_sends_progress():
                 processed = cached + (prompt - cached) * i // (steps + 1)
                 self.sse({**chunk({}), "prompt_progress": {"total": prompt, "cache": cached, "processed": processed,
                                                            "time_ms": 250 * i}})
@@ -783,6 +934,12 @@ class Handler(BaseHTTPRequestHandler):
         elif model == "mock-bare-error":
             self.write_chunk('{"error": {"message": "bare failure"}}\n')
             return
+
+        elif model in ("mock-drop", "mock-cut"):
+            for piece in split_tokens("Partial answer, then the connection breaks"):
+                content(piece)
+            time.sleep(0.05)
+            return "drop" if model == "mock-drop" else None
 
         elif model == "mock-empty":
             self.sse(self.chunk(model, {}, finish="stop"))

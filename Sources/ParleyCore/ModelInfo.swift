@@ -67,6 +67,10 @@ public struct ModelContextInfo: Sendable, Equatable {
     /// The largest request body the server accepts, when it is known to be small (Strata's
     /// shared port: 12 MiB, 4 MiB in its runtime mode). Images are re-sent with every request.
     public var maxRequestBytes: Int?
+    /// Strata's `meta.instanceId` for the model: providers that report the same id reach the same
+    /// running model (e.g. one Strata over Tailscale and over a Cloudflare Tunnel), so what is
+    /// known about its context is shared between them.
+    public var serverInstanceID: String?
 
     public init(
         model: String,
@@ -78,7 +82,8 @@ public struct ModelContextInfo: Sendable, Equatable {
         modelKey: String? = nil,
         instanceIDs: [String] = [],
         acceptsImages: Bool? = nil,
-        maxRequestBytes: Int? = nil
+        maxRequestBytes: Int? = nil,
+        serverInstanceID: String? = nil
     ) {
         self.model = model
         self.serverKind = serverKind
@@ -90,6 +95,7 @@ public struct ModelContextInfo: Sendable, Equatable {
         self.instanceIDs = instanceIDs
         self.acceptsImages = acceptsImages
         self.maxRequestBytes = maxRequestBytes
+        self.serverInstanceID = serverInstanceID
     }
 
     /// Later (more specific) values win; nil never overwrites a value.
@@ -103,6 +109,7 @@ public struct ModelContextInfo: Sendable, Equatable {
         if !other.instanceIDs.isEmpty { instanceIDs = other.instanceIDs }
         acceptsImages = other.acceptsImages ?? acceptsImages
         maxRequestBytes = other.maxRequestBytes ?? maxRequestBytes
+        serverInstanceID = other.serverInstanceID ?? serverInstanceID
     }
 }
 
@@ -278,7 +285,7 @@ extension ChatClient {
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            throw ParleyError.http(status: status, body: Self.truncatedBody(data))
+            throw ParleyError.http(status: status, body: ResponseText.errorBody(status: status, response: response as? HTTPURLResponse, data: data))
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) else {
             throw ParleyError.api("The server's answer is not valid JSON.")
@@ -320,7 +327,10 @@ extension ChatClient {
             info.maxRequestBytes = runtime ? strataRuntimeBodyLimit : strataShareBodyLimit
         }
 
-        if let entry = data.first(where: { ($0["id"] as? String) == model }) {
+        // Strata also answers to a model's aliases (meta.aliases).
+        let entry = data.first(where: { ($0["id"] as? String) == model })
+            ?? data.first(where: { ((($0["meta"] as? [String: Any])?["aliases"] as? [String]) ?? []).contains(model) })
+        if let entry {
             if let n = int(entry["max_model_len"]) {          // vLLM: fixed at server start
                 info.loadedContextLength = n
                 info.maxContextLength = n
@@ -332,6 +342,7 @@ extension ChatClient {
                 // Strata's shared port in its runtime mode (tokens).
                 if info.serverKind == .strata {
                     info.loadedContextLength = info.loadedContextLength ?? int(meta["context"])
+                    if let id = meta["instanceId"] as? String, !id.isEmpty { info.serverInstanceID = id }
                 }
             }
             // Strata's engine: status {value: "loaded"|"unloaded"} (llama.cpp router mode too).

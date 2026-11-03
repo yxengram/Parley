@@ -8,6 +8,8 @@ public enum ContextLimitSource: String, Sendable, Hashable {
     case server
     /// The user typed it in.
     case manual
+    /// Named by an earlier overflow error from the server (Strata, llama.cpp, vLLM, OpenAI).
+    case learned
     /// Only the model's maximum is known; the loaded value may be smaller.
     case serverMaximum
 }
@@ -45,10 +47,12 @@ public enum ContextBudget {
     /// Chat-template tokens per message (role markers, separators).
     public static let messageOverhead = 4
 
-    /// Precedence: what the server uses now > the user's own value > the model's maximum.
-    public static func limit(info: ModelContextInfo?, manual: Int?) -> ContextLimit? {
+    /// Precedence: what the server uses now > the user's own value > the value an overflow error
+    /// named > the model's maximum.
+    public static func limit(info: ModelContextInfo?, manual: Int?, learned: Int? = nil) -> ContextLimit? {
         if let n = info?.loadedContextLength, n > 0 { return ContextLimit(tokens: n, source: .server) }
         if let n = manual, n > 0 { return ContextLimit(tokens: n, source: .manual) }
+        if let n = learned, n > 0 { return ContextLimit(tokens: n, source: .learned) }
         if let n = info?.maxContextLength, n > 0 { return ContextLimit(tokens: n, source: .serverMaximum) }
         return nil
     }

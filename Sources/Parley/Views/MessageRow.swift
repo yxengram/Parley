@@ -138,7 +138,7 @@ struct MessageRow: View, Equatable {
                         .help(Text(message.createdAt, format: .dateTime.weekday().hour().minute()))
                 }
                 if let error = message.error {
-                    ErrorCallout(presentation: ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL, serverKind: serverKind), raw: error, retry: nil, busy: conversationBusy)
+                    ErrorCallout(presentation: ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL, serverKind: serverKind), raw: ErrorPresentation.displayText(error), retry: nil, busy: conversationBusy)
                 }
                 if isLast && !conversationBusy {
                     Button(action: actions.getReply) {
@@ -192,10 +192,12 @@ struct MessageRow: View, Equatable {
             }
 
             if let error = message.error {
-                let presentation = ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL, serverKind: serverKind)
+                let partial = !message.content.isEmpty || !(message.reasoning ?? "").isEmpty
+                let presentation = ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL,
+                                                          serverKind: serverKind, partialReply: partial)
                 ErrorCallout(
                     presentation: presentation,
-                    raw: error,
+                    raw: ErrorPresentation.displayText(error),
                     retry: presentation.retryable ? { requestRegenerate() } : nil,
                     busy: conversationBusy
                 )
@@ -401,7 +403,7 @@ struct WaitingIndicator: View {
                         .monospacedDigit()
                 }
                 if progress == nil, serverKind == .strata, elapsed >= Self.loadingHintAfter {
-                    Text("Strata may be loading the model; a first reply after a pause can take a few minutes.")
+                    Text("Strata may be loading the model or reading a long prompt; a first reply after a pause can take a few minutes.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

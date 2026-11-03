@@ -50,6 +50,8 @@ public final class ChatClient: @unchecked Sendable {
     let modelsURL: URL
 
     private static let maxErrorBodyChars = 2000
+    /// How much of an error response is read (HTML error pages carry several KB of inline CSS).
+    static let maxErrorBodyBytes = 64 * 1024
 
     /// Appended to endpoint errors when the base URL has no path (a common slip: LM Studio,
     /// Ollama, vLLM and OpenAI all serve the API under /v1).
@@ -125,10 +127,15 @@ public final class ChatClient: @unchecked Sendable {
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            throw ParleyError.http(status: status, body: Self.truncatedBody(data))
+            throw ParleyError.http(status: status, body: ResponseText.errorBody(status: status, response: response as? HTTPURLResponse, data: data))
         }
 
         guard let object = try? JSONSerialization.jsonObject(with: data) else {
+            // A 200 HTML page: a captive portal or a proxy's sign-in page, never a model list.
+            let text = String(decoding: data.prefix(64 * 1024), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            if ResponseText.isHTML(text) {
+                throw ParleyError.api("The server answered with a web page (\(ResponseText.htmlSummary(text))) instead of a model list.")
+            }
             throw ParleyError.api("The server's model list is not valid JSON.")
         }
         var ids: [String] = []
@@ -217,20 +224,46 @@ public final class ChatClient: @unchecked Sendable {
         let status = http?.statusCode ?? 0
 
         guard (200..<300).contains(status) else {
+            // Enough for an HTML error page, whose code can sit behind several KB of inline CSS.
             var collected = Data()
             for try await byte in bytes {
                 collected.append(byte)
-                if collected.count >= Self.maxErrorBodyChars * 4 { break }
+                if collected.count >= Self.maxErrorBodyBytes { break }
             }
-            let body = Self.truncatedBody(collected)
+            let body = ResponseText.errorBody(status: status, response: http, data: collected)
             if rejectsStreamOptions, StreamOptionsSupport.isRejection(status: status, body: body) {
                 throw StreamOptionsRejected()
             }
             throw ParleyError.http(status: status, body: body)
         }
 
+        // From here on the server has answered: a transport error is a broken reply, not an
+        // unreachable server, and is reported as such (the partial text stays in the message).
+        let viaCloudflare = http.map(Self.cameThroughCloudflare) ?? false
+        do {
+            try await readStream(bytes: bytes, contentType: http?.value(forHTTPHeaderField: "Content-Type"),
+                                 viaCloudflare: viaCloudflare, continuation: continuation)
+        } catch let error as URLError where error.code != .cancelled {
+            throw ParleyError.api(StreamInterruption.message(underlying: error.localizedDescription, viaCloudflare: viaCloudflare))
+        }
+    }
+
+    /// `server: cloudflare` or a `cf-ray` header: the response passed through Cloudflare.
+    static func cameThroughCloudflare(_ response: HTTPURLResponse) -> Bool {
+        (response.value(forHTTPHeaderField: "Server") ?? "").lowercased() == "cloudflare"
+            || response.value(forHTTPHeaderField: "CF-RAY") != nil
+    }
+
+    private func readStream(
+        bytes: URLSession.AsyncBytes,
+        contentType: String?,
+        viaCloudflare: Bool,
+        continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
+    ) async throws {
+
         // A server that ignores stream:true answers with one plain JSON completion.
-        let contentType = (http?.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+        let contentType = (contentType ?? "").lowercased()
+        var progress = StreamProgress()
         if contentType.contains("application/json") {
             var collected = Data()
             for try await byte in bytes { collected.append(byte) }
@@ -241,9 +274,9 @@ public final class ChatClient: @unchecked Sendable {
                 // Actually SSE, just mislabeled.
                 var decoder = SSEDecoder()
                 for line in lines {
-                    if try Self.emit(decoder.feed(line: line), to: continuation) { return }
+                    if try Self.emit(decoder.feed(line: line), to: continuation, progress: &progress) { return }
                 }
-                _ = try Self.emit(decoder.finish(), to: continuation)
+                _ = try Self.emit(decoder.finish(), to: continuation, progress: &progress)
             } else if let delta = try ChunkParser.parse(text) {
                 continuation.yield(delta)
             }
@@ -253,20 +286,34 @@ public final class ChatClient: @unchecked Sendable {
         var decoder = SSEDecoder()
         for try await line in bytes.lines {
             try Task.checkCancellation()
-            if try Self.emit(decoder.feed(line: line), to: continuation) { return }
+            if try Self.emit(decoder.feed(line: line), to: continuation, progress: &progress) { return }
         }
         try Task.checkCancellation()
-        _ = try Self.emit(decoder.finish(), to: continuation)
+        if try Self.emit(decoder.finish(), to: continuation, progress: &progress) { return }
+        // The body ended cleanly but the reply did not: no finish_reason and no [DONE] after
+        // something was sent (a proxy or tunnel that closed the response, a server that died
+        // between chunks). Every OpenAI-compatible server ends a reply with one or the other.
+        if progress.yieldedAny && !progress.sawFinishReason {
+            throw ParleyError.api(StreamInterruption.message(underlying: nil, viaCloudflare: viaCloudflare))
+        }
+    }
+
+    private struct StreamProgress {
+        var yieldedAny = false
+        var sawFinishReason = false
     }
 
     /// Parses and yields payloads. Returns true once "[DONE]" is seen.
     private static func emit(
         _ payloads: [String],
-        to continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
+        to continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation,
+        progress: inout StreamProgress
     ) throws -> Bool {
         for payload in payloads {
             if payload.trimmingCharacters(in: .whitespacesAndNewlines) == "[DONE]" { return true }
             if let delta = try ChunkParser.parse(payload) {
+                progress.yieldedAny = true
+                if delta.finishReason != nil { progress.sawFinishReason = true }
                 continuation.yield(delta)
             }
         }
@@ -311,7 +358,7 @@ public final class ChatClient: @unchecked Sendable {
     func withPathHint(_ error: Error) -> Error {
         guard baseURLHasNoPath, let parley = error as? ParleyError else { return error }
         switch parley {
-        case .api(let message):
+        case .api(let message) where StreamInterruption.parse(message) == nil:
             return ParleyError.api(message + " " + Self.missingVersionPathHint)
         case .http(let status, let body) where status == 404 || status == 405:
             let detail = body.trimmingCharacters(in: .whitespacesAndNewlines)

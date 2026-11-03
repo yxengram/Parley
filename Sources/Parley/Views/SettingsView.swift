@@ -192,6 +192,13 @@ struct ProviderEditor: View {
         }
     }
 
+    /// A Tailscale MagicDNS name (`mac.tailnet-1234.ts.net`): traffic goes through the tailnet.
+    static func isTailscaleName(_ host: String) -> Bool {
+        var h = host.lowercased()
+        while h.hasSuffix(".") { h.removeLast() }
+        return h.hasSuffix(".ts.net")
+    }
+
     static func urlWarning(_ base: String) -> String? {
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -204,8 +211,13 @@ struct ProviderEditor: View {
             let port = comps.port.map { ":\($0)" } ?? ""
             return "No version path. Most servers expect it to end in /v1, e.g. \(scheme)://\(host)\(port)/v1."
         }
-        if scheme == "http" && !ChatClient.isLocalHost(host) {
-            return "Traffic is unencrypted."
+        // Loopback, LAN and Tailscale (100.64/10 and MagicDNS *.ts.net names, WireGuard-encrypted)
+        // addresses stay quiet. (.ts.net counts as private for this warning only, not for probes.)
+        if scheme == "http" && !ChatClient.isLocalHost(host) && !Self.isTailscaleName(host) {
+            var https = comps
+            https.scheme = "https"
+            https.port = nil
+            return "Plain http over the internet: your API key and chats travel unencrypted, readable by anyone on the way. Use https if the server offers it (\(https.string ?? "https://…"))."
         }
         return nil
     }
@@ -260,7 +272,7 @@ struct ProviderEditor: View {
                 appState.storeModels(models, for: provider)
                 testStatus = .ok(models.count)
             } catch {
-                testStatus = .failed(error.localizedDescription)
+                testStatus = .failed(ErrorPresentation.connectionTestText(error.localizedDescription))
             }
         }
     }

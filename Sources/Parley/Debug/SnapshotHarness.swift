@@ -213,6 +213,8 @@ enum SnapshotHarness {
             settings.providers.append(strata)
             // Strata's shared port does not report the context length: the user's own value.
             settings.setManualContextLength(32768, providerID: strata.id, model: "strata-qwen")
+            // The seeded chat's overflow error named the same size (the popover's "Last error" row).
+            settings.setLearnedContextLength(32768, providerID: strata.id, model: "strata-qwen")
         }
         settings.defaultProviderID = p.id
         settings.defaultDirectoryPath = defaultDirectory.path
@@ -493,6 +495,20 @@ enum SnapshotHarness {
             await wait(0.6)
             await scrollChat(toTop: false)
             capture(appearance, "strata-too-large")
+
+            // Through a Cloudflare Tunnel: the edge's 524 after 100 s, and a reply cut off mid-stream.
+            session.conversation.messages.append(Message(role: .user, content: "Summarize the four photos in one table."))
+            session.conversation.messages.append(Message(
+                role: .assistant, content: "", model: "strata-qwen", isComplete: false,
+                error: "HTTP 524: Cloudflare error 524: A timeout occurred · Ray ID 8f1a2b3c4d5e6f70-SYD"))
+            session.conversation.messages.append(Message(role: .user, content: "Try again, shorter."))
+            session.conversation.messages.append(Message(
+                role: .assistant, content: "| Photo | What it shows |\n|---|---|\n| 1 | The whiteboard before the meeting |", model: "strata-qwen",
+                isComplete: false,
+                error: "API error: The connection closed before the reply finished (through Cloudflare): The network connection was lost."))
+            await wait(0.6)
+            await scrollChat(toTop: false)
+            capture(appearance, "strata-cloudflare-errors")
         }
     }
 

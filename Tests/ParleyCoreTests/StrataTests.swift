@@ -390,9 +390,15 @@ struct StrataIntegrationTests {
     }
 
     @Test func streamsProgressReasoningAndTimings() async throws {
+        // The engine sends prompt progress when asked for it.
+        try await withStrata("strata-engine") { base in
+            let (_, _, deltas) = try await stream(base, strataOptions("strata-qwen"))
+            #expect(deltas.contains { $0.promptProgress != nil })
+        }
         try await withStrata("strata-share") { base in
             let (acc, meter, deltas) = try await stream(base, strataOptions("strata-qwen"))
-            #expect(deltas.contains { $0.promptProgress != nil })
+            // Live, the share port sends none although Parley asks (keep-alive comments only).
+            #expect(!deltas.contains { $0.promptProgress != nil })
             #expect(acc.reasoning == "The user wants an echo.")
             #expect(acc.content == #"You said: "hello" (0 images received)"#)
             #expect(acc.usage?.cachedPromptTokens != nil)

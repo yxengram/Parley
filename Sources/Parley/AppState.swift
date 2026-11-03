@@ -485,6 +485,39 @@ final class AppState {
         contextInfo[ContextKey(provider: provider, model: model)]
     }
 
+    /// The Strata instance this provider reaches for the model: its link at its current address
+    /// (set by every probe, and moved along when another route saw Strata restart the model),
+    /// else this launch's probe. Nil for other servers.
+    func contextInstanceID(provider: Provider, model: String) -> String? {
+        settings.linkedInstanceID(providerID: provider.id, model: model, baseURL: provider.baseURL)
+            ?? contextInfo(provider: provider, model: model)?.serverInstanceID
+    }
+
+    /// The user's value for this model, shared by every provider that reaches the same Strata instance.
+    func manualContextLength(provider: Provider, model: String) -> Int? {
+        settings.manualContextLength(providerID: provider.id, model: model,
+                                     instanceID: contextInstanceID(provider: provider, model: model))
+    }
+
+    func setManualContextLength(_ value: Int?, provider: Provider, model: String) {
+        settings.setManualContextLength(value, providerID: provider.id, model: model,
+                                        instanceID: contextInstanceID(provider: provider, model: model))
+    }
+
+    /// The size an overflow error named (persisted, shared like the manual value).
+    func learnedContextLength(provider: Provider, model: String) -> Int? {
+        settings.learnedContextLength(providerID: provider.id, model: model,
+                                      instanceID: contextInstanceID(provider: provider, model: model))
+    }
+
+    /// The limit the strip uses: server-reported > your value or the one learned from an error (an
+    /// overflow naming another size replaces your value, see replyFinished) > model maximum.
+    func contextLimit(provider: Provider, model: String) -> ContextLimit? {
+        ContextBudget.limit(info: contextInfo(provider: provider, model: model),
+                            manual: manualContextLength(provider: provider, model: model),
+                            learned: learnedContextLength(provider: provider, model: model))
+    }
+
     func isProbingContext(provider: Provider, model: String) -> Bool {
         contextProbing.contains(ContextKey(provider: provider, model: model))
     }
@@ -526,6 +559,22 @@ final class AppState {
         } else {
             emptyProbeAt[key] = nil
             contextInfo[key] = info
+            if let instance = info.serverInstanceID {
+                settings.linkInstance(instance, providerID: key.providerID, model: key.model, baseURL: key.baseURL)
+            } else if info.serverKind != nil && info.serverKind != .strata {
+                // The provider now points at another server: its values are its own again.
+                // (A probe that learned nothing keeps the link: the server may just be down.)
+                settings.unlinkInstance(providerID: key.providerID, model: key.model)
+            }
+            // The server reports the size it uses now: an older error's size no longer applies
+            // (LM Studio reloaded at another size; it would outlive a later unload otherwise).
+            if let loaded = info.loadedContextLength {
+                let instance = info.serverInstanceID
+                if let learned = settings.learnedContextLength(providerID: key.providerID, model: key.model, instanceID: instance),
+                   learned != loaded {
+                    settings.setLearnedContextLength(nil, providerID: key.providerID, model: key.model, instanceID: instance)
+                }
+            }
         }
     }
 
@@ -581,6 +630,8 @@ final class AppState {
                 notes.append("The server loaded the model with \(applied.formatted()) tokens instead.")
             }
             let newKey = ContextKey(provider: provider, model: info.model)
+            // A size learned from an earlier overflow described the old load.
+            settings.setLearnedContextLength(nil, providerID: provider.id, model: model)
             if info.model != model {
                 // The old instance id no longer exists on the server.
                 contextInfo[key] = nil
@@ -604,9 +655,7 @@ final class AppState {
     }
 
     private static func normalizedBaseURL(_ s: String) -> String {
-        var t = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        while t.hasSuffix("/") { t.removeLast() }
-        return t
+        AppSettings.normalizedBaseURL(s)
     }
 
     /// After a reply: a model that was not loaded has been loaded by the request (JIT), so its
@@ -619,12 +668,16 @@ final class AppState {
         guard !model.isEmpty, let last = session.conversation.messages.last, last.role == .assistant else { return }
         let key = ContextKey(provider: provider, model: model)
         if let error = last.error {
+            // Remembered across launches and shared with every route to the same Strata instance.
+            // The newer value wins: a later overflow naming another size replaces the learned one
+            // and also a value the user typed earlier (the server just said what it uses); a value
+            // typed after it wins over it.
             if let n = ContextBudget.contextLength(fromError: error) {
-                var info = contextInfo[key] ?? ModelContextInfo(model: model)
-                if info.loadedContextLength == nil {
-                    info.loadedContextLength = n
-                    contextInfo[key] = info
+                if let manual = manualContextLength(provider: provider, model: model), manual != n {
+                    setManualContextLength(nil, provider: provider, model: model)
                 }
+                settings.setLearnedContextLength(n, providerID: provider.id, model: model,
+                                                 instanceID: contextInstanceID(provider: provider, model: model))
             }
             // Strata's shared port cannot say whether the model reads images; its refusal does.
             // Remembered (memory only), so the composer warns before the next image is sent.

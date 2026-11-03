@@ -802,7 +802,10 @@ struct AppFlowTests {
 
     @Test func reloadModelThroughAppState() async throws {
         try await withFixture { fx in
+            // A size learned from an earlier overflow described the old load.
+            fx.settings.setLearnedContextLength(4000, providerID: fx.provider.id, model: "mock-plain")
             try await fx.state.reloadModel(provider: fx.provider, model: "mock-plain", contextLength: 12000)
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "mock-plain") == nil)
             let info = try #require(fx.state.contextInfo(provider: fx.provider, model: "mock-plain"))
             #expect(info.loadedContextLength == 12000)
             #expect(info.instanceIDs == ["mock-plain"])
@@ -975,14 +978,16 @@ struct AppFlowTests {
             try await fx.send(String(repeating: "word ", count: 8000), in: session)
             let error = try #require(session.conversation.messages.last?.error)
             fx.state.replyFinished(in: session)
-            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen")?.loadedContextLength == 8192)
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen")?.loadedContextLength == nil)
             #expect(ErrorPresentation.make(error).title == "The conversation no longer fits in the model's context")
         }
     }
 
-    // Prompt reading is published while the reply waits for its first token.
+    // Prompt reading is published while the reply waits for its first token (Strata's engine;
+    // the share port sends no progress, so there only the waiting time shows).
     @Test func strataPromptProgressIsLive() async throws {
-        try await withFixture(model: "strata-slow", flavor: "strata-share") { fx in
+        try await withFixture(model: "strata-slow", flavor: "strata-engine") { fx in
             await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-slow")
             let session = try await fx.create()
             session.send(text: "slow", attachments: [], settings: fx.settings)
@@ -1006,7 +1011,7 @@ struct AppFlowTests {
             #expect(session.conversation.messages.last?.error != nil)
             #expect(try await lastRequest(fx)["max_tokens"] as? Int == 9000)
             fx.state.replyFinished(in: session)
-            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-nofit")?.loadedContextLength == 8192)
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-nofit") == ContextLimit(tokens: 8192, source: .learned))
             let error = try #require(session.conversation.messages.last?.error)
             let room = try #require(ContextBudget.strataOverflow(fromError: error)?.room)
             #expect(ErrorPresentation.make(error).detail?.contains("to at most \(TokenFormat.grouped(room))") == true)
@@ -1019,4 +1024,266 @@ struct AppFlowTests {
         }
     }
 
+
+    // MARK: Strata over two routes (Tailscale and a Cloudflare Tunnel: same instance id)
+
+    /// A second provider for the same mock, reached through its /cf prefix (Cloudflare's headers on
+    /// every answer), as the user's Cloudflare Tunnel route reaches the same Strata.
+    private func cloudflareRoute(_ fx: Fixture) -> Provider {
+        let route = Provider(name: "Strata (Cloudflare)", baseURL: fx.provider.baseURL.replacingOccurrences(of: "/v1", with: "/cf/v1"),
+                             defaultModel: fx.provider.defaultModel)
+        fx.settings.providers.append(route)
+        return route
+    }
+
+    // An overflow on one route teaches every route to the same Strata instance, survives a relaunch,
+    // and gives way to the user's own value, which is shared the same way.
+    @Test func strataContextIsSharedAcrossRoutes() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            let tunnel = cloudflareRoute(fx)
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            await fx.state.refreshContextInfo(provider: tunnel, model: "strata-qwen")
+            #expect(fx.state.contextInstanceID(provider: fx.provider, model: "strata-qwen") == "inst-0")
+            #expect(fx.state.contextInstanceID(provider: tunnel, model: "strata-qwen") == "inst-0")
+            #expect(fx.state.contextLimit(provider: tunnel, model: "strata-qwen") == nil)
+
+            // The overflow happens on the direct route…
+            let session = try await fx.create()
+            try await fx.send(String(repeating: "word ", count: 8000), in: session)
+            fx.state.replyFinished(in: session)
+            // …and the tunnel route knows the size too.
+            #expect(fx.state.contextLimit(provider: tunnel, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+
+            // Persisted: a relaunch (new AppState and settings on the same defaults) shows it before any probe.
+            let relaunched = AppState(settings: AppSettings(defaults: fx.defaults))
+            #expect(relaunched.contextLimit(provider: tunnel, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+            #expect(relaunched.contextLimit(provider: fx.provider, model: "strata-qwen")?.source == .learned)
+            // Another model on the same server is not affected.
+            #expect(relaunched.learnedContextLength(provider: tunnel, model: "strata-slow") == nil)
+
+            // The user's value wins over the learned one, on every route.
+            fx.state.setManualContextLength(131072, provider: tunnel, model: "strata-qwen")
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 131072, source: .manual))
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "strata-qwen") == 8192)
+            // Cleared from the other route, it is gone everywhere: the learned value applies again.
+            fx.state.setManualContextLength(nil, provider: fx.provider, model: "strata-qwen")
+            #expect(fx.state.contextLimit(provider: tunnel, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+            #expect(AppSettings(defaults: fx.defaults).contextLengthOverrides.isEmpty)
+        }
+    }
+
+    // A later overflow naming another size replaces the learned one, and the user's older value.
+    // A value typed before the instance was known (stored per provider) moves to the instance, so
+    // the other route gets it.
+    @Test func strataLearnedValueUpdatesAndOldValuesMove() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            fx.settings.setManualContextLength(65536, providerID: fx.provider.id, model: "strata-qwen")
+            fx.settings.setLearnedContextLength(4096, providerID: fx.provider.id, model: "strata-qwen")
+            let tunnel = cloudflareRoute(fx)
+            #expect(fx.state.manualContextLength(provider: tunnel, model: "strata-qwen") == nil)
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            await fx.state.refreshContextInfo(provider: tunnel, model: "strata-qwen")
+            #expect(fx.state.manualContextLength(provider: tunnel, model: "strata-qwen") == 65536)
+            #expect(fx.settings.contextLengthOverrides[AppSettings.contextKey(providerID: fx.provider.id, model: "strata-qwen")] == nil)
+
+            let session = try await fx.create()
+            session.conversation.settings.providerID = tunnel.id
+            try await fx.send(String(repeating: "word ", count: 8000), in: session)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "strata-qwen") == 8192)
+            // The overflow is newer than the typed 65536 and contradicts it: the server's size wins.
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+            #expect(fx.state.manualContextLength(provider: tunnel, model: "strata-qwen") == nil)
+        }
+    }
+
+    // The newer of the user's value and the overflow's size wins.
+    @Test func newerContextValueWins() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            // Typed, then Strata's setup changed: the next overflow names the real size.
+            fx.state.setManualContextLength(131072, provider: fx.provider, model: "strata-qwen")
+            let session = try await fx.create()
+            try await fx.send(String(repeating: "word ", count: 8000), in: session)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .learned))
+            #expect(fx.state.manualContextLength(provider: fx.provider, model: "strata-qwen") == nil)
+            #expect(AppSettings(defaults: fx.defaults).contextLengthOverrides.isEmpty)
+
+            // Typed after the overflow: the user's value wins.
+            fx.state.setManualContextLength(16384, provider: fx.provider, model: "strata-qwen")
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 16384, source: .manual))
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "strata-qwen") == 8192)
+
+            // An overflow naming the same size as the user's value changes nothing.
+            fx.state.setManualContextLength(8192, provider: fx.provider, model: "strata-qwen")
+            try await fx.send(String(repeating: "word ", count: 8000), in: session)
+            fx.state.replyFinished(in: session)
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "strata-qwen") == ContextLimit(tokens: 8192, source: .manual))
+        }
+    }
+
+    // Strata started the model again under a new id (seen live for the same model): the user's value
+    // follows, the learned one does not, every route follows to the new id, and the old id's values
+    // are removed, so a value cleared on one route cannot come back from another.
+    @Test func restartedStrataInstanceCarriesOnlyTheUsersValue() throws {
+        let root = try makeTempRoot()
+        let suiteName = defaultsSuiteName(in: root)
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { removeDefaultsSuite(suiteName, defaults, root: root) }
+        let settings = AppSettings(defaults: defaults)
+        let a = UUID(), b = UUID(), m = "iq3_s"
+        let urlA = "http://100.101.102.103:47832/v1", urlB = "https://strata.example.net/v1"
+        settings.linkInstance("X1", providerID: a, model: m, baseURL: urlA)
+        settings.linkInstance("X1", providerID: b, model: m, baseURL: urlB)
+        settings.setManualContextLength(131072, providerID: a, model: m, instanceID: "X1")
+        settings.setLearnedContextLength(131072, providerID: b, model: m, instanceID: "X1")
+        #expect(settings.manualContextLength(providerID: b, model: m, instanceID: "X1") == 131072)
+
+        // Route A sees the new id first.
+        settings.linkInstance("X2", providerID: a, model: m, baseURL: urlA)
+        #expect(settings.manualContextLength(providerID: a, model: m, instanceID: "X2") == 131072)
+        #expect(settings.learnedContextLength(providerID: a, model: m, instanceID: "X2") == nil)
+        #expect(settings.linkedInstanceID(providerID: b, model: m, baseURL: urlB) == "X2")
+        #expect(!settings.contextLengthOverrides.keys.contains { $0.contains("X1") })
+        #expect(settings.learnedContextLengths.isEmpty)
+
+        // Clear on A, then B's probe sees X2: nothing comes back.
+        settings.setManualContextLength(nil, providerID: a, model: m, instanceID: "X2")
+        settings.linkInstance("X2", providerID: b, model: m, baseURL: urlB)
+        #expect(settings.manualContextLength(providerID: b, model: m, instanceID: "X2") == nil)
+        #expect(settings.contextLengthOverrides.isEmpty)
+
+        // Persisted (links with their address) and read back after a relaunch.
+        settings.setManualContextLength(65536, providerID: b, model: m, instanceID: "X2")
+        let relaunched = AppSettings(defaults: defaults)
+        #expect(relaunched.contextInstanceLinks == settings.contextInstanceLinks)
+        #expect(relaunched.linkedInstanceID(providerID: a, model: m, baseURL: urlA + "/") == "X2")
+        #expect(relaunched.manualContextLength(providerID: a, model: m, instanceID: "X2") == 65536)
+    }
+
+    // Within one launch: when one route sees Strata's new id, the other route (probed earlier, its
+    // cached probe still naming the old id) follows at once and keeps the user's value.
+    @Test func otherRouteFollowsARestartedInstance() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            let tunnel = cloudflareRoute(fx)
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            await fx.state.refreshContextInfo(provider: tunnel, model: "strata-qwen")
+            fx.state.setManualContextLength(32768, provider: tunnel, model: "strata-qwen")
+            fx.settings.linkInstance("inst-1", providerID: fx.provider.id, model: "strata-qwen", baseURL: fx.provider.baseURL)
+            #expect(fx.state.contextInfo(provider: tunnel, model: "strata-qwen")?.serverInstanceID == "inst-0")
+            #expect(fx.state.contextInstanceID(provider: tunnel, model: "strata-qwen") == "inst-1")
+            #expect(fx.state.contextLimit(provider: tunnel, model: "strata-qwen") == ContextLimit(tokens: 32768, source: .manual))
+        }
+    }
+
+    // A provider pointed at another address: its link stops counting at once, and the instance it
+    // finds there starts empty (another Strata serving the same model name has its own values).
+    @Test func repointedStrataProviderStartsFresh() throws {
+        let root = try makeTempRoot()
+        let suiteName = defaultsSuiteName(in: root)
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { removeDefaultsSuite(suiteName, defaults, root: root) }
+        let settings = AppSettings(defaults: defaults)
+        let a = UUID(), m = "iq3_s"
+        let oldURL = "http://100.101.102.103:47832/v1", newURL = "http://192.168.1.30:47832/v1"
+        settings.linkInstance("Y1", providerID: a, model: m, baseURL: oldURL)
+        settings.setManualContextLength(32768, providerID: a, model: m, instanceID: "Y1")
+        settings.setLearnedContextLength(32768, providerID: a, model: m, instanceID: "Y1")
+        #expect(settings.linkedInstanceID(providerID: a, model: m, baseURL: newURL) == nil)
+        settings.linkInstance("Z1", providerID: a, model: m, baseURL: newURL)
+        #expect(settings.manualContextLength(providerID: a, model: m, instanceID: "Z1") == nil)
+        #expect(settings.learnedContextLength(providerID: a, model: m, instanceID: "Z1") == nil)
+        // Nothing links to Y1 any more.
+        #expect(settings.contextLengthOverrides.isEmpty && settings.learnedContextLengths.isEmpty)
+        // A link stored by an earlier build (a bare id string) is ignored, not misread.
+        defaults.set(["\(a.uuidString)|\(m)": "Y1"], forKey: "contextInstanceLinks")
+        #expect(AppSettings(defaults: defaults).linkedInstanceID(providerID: a, model: m, baseURL: oldURL) == nil)
+    }
+
+    // A provider repointed from Strata to another server stops sharing the old instance's values.
+    @Test func repointedProviderDropsTheInstanceLink() async throws {
+        let lmStudio = try await startMockServer()
+        do {
+            try await repointedProviderBody(lmStudio)
+        } catch {
+            await lmStudio.stop()
+            throw error
+        }
+        await lmStudio.stop()
+    }
+
+    private func repointedProviderBody(_ lmStudio: MockServer) async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-share") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "strata-qwen")
+            #expect(fx.state.contextInstanceID(provider: fx.provider, model: "strata-qwen") == "inst-0")
+            fx.state.setManualContextLength(32768, provider: fx.provider, model: "strata-qwen")
+            fx.settings.providers[0].baseURL = lmStudio.baseURL
+            let moved = fx.settings.providers[0]
+            // Before any probe at the new address the old link already does not count.
+            #expect(fx.state.contextInstanceID(provider: moved, model: "strata-qwen") == nil)
+            #expect(fx.state.manualContextLength(provider: moved, model: "strata-qwen") == nil)
+            await fx.state.refreshContextInfo(provider: moved, model: "strata-qwen")
+            #expect(fx.state.contextInstanceID(provider: moved, model: "strata-qwen") == nil)
+            fx.state.setManualContextLength(4096, provider: moved, model: "strata-qwen")
+            #expect(fx.settings.contextLengthOverrides[AppSettings.contextKey(providerID: moved.id, model: "strata-qwen")] == 4096)
+            // No provider reaches inst-0 any more: its values are removed.
+            #expect(fx.settings.contextLengthOverrides[AppSettings.contextKey(instanceID: "inst-0", model: "strata-qwen")] == nil)
+        }
+    }
+
+    // Without an instance id (any other server) values stay per provider and model, as before.
+    @Test func learnedValuesStayPerProviderElsewhere() async throws {
+        try await withFixture { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain")
+            #expect(fx.state.contextInstanceID(provider: fx.provider, model: "mock-plain") == nil)
+            let other = Provider(name: "Other", baseURL: fx.provider.baseURL)
+            fx.settings.providers.append(other)
+            fx.settings.setLearnedContextLength(4000, providerID: other.id, model: "mock-notloaded")
+            #expect(fx.state.learnedContextLength(provider: other, model: "mock-notloaded") == 4000)
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "mock-notloaded") == nil)
+            // The loaded size the server reports wins over a learned one…
+            fx.settings.setLearnedContextLength(4000, providerID: fx.provider.id, model: "mock-plain")
+            #expect(fx.state.contextLimit(provider: fx.provider, model: "mock-plain") == ContextLimit(tokens: 8192, source: .server))
+            // …and replaces it at the next probe, so it cannot outlive a later unload.
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain", force: true)
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "mock-plain") == nil)
+            // A model the server reports no loaded size for keeps its learned value.
+            fx.settings.setLearnedContextLength(4000, providerID: fx.provider.id, model: "mock-notloaded")
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-notloaded", force: true)
+            #expect(fx.state.learnedContextLength(provider: fx.provider, model: "mock-notloaded") == 4000)
+        }
+    }
+
+    // A reply cut off mid-stream keeps its text and reads as an interruption, not "can't reach".
+    @Test func droppedStreamKeepsThePartialReply() async throws {
+        try await withFixture(model: "mock-drop") { fx in
+            let session = try await fx.create()
+            try await fx.send("hello", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.content.hasPrefix("Partial answer") && !reply.isComplete)
+            let error = try #require(reply.error)
+            let p = ErrorPresentation.make(error, providerName: "Mock", partialReply: true)
+            #expect(p.title == "The connection dropped before the reply finished")
+            #expect(p.detail?.hasPrefix("The text received so far is kept.") == true && p.retryable && !p.suggestsSettings)
+            let disk = try #require(try readPlain(session.fileURL).messages.last)
+            #expect(disk.content == reply.content && disk.error == error)
+        }
+    }
+
+    // Cloudflare's 524 through the app: stored as one line, shown as what to do.
+    @Test func cloudflareTimeoutReadsAsGuidance() async throws {
+        try await withFixture(model: "mock-plain") { fx in
+            fx.settings.providers[0].baseURL = fx.provider.baseURL.replacingOccurrences(of: "/v1", with: "/cf-524/v1")
+            let session = try await fx.create()
+            try await fx.send("hello", in: session)
+            let error = try #require(session.conversation.messages.last?.error)
+            #expect(error.hasPrefix("HTTP 524: Cloudflare error 524: A timeout occurred") && !error.contains("<"))
+            let p = ErrorPresentation.make(error, providerName: "Strata", serverKind: .strata)
+            #expect(p.title == "No answer within Cloudflare's 100-second limit")
+            #expect(p.detail?.contains("Tailscale") == true)
+            let disk = try readFile(session.fileURL)
+            #expect(!disk.isEmpty && !contains(disk, "<!DOCTYPE"))
+        }
+    }
 }
