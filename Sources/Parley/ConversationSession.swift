@@ -60,6 +60,14 @@ final class ConversationSession: Identifiable {
     /// What AppState knows about a provider's model (server kind, context length, limits); set
     /// when the session is registered. Nil (or a nil answer) sends a plain OpenAI-style request.
     @ObservationIgnored var serverInfo: ((Provider, String) -> ModelContextInfo?)?
+    /// Waits (briefly, cancellable) for AppState's probe of the server. Used before a request whose
+    /// fields depend on the server kind when nothing is known yet; nil sends at once. The Bool asks
+    /// for the longer wait a thinking budget needs.
+    @ObservationIgnored var awaitServerInfo: ((Provider, String, Bool) async -> ModelContextInfo?)?
+    /// Whether this provider's model refused one of these "no thinking" fields earlier this launch,
+    /// and how a refusal is recorded (AppState.thinkingOffRejections).
+    @ObservationIgnored var thinkingOffRejected: ((Provider, String, [String]) -> Bool)?
+    @ObservationIgnored var markThinkingOffRejected: ((Provider, String, [String]) -> Void)?
     /// What is known to be on disk: set only after a write succeeded (or on load). Lets
     /// Lock/quit skip rewriting an unchanged file, and never skip after a failed save.
     /// Copy-on-write keeps this cheap.
@@ -260,6 +268,11 @@ final class ConversationSession: Identifiable {
         let info = serverInfo?(provider, model)
         options.serverKind = info?.serverKind
         options.maxRequestBytes = info?.maxRequestBytes
+        // "None (no thinking)" and the thinking budget are shaped per server kind: right after
+        // launch the probe may still be running, and sending without its answer would drop them.
+        // What was refused earlier is checked once the kind is known (runStream).
+        let waitsForServer = info == nil
+            && (conversation.settings.disablesThinking == true || conversation.settings.reasoningBudgetTokens != nil)
 
         conversation.messages.append(placeholder)
         conversation.updatedAt = Date()
@@ -271,11 +284,13 @@ final class ConversationSession: Identifiable {
         streamingMessageID = placeholder.id
         streamIsReasoning = false
         streamReasoningStartedAt = nil
+        liveSendsThinkingOff = false
         saveNow()
 
         let messageID = placeholder.id
+        let target = (provider: provider, model: model, waitsForServer: waitsForServer)
         streamTask = Task { [weak self] in
-            await self?.runStream(client: client, history: history, options: options, messageID: messageID)
+            await self?.runStream(client: client, history: history, options: options, messageID: messageID, target: target)
         }
     }
 
@@ -287,22 +302,67 @@ final class ConversationSession: Identifiable {
 
     @ObservationIgnored private var liveAccumulator = StreamAccumulator()
     @ObservationIgnored private var liveMeter = GenerationMeter()
+    /// The in-flight request carries the "no thinking" fields (cleared when the server refused them).
+    @ObservationIgnored private var liveSendsThinkingOff = false
+    /// The server kind that request was shaped for (stored with an "ignored" note).
+    @ObservationIgnored private var liveThinkingOffServerKind: InferenceServerKind?
     /// How often the live speed is published.
     static let liveStatsInterval: TimeInterval = 0.25
 
-    private func runStream(client: ChatClient, history: [Message], options: ChatRequestOptions, messageID: UUID) async {
+    private func runStream(
+        client: ChatClient, history: [Message], options: ChatRequestOptions, messageID: UUID,
+        target: (provider: Provider, model: String, waitsForServer: Bool)
+    ) async {
         // Stopped (or closed) before the task first ran: never open the request.
         guard streamingMessageID == messageID, !isClosed else { return }
         if Task.isCancelled {
             finalizeStreamingMessage(stoppedEarly: true)
             return
         }
+        var options = options
+        if target.waitsForServer, let awaitServerInfo {
+            let forBudget = options.reasoningBudgetTokens != nil && !options.disablesThinking
+            let info = await awaitServerInfo(target.provider, target.model, forBudget)
+            // Stop (or Lock) during the wait has already finalized the message.
+            guard streamingMessageID == messageID, !isClosed else { return }
+            if Task.isCancelled {
+                finalizeStreamingMessage(stoppedEarly: true)
+                return
+            }
+            options.serverKind = info?.serverKind
+            options.maxRequestBytes = info?.maxRequestBytes
+            // Time to first token measures the server, not the probe.
+            liveMeter = GenerationMeter(requestStartedAt: Date())
+        }
+        // The fields "None" takes on this server kind; left out when this provider's model refused
+        // one of them earlier this launch. That reply says so once the server has answered it.
+        var notedNotAccepted = false
+        var pendingNotAccepted = false
+        let thinkingOffFields = ChatClient.sentThinkingOffFields(options)
+        if !thinkingOffFields.isEmpty, thinkingOffRejected?(target.provider, target.model, thinkingOffFields) == true {
+            options.omitsThinkingOff = true
+            pendingNotAccepted = true
+        }
+        liveSendsThinkingOff = !ChatClient.sentThinkingOffFields(options).isEmpty
+        liveThinkingOffServerKind = options.serverKind
         var lastFlush = Date.distantPast
         var lastStats = Date.distantPast
         var failure: Error?
         do {
             for try await delta in client.streamChat(messages: history, options: options) {
                 if Task.isCancelled { break }
+                if delta.thinkingOffRejected {
+                    // The server refused "no thinking" and accepted the request without it.
+                    markThinkingOffRejected?(target.provider, target.model, thinkingOffFields)
+                    liveSendsThinkingOff = false
+                    pendingNotAccepted = true
+                }
+                if pendingNotAccepted, !notedNotAccepted {
+                    // The server has answered (a delta only comes from a 2xx).
+                    notedNotAccepted = true
+                    if let idx = index(of: messageID) { conversation.messages[idx].thinkingOffNotAccepted = true }
+                }
+                if delta.thinkingOffRejected { continue }
                 let now = Date()
                 liveAccumulator.apply(delta, now: now)
                 liveMeter.record(delta, now: now)
@@ -438,7 +498,15 @@ final class ConversationSession: Identifiable {
     private func endStreaming() {
         if let id = streamingMessageID, let idx = index(of: id) {
             conversation.messages[idx].stats = liveMeter.finalStats()
+            // "None" was sent and thinking came anyway (an empty <think></think> does not count).
+            if liveSendsThinkingOff, conversation.messages[idx].thinkingOffNotAccepted != true,
+               !(conversation.messages[idx].reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                conversation.messages[idx].thinkingOffIgnored = true
+                conversation.messages[idx].thinkingOffServerKind = liveThinkingOffServerKind?.rawValue
+            }
         }
+        liveSendsThinkingOff = false
+        liveThinkingOffServerKind = nil
         liveGeneration = nil
         streamTask = nil
         streamingMessageID = nil

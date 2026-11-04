@@ -54,6 +54,18 @@ final class AppState {
     /// conversation started them: a second load of a model that is not loaded yet would add
     /// another copy on the server.
     @ObservationIgnored private var reloadsInFlight: Set<String> = []
+    /// The "no thinking" fields (ChatClient.thinkingOffFields keys) each provider + model refused
+    /// this launch (memory only): later replies that would carry one of them leave the fields out
+    /// and say so. By field, because the shape depends on the server kind, which may not have
+    /// been known for the refused request. Per AppState instance, not process-wide.
+    private(set) var thinkingOffRejections: [ContextKey: Set<String>] = [:]
+    /// How long a send with "None (no thinking)" waits for a context probe that has not finished
+    /// yet. Stop ends the wait at once.
+    @ObservationIgnored var serverInfoWaitTimeout: TimeInterval = 4
+    /// The same for a send with a thinking budget: long enough for one probe GET (the models list
+    /// that identifies Strata, also through a slow tunnel), since without the server kind the
+    /// budget is dropped. "None" needs less: its unknown-server shape is Strata's.
+    @ObservationIgnored var serverInfoBudgetWaitTimeout: TimeInterval = ChatClient.probeTimeout + 1.5
 
     enum ReloadState: Equatable {
         case running(contextLength: Int)
@@ -200,6 +212,17 @@ final class AppState {
         // What the server said about the model (kind, limits) shapes the request (Strata fields).
         session.serverInfo = { [weak self] provider, model in
             self?.contextInfo(provider: provider, model: model)
+        }
+        session.awaitServerInfo = { [weak self] provider, model, forBudget in
+            guard let self else { return nil }
+            return await self.awaitServerInfo(provider: provider, model: model,
+                                              timeout: forBudget ? self.serverInfoBudgetWaitTimeout : self.serverInfoWaitTimeout)
+        }
+        session.thinkingOffRejected = { [weak self] provider, model, fields in
+            self?.isThinkingOffRejected(provider: provider, model: model, fields: fields) ?? false
+        }
+        session.markThinkingOffRejected = { [weak self] provider, model, fields in
+            self?.markThinkingOffRejected(provider: provider, model: model, fields: fields)
         }
         sessions[session.id] = session
     }
@@ -525,19 +548,24 @@ final class AppState {
     /// Asks this provider's own server about the model's context length (read-only GETs; see
     /// ChatClient.fetchModelInfo). Cached per provider, base URL and model; `force` re-reads.
     func refreshContextInfo(provider: Provider, model: String, force: Bool = false) async {
+        guard let task = startContextProbe(provider: provider, model: model, force: force) else { return }
+        await task.value
+    }
+
+    /// The running probe, or a new one when one is due (see refreshContextInfo). Started
+    /// synchronously, so `probeTasks` names it before the caller's first await.
+    @discardableResult
+    private func startContextProbe(provider: Provider, model: String, force: Bool) -> Task<Void, Never>? {
         let key = ContextKey(provider: provider, model: model)
-        guard !model.isEmpty else { return }
-        if let running = probeTasks[key] {
-            await running.value
-            return
-        }
+        guard !model.isEmpty else { return nil }
+        if let running = probeTasks[key] { return running }
         // A reload re-reads the server itself when it is done.
-        if reloadStates[key]?.isRunning == true { return }
+        if reloadStates[key]?.isRunning == true { return nil }
         if !force {
-            if contextInfo[key] != nil { return }
-            if let at = emptyProbeAt[key], Date().timeIntervalSince(at) < Self.emptyProbeRetryInterval { return }
+            if contextInfo[key] != nil { return nil }
+            if let at = emptyProbeAt[key], Date().timeIntervalSince(at) < Self.emptyProbeRetryInterval { return nil }
         }
-        guard let client = try? ChatClient(baseURL: provider.baseURL, apiKey: try? KeychainStore.apiKey(for: provider.id)) else { return }
+        guard let client = try? ChatClient(baseURL: provider.baseURL, apiKey: try? KeychainStore.apiKey(for: provider.id)) else { return nil }
         contextProbing.insert(key)
         let task = Task { [weak self] in
             let info = await client.fetchModelInfo(model: model)
@@ -547,7 +575,41 @@ final class AppState {
             self.store(info, for: key)
         }
         probeTasks[key] = task
-        await task.value
+        return task
+    }
+
+    /// What is known about the model, waiting up to `timeout` (default `serverInfoWaitTimeout`) for
+    /// a probe (started here when none ran recently). Polls instead of awaiting the probe, so
+    /// cancelling the caller (Stop) ends the wait at once; the probe keeps running and stores its result.
+    func awaitServerInfo(provider: Provider, model: String, timeout: TimeInterval? = nil) async -> ModelContextInfo? {
+        let key = ContextKey(provider: provider, model: model)
+        if let info = contextInfo[key] { return info }
+        startContextProbe(provider: provider, model: model, force: false)
+        let deadline = Date().addingTimeInterval(timeout ?? serverInfoWaitTimeout)
+        while probeTasks[key] != nil, Date() < deadline, !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        return contextInfo[key]
+    }
+
+    // MARK: - "No thinking" refusals
+
+    /// Whether this provider's model refused any of `fields` this launch; with no fields, whether
+    /// it refused anything.
+    func isThinkingOffRejected(provider: Provider, model: String, fields: [String]? = nil) -> Bool {
+        guard let refused = thinkingOffRejections[ContextKey(provider: provider, model: model)], !refused.isEmpty else { return false }
+        guard let fields else { return true }
+        return !refused.isDisjoint(with: fields)
+    }
+
+    func markThinkingOffRejected(provider: Provider, model: String, fields: [String]) {
+        guard !fields.isEmpty else { return }
+        thinkingOffRejections[ContextKey(provider: provider, model: model), default: []].formUnion(fields)
+    }
+
+    /// Forgets every refusal (tests; a later launch starts empty anyway).
+    func resetThinkingOffRejections() {
+        thinkingOffRejections.removeAll()
     }
 
     private func store(_ info: ModelContextInfo, for key: ContextKey) {

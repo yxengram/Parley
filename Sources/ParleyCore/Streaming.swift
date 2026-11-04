@@ -17,15 +17,19 @@ public struct ChatDelta: Sendable, Equatable {
     public var timings: ServerTimings?
     /// llama.cpp / Strata `prompt_progress` (only sent when the request asked for it).
     public var promptProgress: PromptProgress?
+    /// Not from the server: ChatClient yields a delta with only this set when the server refused
+    /// the "no thinking" field and accepted the request sent again without it (see streamChat).
+    public var thinkingOffRejected = false
 
     public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil,
-                timings: ServerTimings? = nil, promptProgress: PromptProgress? = nil) {
+                timings: ServerTimings? = nil, promptProgress: PromptProgress? = nil, thinkingOffRejected: Bool = false) {
         self.content = content
         self.reasoning = reasoning
         self.usage = usage
         self.finishReason = finishReason
         self.timings = timings
         self.promptProgress = promptProgress
+        self.thinkingOffRejected = thinkingOffRejected
     }
 }
 

@@ -10,8 +10,13 @@ public struct ChatRequestOptions: Sendable {
     public var temperature: Double?
     public var maxTokens: Int?
     public var reasoningEffort: ReasoningEffort?
-    /// Thinking off (ConversationSettings.disablesThinking). Sent only to Strata.
+    /// "None (no thinking)" (ConversationSettings.disablesThinking). Sent to every server, in the
+    /// shape `thinkingOffFields(for: serverKind)` gives.
     public var disablesThinking = false
+    /// Leave the "no thinking" fields out although `disablesThinking` is set: this server refused
+    /// them (earlier this launch, or in this request's first attempt). Everything else, the
+    /// Strata thinking budget rule included, still follows `disablesThinking`.
+    public var omitsThinkingOff = false
     /// ConversationSettings.reasoningBudgetTokens. Sent only to Strata.
     public var reasoningBudgetTokens: Int?
     /// What the app knows about the server (ModelContextInfo.serverKind). Fields only one server
@@ -176,6 +181,15 @@ public final class ChatClient: @unchecked Sendable {
     /// Asks for `stream_options: {include_usage: true}` (a final usage chunk). A server that
     /// rejects that field with HTTP 400/422 gets the same request once more without it, and is
     /// remembered (per base URL, in memory) so later requests leave it out.
+    ///
+    /// Likewise, a request carrying the "no thinking" fields (`thinkingOffFields`) that the server
+    /// answers with an HTTP 400/422 refusing them (ThinkingOffSupport.isRejection; never on Strata)
+    /// is sent once more without them. Only when that second request is answered with a 2xx does
+    /// the stream first yield a `ChatDelta` with only `thinkingOffRejected` set; the caller then
+    /// remembers the refusal (per provider and model) and tells the user that this reply used the
+    /// server's default thinking. When the second request fails too, the field was not the cause:
+    /// the first answer's error is thrown and nothing is yielded.
+    /// Each of the two retries happens at most once per call, in either order.
     public func streamChat(messages: [Message], options: ChatRequestOptions) -> AsyncThrowingStream<ChatDelta, Error> {
         let includeUsage = !StreamOptionsSupport.isRejected(by: baseURL)
         let request: URLRequest
@@ -189,13 +203,35 @@ public final class ChatClient: @unchecked Sendable {
             // caller drops its reference to the client.
             let task = Task {
                 do {
-                    do {
-                        try await self.runStream(request: request, rejectsStreamOptions: includeUsage, continuation: continuation)
-                    } catch is StreamOptionsRejected {
-                        // Nothing was yielded yet (the server answered with an error status).
-                        StreamOptionsSupport.markRejected(by: self.baseURL)
-                        let retry = try self.makeChatRequest(messages: messages, options: options, includeUsage: false)
-                        try await self.runStream(request: retry, rejectsStreamOptions: false, continuation: continuation)
+                    var request = request
+                    var options = options
+                    var includeUsage = includeUsage
+                    // The first answer's error while the request is being retried without the
+                    // "no thinking" fields: thrown if that retry is refused too.
+                    var thinkingOffRefusal: ParleyError?
+                    while true {
+                        let thinkingOff = Self.sentThinkingOffFields(options)
+                        do {
+                            try await self.runStream(request: request, rejectsStreamOptions: includeUsage,
+                                                     thinkingOffFields: thinkingOff, serverKind: options.serverKind,
+                                                     announcesThinkingOffRefusal: thinkingOffRefusal != nil,
+                                                     continuation: continuation)
+                            break
+                        } catch is StreamOptionsRejected {
+                            // Nothing was yielded yet (the server answered with an error status).
+                            StreamOptionsSupport.markRejected(by: self.baseURL)
+                            includeUsage = false
+                        } catch let rejected as ThinkingOffRejected {
+                            options.omitsThinkingOff = true
+                            thinkingOffRefusal = rejected.error
+                        } catch let error as ParleyError {
+                            // The retry without the field was refused as well: the field was not
+                            // the cause, so the server's first answer is the one to show.
+                            if case .http = error, let first = thinkingOffRefusal { throw first }
+                            throw error
+                        }
+                        // Each retry turns its own flag off, so neither can be thrown twice.
+                        request = try self.makeChatRequest(messages: messages, options: options, includeUsage: includeUsage)
                     }
                     continuation.finish()
                 } catch {
@@ -213,10 +249,16 @@ public final class ChatClient: @unchecked Sendable {
     }
 
     /// With `rejectsStreamOptions`, an HTTP 400/422 whose body blames `stream_options` throws
-    /// StreamOptionsRejected instead of the HTTP error, so the caller can retry without it.
+    /// StreamOptionsRejected instead of the HTTP error, so the caller can retry without it. With
+    /// `thinkingOffFields` (the "no thinking" keys this request carries), one that refuses them
+    /// throws ThinkingOffRejected. With `announcesThinkingOffRefusal` (this is that retry), a 2xx
+    /// answer first yields the `thinkingOffRejected` delta.
     private func runStream(
         request: URLRequest,
         rejectsStreamOptions: Bool,
+        thinkingOffFields: [String],
+        serverKind: InferenceServerKind?,
+        announcesThinkingOffRefusal: Bool,
         continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
     ) async throws {
         let (bytes, response) = try await session.bytes(for: request)
@@ -234,7 +276,14 @@ public final class ChatClient: @unchecked Sendable {
             if rejectsStreamOptions, StreamOptionsSupport.isRejection(status: status, body: body) {
                 throw StreamOptionsRejected()
             }
+            if ThinkingOffSupport.isRejection(status: status, body: body, sentFields: thinkingOffFields, serverKind: serverKind) {
+                throw ThinkingOffRejected(error: ParleyError.http(status: status, body: body))
+            }
             throw ParleyError.http(status: status, body: body)
+        }
+        if announcesThinkingOffRefusal {
+            // The request without the "no thinking" fields was accepted: they were the cause.
+            continuation.yield(ChatDelta(thinkingOffRejected: true))
         }
 
         // From here on the server has answered: a transport error is a broken reply, not an
@@ -438,16 +487,57 @@ public final class ChatClient: @unchecked Sendable {
         if let m = options.maxTokens { body["max_tokens"] = m }
         if let r = options.reasoningEffort { body["reasoning_effort"] = r.rawValue }
         if includeUsage { body["stream_options"] = ["include_usage": true] }
+        if options.disablesThinking && !options.omitsThinkingOff {
+            // "None" replaces an effort (the picker never sets both).
+            body["reasoning_effort"] = nil
+            for (key, value) in thinkingOffFields(for: options.serverKind) { body[key] = value }
+        }
         if options.serverKind == .strata {
             // Prompt-reading progress before the first token (llama.cpp's flag; best effort).
             body["return_progress"] = true
-            // Strata's words: "none" turns thinking off (low/medium/high are as above).
-            if options.disablesThinking { body["reasoning_effort"] = "none" }
             if let budget = options.reasoningBudgetTokens, budget > 0, !options.disablesThinking {
                 body["reasoning_budget_tokens"] = budget
             }
         }
         return body
+    }
+
+    /// What turns thinking off ("None (no thinking)") on each kind of server, on
+    /// POST /v1/chat/completions. Only shapes the servers' own code or docs confirm; where nothing
+    /// is confirmed, the one field most servers accept, and the app shows a note on the reply when
+    /// it was refused (streamChat retries without it) or ignored (thinking still came back).
+    public static func thinkingOffFields(for kind: InferenceServerKind?) -> [String: Any] {
+        let effortNone: [String: Any] = ["reasoning_effort": "none"]
+        let templateOff: [String: Any] = ["chat_template_kwargs": ["enable_thinking": false]]
+        switch kind {
+        case .strata:
+            // Verified live; serve/frontend.py maps none/off/minimal/disabled/false to
+            // enable_thinking=False (an unknown effort is a 400).
+            return effortNone
+        case .llamaCpp:
+            // tools/server/server-common.cpp (README "chat_template_kwargs"): per-request kwargs since
+            // b5780. (reasoning_effort "none" only from b10121; before, the field was ignored.)
+            return templateOff
+        case .vLLM:
+            // chat_completion/protocol.py: chat_template_kwargs.enable_thinking wins and is dropped for
+            // templates without it. reasoning_effort "none" is a 400 up to v0.17.1 and on gpt-oss.
+            return templateOff
+        case .ollama:
+            // openai/openai.go: reasoning_effort "none" becomes think=false (v0.12.4+);
+            // chat_template_kwargs is not read at all.
+            return effortNone
+        case .lmStudio, .hosted, nil:
+            // Best effort. LM Studio accepts reasoning_effort on chat completions since 0.4.8 (its
+            // values are not documented; chat_template_kwargs is ignored, bug tracker #1990). OpenAI
+            // (gpt-5.1+), OpenRouter and Gemini 2.5 Flash document "none"; other models refuse it.
+            return effortNone
+        }
+    }
+
+    /// The "no thinking" keys this request carries (none when it was not asked for or omitted).
+    public static func sentThinkingOffFields(_ options: ChatRequestOptions) -> [String] {
+        guard options.disablesThinking && !options.omitsThinkingOff else { return [] }
+        return Array(thinkingOffFields(for: options.serverKind).keys)
     }
 
     // MARK: Host classification
@@ -526,6 +616,13 @@ enum StreamOptionsSupport {
         rejected.insert(baseURL.absoluteString)
     }
 
+    /// Forgets one base URL (tests: a new mock server on a port an earlier one used). Never
+    /// clears the whole set, which tests running in parallel rely on.
+    static func forget(baseURL: URL) {
+        lock.lock(); defer { lock.unlock() }
+        rejected.remove(baseURL.absoluteString)
+    }
+
     /// HTTP 400/422 whose body names the field (OpenAI: "Unrecognized request argument supplied:
     /// stream_options"; pydantic servers: "Extra inputs are not permitted" with loc
     /// ["body","stream_options"]). Other 400s (context overflow, bad model) are not retried.
@@ -533,6 +630,37 @@ enum StreamOptionsSupport {
         guard status == 400 || status == 422 else { return false }
         let lower = body.lowercased()
         return lower.contains("stream_options") || lower.contains("include_usage")
+    }
+}
+
+/// Thrown inside runStream when the server refused the "no thinking" field; never escapes streamChat.
+struct ThinkingOffRejected: Error {
+    /// The server's answer, shown if the retry without the field is refused as well.
+    let error: ParleyError
+}
+
+/// Whether an error answer refuses the "no thinking" field. What is remembered about it lives in
+/// the app (per provider and model, AppState), not here: no process-wide state.
+enum ThinkingOffSupport {
+    /// HTTP 400/422 that refuses a field that was sent: the body names it (OpenAI `{"error":{"param":
+    /// "reasoning_effort","code":"unsupported_value"|"unknown_parameter",…}}`, `reasoning.effort` in
+    /// the Responses API's spelling, pydantic errors that list it) or speaks of what it controls
+    /// ("reasoning" for reasoning_effort: Ollama's `invalid reasoning value`, LM Studio-style
+    /// "reasoning effort"; "thinking" for either: Gemini's "Thinking can't be disabled"). Being
+    /// loose here is safe: streamChat counts it as a refusal only if the retry without the field
+    /// is accepted. Never on Strata, where "none" is verified (its 400s are about something
+    /// else), and never for a context overflow or any other 400.
+    static func isRejection(status: Int, body: String, sentFields: [String], serverKind: InferenceServerKind? = nil) -> Bool {
+        guard status == 400 || status == 422, !sentFields.isEmpty, serverKind != .strata else { return false }
+        let lower = body.lowercased()
+        if ContextBudget.contextLength(fromError: body) != nil
+            || lower.contains("context length") || lower.contains("context window") {
+            return false
+        }
+        var names = sentFields.map { $0.lowercased() }
+        if names.contains("reasoning_effort") { names += ["reasoning", "thinking"] }
+        if names.contains("chat_template_kwargs") { names += ["enable_thinking", "chat template kwargs", "thinking"] }
+        return names.contains { lower.contains($0) }
     }
 }
 

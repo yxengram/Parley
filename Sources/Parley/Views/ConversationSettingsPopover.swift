@@ -2,12 +2,12 @@ import SwiftUI
 import ParleyCore
 
 /// Per-conversation request settings: system prompt, temperature, max tokens, reasoning effort
-/// (with Strata also thinking off and a thinking budget).
+/// (including "None (no thinking)" for every server; with Strata also a thinking budget).
 struct ConversationSettingsPopover: View {
     @Environment(AppState.self) private var appState
     @Bindable var session: ConversationSession
 
-    /// The reasoning picker's choices. "Off" is stored as `disablesThinking`, not as a
+    /// The reasoning picker's choices. "None" is stored as `disablesThinking`, not as a
     /// ReasoningEffort case, so older versions still read the file.
     enum Thinking: Hashable {
         case notSent, off, effort(ReasoningEffort)
@@ -37,17 +37,38 @@ struct ConversationSettingsPopover: View {
         )
     }
 
-    /// Thinking off and the thinking budget are sent only to Strata.
-    private var isStrata: Bool {
+    /// What the probe found the server to be (nil while unknown or still probing).
+    private var serverKind: InferenceServerKind? {
         let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
         let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
-        guard let provider, !model.isEmpty else { return false }
-        return appState.contextInfo(provider: provider, model: model)?.serverKind == .strata
+        guard let provider, !model.isEmpty else { return nil }
+        return appState.contextInfo(provider: provider, model: model)?.serverKind
+    }
+
+    /// The footer's notes under the reasoning settings (none for the defaults).
+    static func reasoningNotes(serverKind: InferenceServerKind?, disablesThinking: Bool, hasBudget: Bool) -> [String] {
+        if serverKind == .strata {
+            return ["Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone."]
+        }
+        var notes: [String] = []
+        if disablesThinking {
+            notes.append("None asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored.")
+        }
+        if hasBudget {
+            // While the probe is pending the server may still turn out to be Strata.
+            notes.append(serverKind == nil
+                ? "The thinking budget is sent only to Strata."
+                : "The thinking budget is sent only to Strata; this server does not get it.")
+        }
+        return notes
     }
 
     var body: some View {
         let s = session.conversation.settings
-        let strata = isStrata
+        let kind = serverKind
+        let strata = kind == .strata
+        let notes = Self.reasoningNotes(serverKind: kind, disablesThinking: s.disablesThinking == true,
+                                        hasBudget: s.reasoningBudgetTokens != nil)
         Form {
             Section("System Prompt") {
                 TextEditor(text: Binding(
@@ -102,9 +123,7 @@ struct ConversationSettingsPopover: View {
 
                 Picker("Reasoning Effort", selection: thinking) {
                     Text("Not sent").tag(Thinking.notSent)
-                    if strata || s.disablesThinking == true {
-                        Text("Off (no thinking)").tag(Thinking.off)
-                    }
+                    Text("None (no thinking)").tag(Thinking.off)
                     ForEach(ReasoningEffort.allCases, id: \.self) { e in
                         Text(e.rawValue.capitalized).tag(Thinking.effort(e))
                     }
@@ -134,19 +153,14 @@ struct ConversationSettingsPopover: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Settings that are off use the server's default.")
-                    if strata {
-                        Text("Strata: Off turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone.")
-                    } else if s.disablesThinking == true || s.reasoningBudgetTokens != nil {
-                        Text("Thinking off and the thinking budget are sent only to Strata; this server gets neither.")
-                    }
+                    ForEach(notes, id: \.self) { Text($0) }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 // The single line keeps its usual place (trailing); the notes read better leading.
-                .frame(maxWidth: .infinity, alignment: strata || s.disablesThinking == true || s.reasoningBudgetTokens != nil
-                       ? .leading : .trailing)
+                .frame(maxWidth: .infinity, alignment: notes.isEmpty ? .trailing : .leading)
             }
         }
         .formStyle(.grouped)

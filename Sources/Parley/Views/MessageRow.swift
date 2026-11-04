@@ -38,6 +38,9 @@ struct MessageRow: View, Equatable {
     var promptProgress: PromptProgress? = nil
     /// The conversation's Max Tokens (nil when off), to tell a capped reply from a full context.
     var maxTokens: Int? = nil
+    /// An earlier reply (the nearest one) carries the same "None (no thinking)" note: this one
+    /// gets the short form, the full text is in its help tag.
+    var repeatsThinkingOffNote = false
     let actions: Actions
 
     @ViewState private var isHovering = false
@@ -60,6 +63,7 @@ struct MessageRow: View, Equatable {
             && lhs.serverKind == rhs.serverKind
             && lhs.promptProgress == rhs.promptProgress
             && lhs.maxTokens == rhs.maxTokens
+            && lhs.repeatsThinkingOffNote == rhs.repeatsThinkingOffNote
     }
 
     private var isUser: Bool { message.role == .user }
@@ -191,6 +195,14 @@ struct MessageRow: View, Equatable {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if !isStreamingThis, let note = Self.thinkingOffNote(message, repeated: repeatsThinkingOffNote) {
+                Label(note, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(Self.thinkingOffNote(message) ?? note)
+            }
+
             if let error = message.error {
                 let partial = !message.content.isEmpty || !(message.reasoning ?? "").isEmpty
                 let presentation = ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL,
@@ -268,11 +280,65 @@ struct MessageRow: View, Equatable {
         if message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(message.reasoning ?? "").isEmpty {
             return contextFull
                 ? "The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer."
-                : "The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort or set a thinking budget (Conversation Settings, ⌘I), then regenerate."
+                : "The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate."
         }
         return contextFull
             ? "The reply was cut off at the end of the context (or the server's own output limit). Start a new chat, fork from an earlier message or roll back to make room."
             : "The reply was cut off at the token limit (Max tokens)."
+    }
+
+    enum ThinkingOffNoteKind: Equatable {
+        /// The server refused the field; the reply used its default thinking.
+        case notAccepted
+        /// The field was sent, thinking came back anyway.
+        case ignored
+    }
+
+    /// Which "None (no thinking)" note a reply carries. None for a reply that failed before any
+    /// text arrived: there is no reply for the note to describe.
+    static func thinkingOffNoteKind(_ message: Message) -> ThinkingOffNoteKind? {
+        guard message.role == .assistant else { return nil }
+        if message.error != nil, message.content.isEmpty, (message.reasoning ?? "").isEmpty { return nil }
+        if message.thinkingOffNotAccepted == true { return .notAccepted }
+        if message.thinkingOffIgnored == true { return .ignored }
+        return nil
+    }
+
+    /// Why a reply asked for with "None (no thinking)" still thought: the server refused the field
+    /// (the reply was requested again without it) or ignored it. Never claims thinking was off.
+    /// `repeated`: the reply before already says the same, so the short form. The hint names the
+    /// server kind that wrote the reply (stored with the note), not the conversation's current one.
+    static func thinkingOffNote(_ message: Message, repeated: Bool = false) -> String? {
+        switch thinkingOffNoteKind(message) {
+        case nil:
+            return nil
+        case .notAccepted:
+            return repeated
+                ? "“None” was not accepted again, so this reply also used the default thinking."
+                : "This server did not accept “None (no thinking)”, so this reply used its default thinking."
+        case .ignored:
+            if repeated { return "“None” was ignored again: this reply also contains thinking." }
+            let base = "This server or model ignored “None (no thinking)”: the reply still contains thinking."
+            switch message.thinkingOffServerKind.flatMap(InferenceServerKind.init(rawValue:)) {
+            case .lmStudio:
+                return base + " LM Studio may offer a thinking switch in this model's settings."
+            case .llamaCpp, .vLLM:
+                return base + " The model's chat template may not support turning it off."
+            default:
+                return base
+            }
+        }
+    }
+
+    /// For each message, whether the nearest earlier reply carries the same thinking-off note.
+    static func repeatsThinkingOffNotes(_ messages: [Message]) -> [Bool] {
+        var previous: ThinkingOffNoteKind?
+        return messages.map { message in
+            guard message.role == .assistant else { return false }
+            let kind = thinkingOffNoteKind(message)
+            defer { previous = kind }
+            return kind != nil && kind == previous
+        }
     }
 
     /// "1184 prompt · 236 completion · 1420 total tokens · 42.3 tok/s · 0.21 s to first token".

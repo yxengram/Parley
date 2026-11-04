@@ -6,7 +6,7 @@
 ```bash
 ./build.sh            # 生成 build/Parley.app（ad-hoc 签名）
 open build/Parley.app
-swift test            # 231 个测试：核心层 178 个，App 层 53 个；集成测试会自动启动 tools/mock_server.py
+swift test            # 260 个测试：核心层 187 个，App 层 73 个；集成测试会自动启动 tools/mock_server.py
 ```
 只装了 Command Line Tools 就能构建，不需要 Xcode。
 
@@ -15,7 +15,14 @@ swift test            # 231 个测试：核心层 178 个，App 层 53 个；集
 - 会话的默认存放目录是 `~/Library/Application Support/Parley/Conversations`。这个位置不会被 iCloud 同步，可以在设置里修改。新建对话时也可以单独选择目录。
 - 消息上的悬停按钮：复制、回滚到此处、从此处分叉、编辑并重发（用户消息）、重新生成（模型消息）。
 - 思考内容：兼容 `reasoning_content`、`reasoning`，以及内联的 `<think>…</think>` 标签。
-- 回复因达到 token 上限而被截断时（`finish_reason: length`），消息下方会说明原因：用满了 Max Tokens 时，提示提高 Max Tokens、降低推理强度或设置思考预算；没有设置 Max Tokens，或回复比 Max Tokens 短（上下文已满，Strata 会把 Max Tokens 缩短到剩余空间）时，提示新建对话、分叉或回滚。
+- **不思考（None）**：会话设置（⌘I）的推理强度可以直接选“None (no thinking)”，所有服务器都可以选（默认仍是“Not sent”，什么都不发）。按服务器类型发送：
+  - 已确认的：Strata 发 `reasoning_effort: "none"`（实测）；llama.cpp 和 vLLM 发 `chat_template_kwargs: {"enable_thinking": false}`（是否生效取决于模型的聊天模板，例如 Qwen3 支持，gpt-oss 不支持；vLLM 旧版和 gpt-oss 会以 400 拒绝 `"none"`，所以不发它）；Ollama 发 `reasoning_effort: "none"`（0.12.4 起等于 `think: false`）。
+  - 尽力而为的：LM Studio、在线 API 和还没识别出类型的服务器发 `reasoning_effort: "none"`。LM Studio 的文档没有写明它接受这个值（未验证）；OpenAI gpt-5.1 及以后、OpenRouter、Gemini 2.5 Flash 支持，有些模型会拒绝。
+  - 服务器以 400/422 拒绝这个字段（错误里提到这个字段、reasoning 或 thinking）时，Parley 去掉它重试一次。重试成功，才在回复下方说明服务器没有接受 None、这条回复用了默认的思考方式，并在本次运行中对这个 Provider 的这个模型记住被拒的字段，之后不再发送，回复照样标注；重试也失败，说明不是这个字段的问题，显示原来的错误，什么都不记。上下文超长等其他 400 不重试；Strata 已确认接受 None，它的 400 也不重试。
+  - 发了 None 却仍收到思考内容时，回复下方注明服务器或模型忽略了它（LM Studio 会提示该模型的设置里可能有思考开关，界面位置未核实）。连续几条回复是同一种情况时，后面的只显示一行简短说明。这些标注保存在会话文件里，旧版本仍能打开文件。
+  - 刚启动、还没识别出服务器类型时，用 None 的消息会先等识别结果（最多 4 秒），用思考预算的最多等约 6.5 秒（没识别出 Strata 就不能发预算）；Stop 可以立即取消。其他设置不等待。
+  - 以前在 Strata 上设为“Off”的会话，现在显示为 None；换到其他服务器时也会按上面的方式发送（以前其他服务器什么都收不到）。
+- 回复因达到 token 上限而被截断时（`finish_reason: length`），消息下方会说明原因：用满了 Max Tokens 时，提示提高 Max Tokens、降低推理强度（或选 None），在 Strata 上也可以设置思考预算；没有设置 Max Tokens，或回复比 Max Tokens 短（上下文已满，Strata 会把 Max Tokens 缩短到剩余空间）时，提示新建对话、分叉或回滚。
 - 推理速度：生成时，窗口右下角的状态条实时显示每秒 token 数（tok/s），每秒刷新几次。回复结束后，速度和首个 token 的等待时间会显示在消息底部的 token 用量旁边（设置里的“显示 token 用量”同时控制它）。服务器返回 usage 或 llama.cpp/Strata 的 timings 时用精确数值；否则按流式分块估算（一块约等于一个 token），并标上“≈”。等待第一个 token 时显示已等待的秒数；服务器报告读取提示词的进度时（Strata 引擎、llama.cpp），显示“Reading the prompt: 42% …”。
 - 上下文长度：状态条显示“已用 / 上限（百分比）”，超过 80% 变橙色，超过 95% 变红。点击可查看详情：已用 token、上限及其来源、模型最大值、服务器类型和速度。
   - Parley 会向当前服务器读取模型的上下文长度：LM Studio（`/api/v1/models`，旧版 `/api/v0/models`）、llama.cpp（`/props`）、vLLM（`max_model_len`）、Ollama（`/api/ps`），以及在线 API 模型列表里的字段。
@@ -29,7 +36,7 @@ Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做�
 - **上下文长度**：共享端口不报告上下文长度（Strata issue #3931），请在弹窗里填写 Strata 安装时选择的值（例如 131072），或者等第一次超长错误：Parley 会从错误里读出上下文长度（“learned from Strata's error”），保存下来，重启 Parley 后仍然有效；之后的超长错误给出不同数值时会更新它。你填写的值和从错误里得知的值以较新的为准：之后的超长错误给出与你填写的不同的数值时，会替换你填写的值（服务器刚说明了它实际用的大小）；之后再填写的值又优先于它，弹窗里会同时显示“Last error”那一行。引擎端口从 `/health` 和模型列表读取。Strata 在启动模型时就固定了上下文长度，API 无法修改，所以没有“重新加载”按钮；要改只能在 Strata 里重新设置。
 - **多条线路共享**：同一个 Strata 可以通过多个地址访问（例如 Tailscale `http://100.x.x.x:47832/v1` 和 Cloudflare Tunnel `https://…/v1`，用同一个 key）。Parley 从 `/v1/models` 的 `meta.instanceId` 识别出它们是同一个实例，于是你填写的值和从错误里得知的值对这个模型的所有线路都生效（按实例 id + 模型保存）；没有实例 id 的服务器仍按“服务器 + 模型”分别保存。以前按单个 Provider 填写的值会在第一次读到实例 id 时迁移过去。Strata 重新启动模型后实例 id 会改变（实测同一个模型隔天换了 id），这时你填写的值会带到新 id 上，其他线路也跟着指向新 id；从错误里得知的值不带过去（重启后上下文可能不同，下一次超长错误会再告诉 Parley）。Provider 改成别的地址后，不再沿用原来实例的数值；没有任何线路再用到的旧实例数值会被删除。
 - **超出上下文**：Max Tokens 总是按你的设置发送。Strata 默认（`fit_max_tokens` 开启）会把放不下的 Max Tokens 精确缩短到剩余空间；关闭 `fit_max_tokens` 时会报 400，并给出最多还能用多少。Strata 的超长错误会显示成可读的说明：对话有多少 token、上下文多大，以及下一步怎么做（新建对话、从更早的消息分叉、回滚，或把 Max Tokens 降到提示的数值）。错误里的上下文长度也会自动填入状态条。
-- **思考**：推理强度照常发送 low/medium/high（Strata 把 high 当作最高档）。连接 Strata 时，会话设置里多出“Off (no thinking)”（发送 `reasoning_effort: "none"`）和“Thinking Budget”（`reasoning_budget_tokens`）。这两项只发给 Strata，其他服务器收不到。
+- **思考**：推理强度照常发送 low/medium/high（Strata 把 high 当作最高档），“None (no thinking)”按服务器类型发送（见上面的“不思考”）。连接 Strata 时，会话设置里还多出“Thinking Budget”（`reasoning_budget_tokens`），它只发给 Strata，其他服务器收不到。
 - **提示词进度与速度**：只对 Strata 发送 `return_progress: true`。Strata 引擎会返回读取提示词的进度和缓存命中的 token 数，Parley 会显示出来（引擎端口的这一点没有实测）；实测桌面版的共享端口目前不发送进度（读 6505 个 token 的提示词用了 4 秒，只有 keep-alive），所以通过共享端口时只显示已等待的秒数。10 秒后还没有进度和第一个 token 时提示“Strata may be loading the model or reading a long prompt”。tok/s 使用 Strata 自己报告的 `predicted_per_second`；弹窗里还显示提示词读取速度和缓存命中的 token 数。
 - **图片**：共享端口单次请求最多 12 MB（运行时模式 4 MB），而每条消息都会重新发送之前的所有图片，所以超出时 Parley 在发送前就拒绝（不提供重试按钮，因为重试只会同样失败），并建议从第一张图片之前分叉或新建对话。模型没有开启图片读取（Pictures）时，Strata 会拒绝请求；Parley 会记住这一点（只在内存中），并在输入框上方提前警告：草稿里有图片时提示移除它；对话里之前已经有图片时（每条消息都会重新发送它们），提示在 Strata 里开启 Pictures 或从第一张图片之前分叉。
 - **其他错误**：模型还在加载、没有加载模型、暂停了新请求、引擎正在启动或已停止、正忙（Strata 一次只处理一个请求，排队超时）、显存被其他程序占用、API key 错误、共享端口连不上（可能换了端口）等情况都会显示成明确的说明和重试建议（共享端口不转发 Retry-After）。

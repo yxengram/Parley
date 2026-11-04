@@ -120,7 +120,7 @@ public let strataShareBodyLimit = 12 * 1024 * 1024
 public let strataRuntimeBodyLimit = 4 * 1024 * 1024
 
 extension ChatClient {
-    static let probeTimeout: TimeInterval = 5
+    public static let probeTimeout: TimeInterval = 5
     /// Loading a large model can take minutes (same budget as a chat request).
     static let loadTimeout: TimeInterval = 600
     static let unloadTimeout: TimeInterval = 120

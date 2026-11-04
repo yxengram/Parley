@@ -239,6 +239,8 @@ private func withMock(_ flavor: String = "lmstudio", _ body: (String) async thro
         _ = exited.wait(timeout: .now() + 5)
     }
     let root = "http://127.0.0.1:\(port)"
+    // A port can be handed out again in this process: what an earlier server on it refused is not this one's.
+    StreamOptionsSupport.forget(baseURL: URL(string: root + "/v1")!)
     let probe = try ChatClient(baseURL: root + "/v1", apiKey: nil)
     let deadline = Date().addingTimeInterval(15)
     while Date() < deadline {

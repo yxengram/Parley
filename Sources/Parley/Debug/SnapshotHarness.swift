@@ -334,8 +334,17 @@ enum SnapshotHarness {
             await scrollChat(toTop: false)
             capture(appearance, "chat-bottom")
 
-            // 4. Per-conversation settings popover.
+            // 4. Per-conversation settings popover, then with "None (no thinking)" chosen on a
+            //    server that is not Strata: the picker's new choice and its footer note.
             await capturePopover(appearance)
+            if let session = appState.session(for: ids.main) {
+                let saved = (session.conversation.settings.reasoningEffort, session.conversation.settings.disablesThinking)
+                session.conversation.settings.reasoningEffort = nil
+                session.conversation.settings.disablesThinking = true
+                await capturePopover(appearance, "conversation-settings-none")
+                session.conversation.settings.reasoningEffort = saved.0
+                session.conversation.settings.disablesThinking = saved.1
+            }
 
             // 5. Hover action bar, forced through state (rows are rebuilt when re-selected).
             if !dark {
@@ -436,6 +445,28 @@ enum SnapshotHarness {
             await captureContextPopover(appearance, "context-reload-confirm")
             showsReloadConfirmation = false
         }
+
+        // "None (no thinking)" that LM Studio ignored (its hint), one a server refused (the reply
+        // was asked for again without it), and the next refused one in the short form.
+        session.conversation.messages.append(Message(role: .user, content: "Just the answer: what is 17 × 23?"))
+        var ignored = Message(role: .assistant, content: "17 × 23 = **391**.", reasoning: "17 × 20 = 340, 17 × 3 = 51, so 391.",
+                              reasoningDuration: 1.2, model: "qwen3-14b-instruct")
+        ignored.thinkingOffIgnored = true
+        ignored.thinkingOffServerKind = InferenceServerKind.lmStudio.rawValue
+        session.conversation.messages.append(ignored)
+        session.conversation.messages.append(Message(role: .user, content: "And 19 × 21?"))
+        var refused = Message(role: .assistant, content: "19 × 21 = **399**.", reasoning: "(20 − 1)(20 + 1) = 400 − 1.",
+                              reasoningDuration: 0.8, model: "qwen3-14b-instruct")
+        refused.thinkingOffNotAccepted = true
+        session.conversation.messages.append(refused)
+        session.conversation.messages.append(Message(role: .user, content: "And 31 × 29?"))
+        var refusedAgain = Message(role: .assistant, content: "31 × 29 = **899**.", reasoning: "(30 + 1)(30 − 1) = 900 − 1.",
+                                   reasoningDuration: 0.7, model: "qwen3-14b-instruct")
+        refusedAgain.thinkingOffNotAccepted = true
+        session.conversation.messages.append(refusedAgain)
+        await wait(0.6)
+        await scrollChat(toTop: false)
+        capture(appearance, "thinking-off-notes")
     }
 
     private static func captureStrata(_ appearance: String) async {
@@ -450,8 +481,15 @@ enum SnapshotHarness {
         await scrollChat(toTop: false)
         capture(appearance, "strata-chat")
         await captureContextPopover(appearance, "strata-context-popover")
-        if appearance == "light" {
-            await capturePopover(appearance, "strata-conversation-settings")
+        await capturePopover(appearance, "strata-conversation-settings")
+        // "None" on Strata: its own footer line, the budget toggle disabled.
+        if let session = appState.session(for: ids.strata) {
+            let saved = (session.conversation.settings.reasoningEffort, session.conversation.settings.disablesThinking)
+            session.conversation.settings.reasoningEffort = nil
+            session.conversation.settings.disablesThinking = true
+            await capturePopover(appearance, "strata-conversation-settings-none")
+            session.conversation.settings.reasoningEffort = saved.0
+            session.conversation.settings.disablesThinking = saved.1
         }
 
         // A new Strata chat: prompt reading before the first token, then a refused image.

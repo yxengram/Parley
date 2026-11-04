@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 @testable import Parley
-import ParleyCore
+@testable import ParleyCore
 
 // Headless app-layer flow tests: they drive the real AppState / ConversationSession against
 // tools/mock_server.py and assert on what ends up on disk.
@@ -83,7 +83,7 @@ private struct MockServer {
 /// Starts the mock server on a free port. Retries with a new port if the server exits before
 /// it answers (another suite may have grabbed the same free port in the meantime).
 @MainActor
-private func startMockServer(flavor: String? = nil) async throws -> MockServer {
+private func startMockServer(flavor: String? = nil, environment: [String: String] = [:]) async throws -> MockServer {
     guard FileManager.default.fileExists(atPath: mockServerScript.path) else {
         throw FlowTestError(description: "mock server not found at \(mockServerScript.path)")
     }
@@ -92,6 +92,9 @@ private func startMockServer(flavor: String? = nil) async throws -> MockServer {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: python3Path)
         process.arguments = ["-I", "-u", mockServerScript.path, String(port)] + (flavor.map { [$0] } ?? [])
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(environment) { $1 }
+        }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         let exited = ExitFlag()
@@ -99,6 +102,8 @@ private func startMockServer(flavor: String? = nil) async throws -> MockServer {
         try process.run()
 
         let server = MockServer(process: process, exited: exited, baseURL: "http://127.0.0.1:\(port)/v1")
+        // A port can be handed out again in this process: what an earlier server on it refused is not this one's.
+        StreamOptionsSupport.forget(baseURL: URL(string: server.baseURL)!)
         let probe = try ChatClient(baseURL: server.baseURL, apiKey: nil)
         let deadline = Date().addingTimeInterval(15)
         while Date() < deadline, !exited.value {
@@ -200,9 +205,10 @@ private final class Fixture {
 private func withFixture(
     model: String = "mock-plain",
     flavor: String? = nil,
+    environment: [String: String] = [:],
     _ body: (Fixture) async throws -> Void
 ) async throws {
-    let server = try await startMockServer(flavor: flavor)
+    let server = try await startMockServer(flavor: flavor, environment: environment)
     do {
         let fixture = try Fixture(baseURL: server.baseURL, defaultModel: model)
         defer { fixture.cleanup() }
@@ -935,7 +941,8 @@ struct AppFlowTests {
         }
     }
 
-    // The same settings against a server that is not Strata: nothing Strata-specific is sent.
+    // The same settings against a server that is not Strata: nothing Strata-specific is sent
+    // ("None" goes in LM Studio's best-effort shape, see the "No thinking" tests below).
     @Test func strataFieldsStayOffOtherServers() async throws {
         try await withFixture { fx in
             await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-plain")
@@ -946,8 +953,311 @@ struct AppFlowTests {
             session.conversation.settings.maxTokens = 100_000
             try await fx.send("hello", in: session)
             let sent = try await lastRequest(fx)
-            #expect(sent["return_progress"] == nil && sent["reasoning_effort"] == nil && sent["reasoning_budget_tokens"] == nil)
+            #expect(sent["return_progress"] == nil && sent["reasoning_budget_tokens"] == nil)
+            #expect(sent["reasoning_effort"] as? String == "none" && sent["chat_template_kwargs"] == nil)
             #expect(sent["max_tokens"] as? Int == 100_000)
+        }
+    }
+
+    // MARK: "None (no thinking)" on every server
+
+    private func counters(_ fx: Fixture) async throws -> [String: Int] {
+        let url = URL(string: fx.provider.baseURL.replacingOccurrences(of: "/v1", with: "") + "/mock/requests")!
+        let (data, _) = try await URLSession(configuration: .ephemeral).data(from: url)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Int] ?? [:]
+    }
+
+    /// A conversation set to "None" for `model`.
+    private func noneSession(_ fx: Fixture, model: String) async throws -> ConversationSession {
+        let session = try await fx.create()
+        session.conversation.settings.model = model
+        session.conversation.settings.disablesThinking = true
+        return session
+    }
+
+    // llama.cpp and vLLM get chat_template_kwargs (and no reasoning_effort, which old vLLM refuses);
+    // the mock honours it like the real servers, so the reply has no thinking and no note.
+    @Test(arguments: ["llamacpp", "vllm"])
+    func templateServersHonourNone(flavor: String) async throws {
+        try await withFixture(model: "mock-reasoning-content", flavor: flavor) { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-reasoning-content")
+            let kind = fx.state.contextInfo(provider: fx.provider, model: "mock-reasoning-content")?.serverKind
+            #expect(kind == (flavor == "vllm" ? .vLLM : .llamaCpp))
+            let session = try await noneSession(fx, model: "mock-reasoning-content")
+            try await fx.send("hello", in: session)
+            let sent = try await lastRequest(fx)
+            #expect((sent["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false)
+            #expect(sent["reasoning_effort"] == nil)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.reasoning == nil && reply.content == echo("hello"))
+            #expect(reply.thinkingOffIgnored == nil && reply.thinkingOffNotAccepted == nil)
+            #expect(MessageRow.thinkingOffNote(reply) == nil)
+        }
+    }
+
+    // Ollama: reasoning_effort "none" (its think=false), honoured.
+    @Test func ollamaHonoursNone() async throws {
+        try await withFixture(model: "mock-reasoning", flavor: "ollama") { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: "mock-reasoning")
+            let session = try await noneSession(fx, model: "mock-reasoning")
+            try await fx.send("hello", in: session)
+            let sent = try await lastRequest(fx)
+            #expect(sent["reasoning_effort"] as? String == "none" && sent["chat_template_kwargs"] == nil)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.reasoning == nil && reply.thinkingOffIgnored == nil)
+        }
+    }
+
+    // LM Studio (the mock ignores the field, as an unconfirmed server may): thinking still comes,
+    // inline <think> tags included, and the reply says so, also after reopening the file.
+    @Test(arguments: ["mock-reasoning-content", "mock-think-tags"])
+    func ignoredNoneIsNotedAndPersisted(model: String) async throws {
+        try await withFixture(model: model) { fx in
+            await fx.state.refreshContextInfo(provider: fx.provider, model: model)
+            let session = try await noneSession(fx, model: model)
+            try await fx.send("hello", in: session)
+            #expect(try await lastRequest(fx)["reasoning_effort"] as? String == "none")
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && !(reply.reasoning ?? "").isEmpty)
+            #expect(reply.thinkingOffIgnored == true && reply.thinkingOffNotAccepted == nil)
+            // The kind the request was shaped for is stored with the note (its hint).
+            #expect(reply.thinkingOffServerKind == "lmStudio")
+            let note = try #require(MessageRow.thinkingOffNote(reply))
+            #expect(note.contains("ignored") && note.contains("LM Studio"))
+
+            let disk = try readPlain(session.fileURL)
+            #expect(disk.messages.last?.thinkingOffIgnored == true && disk.messages.last?.thinkingOffServerKind == "lmStudio")
+            #expect(disk.settings.disablesThinking == true && disk.settings.reasoningEffort == nil)
+
+            // A reply without thinking, or one sent without "None", gets no note.
+            session.conversation.settings.model = "mock-plain"
+            try await fx.send("plain", in: session)
+            #expect(session.conversation.messages.last?.thinkingOffIgnored == nil)
+            session.conversation.settings.model = model
+            session.conversation.settings.disablesThinking = nil
+            try await fx.send("default", in: session)
+            #expect(session.conversation.messages.last?.thinkingOffIgnored == nil)
+            #expect(try await lastRequest(fx)["reasoning_effort"] == nil)
+        }
+    }
+
+    // A server that refuses the field (OpenAI's 400 naming the param) gets the request once more
+    // without it; the reply says it used the server's default. Remembered for this provider and
+    // model in this AppState only: later replies leave the field out and still say so.
+    @Test func refusedNoneIsRetriedOnceAndRemembered() async throws {
+        try await withFixture(model: "mock-reasoning-content", flavor: "openai-strict") { fx in
+            let model = "mock-reasoning-content"
+            await fx.state.refreshContextInfo(provider: fx.provider, model: model)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: model)?.serverKind == nil)
+            let session = try await noneSession(fx, model: model)
+            try await fx.send("hello", in: session)
+            var reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.content == echo("hello") && reply.reasoning != nil)
+            #expect(reply.thinkingOffNotAccepted == true && reply.thinkingOffIgnored == nil)
+            #expect(MessageRow.thinkingOffNote(reply)?.contains("did not accept") == true)
+            var count = try await counters(fx)
+            #expect(count["chat"] == 2 && count["thinking_off_rejected"] == 1)
+            #expect(try await lastRequest(fx)["reasoning_effort"] == nil)
+            #expect(fx.state.isThinkingOffRejected(provider: fx.provider, model: model))
+            #expect(!fx.state.isThinkingOffRejected(provider: fx.provider, model: "mock-plain"))
+            #expect(try readPlain(session.fileURL).messages.last?.thinkingOffNotAccepted == true)
+
+            // Remembered: one request, without the field, and the same note.
+            try await fx.send("again", in: session)
+            reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.thinkingOffNotAccepted == true && reply.thinkingOffIgnored == nil)
+            count = try await counters(fx)
+            #expect(count["chat"] == 3 && count["thinking_off_rejected"] == 1)
+
+            // A reset (or another AppState: a later launch) starts over.
+            fx.state.resetThinkingOffRejections()
+            try await fx.send("fresh", in: session)
+            count = try await counters(fx)
+            #expect(count["chat"] == 5 && count["thinking_off_rejected"] == 2)
+        }
+    }
+
+    // Retried only once (a server that refuses everything ends with its error), never for other
+    // 400s (a generic error, an overflow) and never when "None" was not chosen. A retry that is
+    // refused too shows the first error, with no note, and nothing is remembered.
+    @Test func onlyARefusalOfTheFieldIsRetried() async throws {
+        try await withFixture(model: "mock-plain", flavor: "openai-strict") { fx in
+            let session = try await noneSession(fx, model: "mock-always-reject")
+            try await fx.send("hello", in: session)
+            var reply = try #require(session.conversation.messages.last)
+            #expect(reply.error?.contains("reasoning_effort") == true)
+            #expect(reply.thinkingOffNotAccepted == nil && MessageRow.thinkingOffNote(reply) == nil)
+            #expect(!fx.state.isThinkingOffRejected(provider: fx.provider, model: "mock-always-reject"))
+            var count = try await counters(fx)
+            #expect(count["chat"] == 2 && count["thinking_off_rejected"] == 2)
+            // Not remembered: the next send tries "None" again.
+            try await fx.send("again", in: session)
+            count = try await counters(fx)
+            #expect(count["chat"] == 4 && count["thinking_off_rejected"] == 4)
+
+            for model in ["mock-error", "mock-overflow"] {
+                session.conversation.settings.model = model
+                try await fx.send("hello", in: session)
+                reply = try #require(session.conversation.messages.last)
+                #expect(reply.error != nil && reply.thinkingOffNotAccepted == nil, "\(model)")
+                #expect(!fx.state.isThinkingOffRejected(provider: fx.provider, model: model))
+            }
+            count = try await counters(fx)
+            #expect(count["chat"] == 6)
+
+            session.conversation.settings.disablesThinking = nil
+            session.conversation.settings.model = "mock-always-reject"
+            try await fx.send("hello", in: session)
+            count = try await counters(fx)
+            #expect(count["chat"] == 7)
+        }
+    }
+
+    // A refusal that does not name the field (Ollama's "invalid reasoning value") is retried too,
+    // and counts as one because the retry without the field is accepted.
+    @Test func unnamedRefusalIsRetriedAndRemembered() async throws {
+        try await withFixture(model: "mock-plain", flavor: "openai-strict") { fx in
+            let model = "mock-refuse-unnamed"
+            let session = try await noneSession(fx, model: model)
+            try await fx.send("hello", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.content == echo("hello") && reply.thinkingOffNotAccepted == true)
+            var count = try await counters(fx)
+            #expect(count["chat"] == 2 && count["thinking_off_rejected"] == 1)
+            #expect(fx.state.isThinkingOffRejected(provider: fx.provider, model: model, fields: ["reasoning_effort"]))
+            try await fx.send("again", in: session)
+            count = try await counters(fx)
+            #expect(count["chat"] == 3 && count["thinking_off_rejected"] == 1)
+            #expect(session.conversation.messages.last?.thinkingOffNotAccepted == true)
+        }
+    }
+
+    // A remembered refusal is noted only once the server answered: a reply that then fails with
+    // another error carries the error alone.
+    @Test func rememberedRefusalIsNotedOnlyOnAnAnswer() async throws {
+        try await withFixture(model: "mock-plain", flavor: "openai-strict") { fx in
+            fx.state.markThinkingOffRejected(provider: fx.provider, model: "mock-error", fields: ["reasoning_effort"])
+            let session = try await noneSession(fx, model: "mock-error")
+            try await fx.send("hello", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error != nil && reply.thinkingOffNotAccepted == nil)
+            #expect(try await lastRequest(fx)["reasoning_effort"] == nil)
+            #expect(try await counters(fx)["chat"] == 1)
+        }
+    }
+
+    // The memory is per field: "reasoning_effort" refused while the kind was unknown does not stop
+    // llama.cpp (identified later) from getting chat_template_kwargs; the unknown shape stays off.
+    @Test func refusalMemoryIsPerField() async throws {
+        try await withFixture(model: "mock-reasoning-content", flavor: "llamacpp") { fx in
+            let model = "mock-reasoning-content"
+            fx.state.markThinkingOffRejected(provider: fx.provider, model: model, fields: ["reasoning_effort"])
+            #expect(fx.state.isThinkingOffRejected(provider: fx.provider, model: model, fields: ["reasoning_effort"]))
+            #expect(!fx.state.isThinkingOffRejected(provider: fx.provider, model: model, fields: ["chat_template_kwargs"]))
+            await fx.state.refreshContextInfo(provider: fx.provider, model: model)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: model)?.serverKind == .llamaCpp)
+            let session = try await noneSession(fx, model: model)
+            try await fx.send("hello", in: session)
+            let sent = try await lastRequest(fx)
+            #expect((sent["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.reasoning == nil)
+            #expect(reply.thinkingOffNotAccepted == nil && reply.thinkingOffIgnored == nil)
+        }
+    }
+
+    // Both retries in one reply: stream_options first, then "no thinking".
+    @Test func streamOptionsAndNoneRetriesCombine() async throws {
+        try await withFixture(model: "mock-no-stream-options", flavor: "openai-strict") { fx in
+            let session = try await noneSession(fx, model: "mock-no-stream-options")
+            try await fx.send("hello", in: session)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.content == echo("hello") && reply.thinkingOffNotAccepted == true)
+            let count = try await counters(fx)
+            #expect(count["chat"] == 3 && count["stream_options_rejected"] == 1 && count["thinking_off_rejected"] == 1)
+        }
+    }
+
+    // Fresh launch, first send: the probe has not finished. A send with "None" waits for it, so
+    // llama.cpp gets its own shape instead of the unknown-server one; "Not sent" never waits.
+    @Test func noneWaitsForTheProbe() async throws {
+        try await withFixture(model: "mock-reasoning-content", flavor: "llamacpp", environment: ["MOCK_PROBE_DELAY": "1"]) { fx in
+            let model = "mock-reasoning-content"
+            let plain = try await fx.create()
+            try await fx.send("plain", in: plain)
+            #expect(!fx.state.isProbingContext(provider: fx.provider, model: model))
+            #expect(fx.state.contextInfo(provider: fx.provider, model: model) == nil)
+
+            let session = try await noneSession(fx, model: model)
+            session.send(text: "hello", attachments: [], settings: fx.settings)
+            // The send started the probe and waits for it (no request until it is done).
+            #expect(await waitUntil(timeout: 0.8) { fx.state.isProbingContext(provider: fx.provider, model: model) })
+            #expect(try await counters(fx)["chat"] == 1)
+            try await fx.waitForReply(session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: model)?.serverKind == .llamaCpp)
+            let sent = try await lastRequest(fx)
+            #expect((sent["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false)
+            #expect(sent["reasoning_effort"] == nil)
+            let reply = try #require(session.conversation.messages.last)
+            #expect(reply.error == nil && reply.reasoning == nil && reply.thinkingOffIgnored == nil)
+            // Time to first token is the server's, not the probe's second.
+            #expect((reply.stats?.timeToFirstToken ?? 9) < 0.9)
+        }
+    }
+
+    // The same race for Strata's thinking budget, which only Strata gets: without the wait the
+    // first reply after launch would silently drop it (and Strata's progress flag).
+    @Test func thinkingBudgetWaitsForTheProbe() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-engine", environment: ["MOCK_PROBE_DELAY": "1"]) { fx in
+            let session = try await fx.create()
+            session.conversation.settings.reasoningBudgetTokens = 256
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen") == nil)
+            try await fx.send("hello", in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen")?.serverKind == .strata)
+            let sent = try await lastRequest(fx)
+            #expect(sent["reasoning_budget_tokens"] as? Int == 256 && sent["return_progress"] as? Bool == true)
+            #expect(session.conversation.messages.last?.error == nil)
+        }
+    }
+
+    // A thinking budget waits longer than "None" (one probe GET): Strata identified after the
+    // short wait would otherwise lose the budget silently.
+    @Test func thinkingBudgetWaitsLongerThanNone() async throws {
+        try await withFixture(model: "strata-qwen", flavor: "strata-engine", environment: ["MOCK_PROBE_DELAY": "1"]) { fx in
+            fx.state.serverInfoWaitTimeout = 0.2
+            #expect(fx.state.serverInfoBudgetWaitTimeout > 5)
+            let session = try await fx.create()
+            session.conversation.settings.reasoningBudgetTokens = 256
+            try await fx.send("hello", in: session)
+            #expect(fx.state.contextInfo(provider: fx.provider, model: "strata-qwen")?.serverKind == .strata)
+            let sent = try await lastRequest(fx)
+            #expect(sent["reasoning_budget_tokens"] as? Int == 256 && sent["return_progress"] as? Bool == true)
+        }
+    }
+
+    // Stop during that wait ends it at once and no chat request is ever sent; a wait that runs out
+    // sends the best-effort shape.
+    @Test func stopDuringTheProbeWaitSendsNothing() async throws {
+        try await withFixture(model: "mock-reasoning-content", flavor: "llamacpp", environment: ["MOCK_PROBE_DELAY": "2"]) { fx in
+            let model = "mock-reasoning-content"
+            let session = try await noneSession(fx, model: model)
+            session.send(text: "hello", attachments: [], settings: fx.settings)
+            try await Task.sleep(nanoseconds: 300_000_000)
+            #expect(session.isStreaming)
+            session.stop()
+            #expect(!session.isStreaming)
+            let stopped = try #require(session.conversation.messages.last)
+            #expect(!stopped.isComplete && stopped.error == nil)
+            try #require(await waitUntil { !fx.state.isProbingContext(provider: fx.provider, model: model) })
+            try await Task.sleep(nanoseconds: 300_000_000)
+            #expect(try await counters(fx)["chat"] == 0)
+
+            // A probe slower than the wait: sent without the server kind.
+            fx.state.serverInfoWaitTimeout = 0.2
+            let other = try await noneSession(fx, model: "mock-reasoning")
+            try await fx.send("hello", in: other)
+            #expect(try await counters(fx)["chat"] == 1)
+            #expect(try await lastRequest(fx)["reasoning_effort"] as? String == "none")
         }
     }
 

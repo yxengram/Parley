@@ -75,6 +75,18 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     /// Generation speed of an assistant reply (see GenerationStats). Optional, so files
     /// written before it existed still decode.
     public var stats: GenerationStats?
+    /// "None (no thinking)" was asked for, but the server refused the field that turns thinking
+    /// off, so the reply was requested without it and used the server's default thinking.
+    /// Optional (like the two below), so files written before it existed still decode, and a Bool
+    /// rather than an enum, so a value a later version adds cannot make this one fail to decode.
+    public var thinkingOffNotAccepted: Bool?
+    /// "None (no thinking)" was sent, but thinking came back anyway (the server or the model's
+    /// chat template ignored it).
+    public var thinkingOffIgnored: Bool?
+    /// With `thinkingOffIgnored`: the kind of server that ignored it (InferenceServerKind's raw
+    /// value), so the note's hint fits the server that wrote this reply, not the one the
+    /// conversation uses now. A String, so a kind a later version adds cannot break decoding.
+    public var thinkingOffServerKind: String?
 
     public init(
         id: UUID = UUID(),
@@ -120,8 +132,8 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     public var maxTokens: Int?
     /// Sent as `reasoning_effort` when non-nil.
     public var reasoningEffort: ReasoningEffort?
-    /// Thinking turned off. Only sent to servers known to accept it (Strata: reasoning_effort
-    /// "none"); elsewhere it is ignored. A separate optional field rather than a ReasoningEffort
+    /// "None (no thinking)": thinking turned off. Sent to every server in the shape it understands
+    /// (ChatClient.thinkingOffFields). A separate optional field rather than a ReasoningEffort
     /// case, so older versions still decode files that use it.
     public var disablesThinking: Bool?
     /// The most tokens the model may think per reply (Strata: reasoning_budget_tokens). Only

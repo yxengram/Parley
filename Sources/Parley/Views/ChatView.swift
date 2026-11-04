@@ -173,6 +173,7 @@ private struct MessageListView: View {
         let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
         let serverKind = provider.flatMap { model.isEmpty ? nil : appState.contextInfo(provider: $0, model: model) }?.serverKind
         let editIndex = session.pendingEditIndex
+        let repeatsNote = MessageRow.repeatsThinkingOffNotes(messages)
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -193,6 +194,7 @@ private struct MessageListView: View {
                             serverKind: serverKind,
                             promptProgress: streamingThis ? session.liveGeneration?.promptProgress : nil,
                             maxTokens: session.conversation.settings.maxTokens,
+                            repeatsThinkingOffNote: repeatsNote[index],
                             actions: actions
                         )
                         .equatable()

@@ -749,6 +749,8 @@ private func withMockServer(_ body: (String) async throws -> Void) async throws 
     }
 
     let baseURL = "http://127.0.0.1:\(port)/v1"
+    // A port can be handed out again in this process: what an earlier server on it refused is not this one's.
+    StreamOptionsSupport.forget(baseURL: URL(string: baseURL)!)
     let probe = try ChatClient(baseURL: baseURL, apiKey: nil)
     let deadline = Date().addingTimeInterval(15)
     var ready = false

@@ -362,3 +362,68 @@ import ParleyCore
     #expect(ContextBudget.limit(info: info, manual: 65536, learned: 131072) == ContextLimit(tokens: 65536, source: .manual))
     #expect(ContextBudget.limit(info: ModelContextInfo(model: "m", loadedContextLength: 8192), manual: nil, learned: 131072)?.source == .server)
 }
+
+// "None (no thinking)": the note under a reply never claims thinking was off, and the settings
+// footer no longer says "None" reaches only Strata.
+@Test func thinkingOffNotes() {
+    var reply = Message(role: .assistant, content: "Hi", reasoning: "thought")
+    #expect(MessageRow.thinkingOffNote(reply) == nil)
+    reply.thinkingOffIgnored = true
+    // The hint follows the kind stored with the reply (the server that wrote it), not the
+    // conversation's current one; an unknown stored value (a later version's kind) gets none.
+    let kinds: [InferenceServerKind?] = [nil, .lmStudio, .llamaCpp, .vLLM, .ollama, .strata, .hosted]
+    for kind in kinds {
+        reply.thinkingOffServerKind = kind?.rawValue
+        let note = MessageRow.thinkingOffNote(reply) ?? ""
+        #expect(note.hasPrefix("This server or model ignored “None (no thinking)”"), "\(String(describing: kind))")
+        #expect(note.contains("LM Studio") == (kind == .lmStudio))
+        #expect(note.contains("chat template") == (kind == .llamaCpp || kind == .vLLM))
+    }
+    reply.thinkingOffServerKind = "someFutureServer"
+    #expect(MessageRow.thinkingOffNote(reply) == "This server or model ignored “None (no thinking)”: the reply still contains thinking.")
+    // The LM Studio hint is hedged (where LM Studio shows the switch is not verified).
+    reply.thinkingOffServerKind = "lmStudio"
+    #expect(MessageRow.thinkingOffNote(reply)?.contains("may offer a thinking switch") == true)
+    // A refusal wins: the reply was requested without the field.
+    reply.thinkingOffNotAccepted = true
+    #expect(MessageRow.thinkingOffNote(reply) == "This server did not accept “None (no thinking)”, so this reply used its default thinking.")
+    var user = Message(role: .user, content: "x")
+    user.thinkingOffIgnored = true
+    #expect(MessageRow.thinkingOffNote(user) == nil)
+    // A reply that failed before any text arrived has nothing for the note to describe.
+    var failed = Message(role: .assistant, content: "", isComplete: false, error: "HTTP 500: boom")
+    failed.thinkingOffNotAccepted = true
+    #expect(MessageRow.thinkingOffNote(failed) == nil)
+    failed.content = "partial"
+    #expect(MessageRow.thinkingOffNote(failed) != nil)
+
+    #expect(ConversationSettingsPopover.reasoningNotes(serverKind: .lmStudio, disablesThinking: false, hasBudget: false).isEmpty)
+    let none = ConversationSettingsPopover.reasoningNotes(serverKind: nil, disablesThinking: true, hasBudget: false)
+    #expect(none.count == 1 && none[0].hasPrefix("None asks the server not to think"))
+    #expect(!none.joined().contains("only to Strata"))
+    let budget = ConversationSettingsPopover.reasoningNotes(serverKind: .vLLM, disablesThinking: false, hasBudget: true)
+    #expect(budget == ["The thinking budget is sent only to Strata; this server does not get it."])
+    #expect(ConversationSettingsPopover.reasoningNotes(serverKind: nil, disablesThinking: false, hasBudget: true) == ["The thinking budget is sent only to Strata."])
+    #expect(ConversationSettingsPopover.reasoningNotes(serverKind: .strata, disablesThinking: true, hasBudget: true).first?.hasPrefix("Strata: None turns thinking off") == true)
+}
+
+// The note repeats under every reply of a "None" conversation on a server that refuses or ignores
+// it: only the first of a run gets the full text, the next ones a short line.
+@Test func repeatedThinkingOffNotesAreShort() {
+    func reply(_ notAccepted: Bool? = nil, ignored: Bool? = nil) -> Message {
+        var m = Message(role: .assistant, content: "a", reasoning: "r")
+        m.thinkingOffNotAccepted = notAccepted
+        m.thinkingOffIgnored = ignored
+        return m
+    }
+    let user = Message(role: .user, content: "q")
+    let messages = [user, reply(true), user, reply(true), user, reply(ignored: true), user, reply(ignored: true),
+                    user, reply(), user, reply(ignored: true)]
+    #expect(MessageRow.repeatsThinkingOffNotes(messages)
+        == [false, false, false, true, false, false, false, true, false, false, false, false])
+    let short = MessageRow.thinkingOffNote(reply(true), repeated: true) ?? ""
+    #expect(short.contains("not accepted again") && short.count < 90)
+    let shortIgnored = MessageRow.thinkingOffNote(reply(ignored: true), repeated: true) ?? ""
+    #expect(shortIgnored.contains("ignored again") && shortIgnored.count < 90)
+    #expect(MessageRow.thinkingOffNote(reply(), repeated: true) == nil)
+}

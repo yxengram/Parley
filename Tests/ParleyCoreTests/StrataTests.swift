@@ -189,8 +189,11 @@ private func json(_ text: String) throws -> Any {
 
         let kinds: [InferenceServerKind?] = [nil, .lmStudio, .llamaCpp, .vLLM, .ollama, .hosted]
         for kind in kinds {
+            // "None" goes to every server in its own shape (ThinkingOffTests); the budget does not.
             let body = ChatClient.buildRequestBody(messages: messages, options: options(kind, off: true, budget: 2048), includeUsage: true)
-            #expect(Set(body.keys) == ["model", "stream", "messages", "stream_options"], "\(String(describing: kind))")
+            let thinkingOff = Set(ChatClient.thinkingOffFields(for: kind).keys)
+            #expect(Set(body.keys) == Set(["model", "stream", "messages", "stream_options"]).union(thinkingOff), "\(String(describing: kind))")
+            #expect(body["reasoning_budget_tokens"] == nil && body["return_progress"] == nil)
             let withEffort = ChatClient.buildRequestBody(messages: messages, options: options(kind, effort: .high))
             #expect(withEffort["reasoning_effort"] as? String == "high")
             #expect(withEffort["return_progress"] == nil)
@@ -291,6 +294,8 @@ private func withStrata(_ flavor: String, _ body: (String) async throws -> Void)
         _ = exited.wait(timeout: .now() + 5)
     }
     let base = "http://127.0.0.1:\(port)/v1"
+    // A port can be handed out again in this process: what an earlier server on it refused is not this one's.
+    StreamOptionsSupport.forget(baseURL: URL(string: base)!)
     let probe = try ChatClient(baseURL: base, apiKey: testKey)
     let deadline = Date().addingTimeInterval(15)
     while Date() < deadline {

@@ -13,6 +13,13 @@ FLAVOR picks which native (non-OpenAI) endpoints exist, for context-length disco
   vllm         vLLM: /v1/models entries carry owned_by "vllm" and max_model_len.
   ollama       Ollama: GET /api/ps lists running models with context_length.
   plain        none of the above (like a hosted API): native routes are 404.
+  openai-strict  like plain, but refuses "no thinking" as OpenAI does for a model without it:
+               reasoning_effort "none" is a 400 {"error":{"param":"reasoning_effort",
+               "code":"unsupported_value",…}}. Its extra models: mock-always-reject answers that
+               400 to every request (with or without the field), mock-overflow an OpenAI context
+               overflow 400 ("maximum context length is 8192 tokens", param "messages"),
+               mock-refuse-unnamed refuses "none" with a 400 that does not name the field
+               (Ollama's 'invalid reasoning value: "none"'), and answers plainly without it.
   strata-share   Strata desktop's "share on network" port (apps/host/server/local-share.mjs): only
                GET /v1/models, POST /v1/chat/completions and /v1/messages exist; every other path
                is a 404 with the bare text "Not found". The list says owned_by "strata" and has no
@@ -36,6 +43,14 @@ Models: strata-qwen (normal), strata-nofit, strata-slow (prompt reading for ~2 s
 token every 150 ms), strata-loading (share: not in /v1/models, which lists ready models only, and
 400 "This model is not ready."; engine: 503 "the engine is starting"), strata-novision (share: images are a 400), strata-length (thinking uses up
 max_tokens: no content, finish_reason "length").
+"No thinking" (every non-Strata flavor; Strata's own rule is above): llamacpp and vllm honour
+chat_template_kwargs {"enable_thinking": false} and ollama honours reasoning_effort "none", as those
+servers do: the reasoning models (mock-reasoning-content, mock-reasoning, mock-think-tags,
+mock-orphan-think, mock-slow-think) then send their answer without any thinking. lmstudio,
+lmstudio-v0 and plain ignore both fields and still stream thinking (unknown fields are ignored).
+MOCK_PROBE_DELAY=<seconds> in the environment delays every native GET (/props, /api/…, /health)
+by that much, so tests can send while a context probe is still running (/v1/models is not delayed).
+
 GET /mock/last-request (every flavor) returns the last chat request body without its messages
 (message_count instead), so tests can check which fields were sent.
 
@@ -124,6 +139,8 @@ MODELS = [
     "mock-drop",
     "mock-cut",
 ]
+# openai-strict only.
+STRICT_MODELS = ["mock-always-reject", "mock-overflow", "mock-refuse-unnamed"]
 
 FLAVOR = "lmstudio"
 API_KEY = ""
@@ -136,7 +153,7 @@ LLAMACPP_N_CTX_TRAIN = 131072
 STATE_LOCK = threading.Lock()
 # LM Studio-like model state, in memory: key -> {"max": int, "instances": [{"id", "context_length"}]}
 LMS_MODELS = {}
-COUNTERS = {"chat": 0, "stream_options_rejected": 0, "load": 0, "unload": 0, "get_other": 0}
+COUNTERS = {"chat": 0, "stream_options_rejected": 0, "thinking_off_rejected": 0, "load": 0, "unload": 0, "get_other": 0}
 LAST_REQUEST = {}
 
 STRATA_MODELS = ["strata-qwen", "strata-nofit", "strata-slow", "strata-loading", "strata-novision", "strata-length"]
@@ -404,6 +421,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.mock_control(path):
             return
+        delay = float(os.environ.get("MOCK_PROBE_DELAY") or 0)
+        if delay > 0 and (path.startswith("/api/") or path in ("/props", "/health")):
+            time.sleep(delay)
         if FLAVOR.startswith("strata"):
             self.strata_get(path)
             return
@@ -421,7 +441,7 @@ class Handler(BaseHTTPRequestHandler):
     def openai_model_list(self):
         now = int(time.time())
         data = []
-        for m in MODELS:
+        for m in MODELS + (STRICT_MODELS if FLAVOR == "openai-strict" else []):
             entry = {"id": m, "object": "model", "created": now, "owned_by": "mock"}
             if FLAVOR in ("lmstudio", "lmstudio-v0"):
                 entry["owned_by"] = "organization_owner"
@@ -563,6 +583,26 @@ class Handler(BaseHTTPRequestHandler):
         if model == "mock-error":
             self.send_json(400, {"error": {"message": "mock bad request"}})
             return
+        if FLAVOR == "openai-strict":
+            if model == "mock-overflow":
+                self.send_json(400, {"error": {
+                    "message": "This model's maximum context length is 8192 tokens. However, your messages resulted "
+                               "in 9000 tokens. Please reduce the length of the messages.",
+                    "type": "invalid_request_error", "param": "messages", "code": "context_length_exceeded"}})
+                return
+            if model == "mock-refuse-unnamed" and req.get("reasoning_effort") == "none":
+                with STATE_LOCK:
+                    COUNTERS["thinking_off_rejected"] += 1
+                self.send_json(400, {"error": 'invalid reasoning value: "none" (must be "high", "medium", "low")'})
+                return
+            if model == "mock-always-reject" or req.get("reasoning_effort") == "none":
+                with STATE_LOCK:
+                    COUNTERS["thinking_off_rejected"] += 1
+                self.send_json(400, {"error": {
+                    "message": "Unsupported value: 'none' is not supported with the '%s' model. Supported values "
+                               "are: 'low', 'medium', and 'high'." % model,
+                    "type": "invalid_request_error", "param": "reasoning_effort", "code": "unsupported_value"}})
+                return
 
         text, images = last_user_message(req.get("messages"))
         echo = 'You said: "%s" (%d image%s received)' % (text, images, "" if images == 1 else "s")
@@ -575,7 +615,7 @@ class Handler(BaseHTTPRequestHandler):
             options = req.get("stream_options")
             include_usage = isinstance(options, dict) and options.get("include_usage") is True
             self.start_stream()
-            if self.stream(model, echo, include_usage) == "drop":
+            if self.stream(model, echo, include_usage, thinking=self.thinks(req)) == "drop":
                 self.drop_connection()
                 return
             self.end_stream()
@@ -875,7 +915,17 @@ class Handler(BaseHTTPRequestHandler):
             "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
         }
 
-    def stream(self, model, echo, include_usage=False):
+    @staticmethod
+    def thinks(req):
+        """False when the request turns thinking off in a way this flavor's server honours."""
+        if FLAVOR in ("llamacpp", "vllm"):
+            kwargs = req.get("chat_template_kwargs")
+            return not (isinstance(kwargs, dict) and kwargs.get("enable_thinking") is False)
+        if FLAVOR == "ollama":
+            return req.get("reasoning_effort") != "none"
+        return True
+
+    def stream(self, model, echo, include_usage=False, thinking=True):
         self.write_chunk(": mock stream start\n\n")  # SSE comment
         self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
 
@@ -884,7 +934,13 @@ class Handler(BaseHTTPRequestHandler):
         def content(piece, space=True):
             self.sse(self.chunk(model, {"content": piece}), space=space)
 
-        if model == "mock-reasoning-content":
+        if not thinking and model in ("mock-reasoning-content", "mock-reasoning", "mock-think-tags",
+                                      "mock-orphan-think", "mock-slow-think"):
+            model_mode = "mock-plain"
+        else:
+            model_mode = model
+
+        if model_mode == "mock-reasoning-content":
             for piece in ["Let me think", " about this", " request."]:
                 self.sse(self.chunk(model, {"reasoning_content": piece, "content": None}))
                 completion_tokens += 1
@@ -892,7 +948,7 @@ class Handler(BaseHTTPRequestHandler):
                 content(piece)
                 completion_tokens += 1
 
-        elif model == "mock-reasoning":
+        elif model_mode == "mock-reasoning":
             for piece in ["Considering", " the user's", " message."]:
                 self.sse(self.chunk(model, {"reasoning": piece}))
                 completion_tokens += 1
@@ -900,7 +956,7 @@ class Handler(BaseHTTPRequestHandler):
                 content(piece, space=False)  # also exercises "data:" without a space
                 completion_tokens += 1
 
-        elif model == "mock-think-tags":
+        elif model_mode == "mock-think-tags":
             for piece in ["<thi", "nk>Let me", " think...</th", "ink>\n\n"]:
                 content(piece)
                 completion_tokens += 1
@@ -908,7 +964,7 @@ class Handler(BaseHTTPRequestHandler):
                 content(piece)
                 completion_tokens += 1
 
-        elif model == "mock-orphan-think":
+        elif model_mode == "mock-orphan-think":
             for piece in ["The user wants", " an echo.</thi", "nk>\n"]:
                 content(piece)
                 completion_tokens += 1
@@ -916,44 +972,44 @@ class Handler(BaseHTTPRequestHandler):
                 content(piece)
                 completion_tokens += 1
 
-        elif model == "mock-stream-error":
+        elif model_mode == "mock-stream-error":
             content("Partial answer")
             self.sse({"error": {"message": "mock stream error", "type": "server_error"}})
             self.write_chunk("data: [DONE]\n\n")
             return
 
-        elif model == "mock-sse-error-field":
+        elif model_mode == "mock-sse-error-field":
             # llama.cpp style: an "error:" field line instead of "data:".
             self.write_chunk('error: {"code": 500, "message": "boom", "type": "server_error"}\n\n')
             return
 
-        elif model == "mock-sse-error-event":
+        elif model_mode == "mock-sse-error-event":
             self.write_chunk('event: error\ndata: {"message": "context length exceeded"}\n\n')
             return
 
-        elif model == "mock-bare-error":
+        elif model_mode == "mock-bare-error":
             self.write_chunk('{"error": {"message": "bare failure"}}\n')
             return
 
-        elif model in ("mock-drop", "mock-cut"):
+        elif model_mode in ("mock-drop", "mock-cut"):
             for piece in split_tokens("Partial answer, then the connection breaks"):
                 content(piece)
             time.sleep(0.05)
             return "drop" if model == "mock-drop" else None
 
-        elif model == "mock-empty":
+        elif model_mode == "mock-empty":
             self.sse(self.chunk(model, {}, finish="stop"))
             self.write_chunk("data: [DONE]\n\n")
             return
 
-        elif model == "mock-slow":
+        elif model_mode == "mock-slow":
             content(echo + "\n")
             for i in range(1, SLOW_TOKENS + 1):
                 time.sleep(SLOW_INTERVAL)
                 content("token%d " % i)
                 completion_tokens += 1
 
-        elif model == "mock-slow-think":
+        elif model_mode == "mock-slow-think":
             thoughts = ("The user wants a migration plan. Core Data and SwiftData can share one "
                         "store file, so the safest order is: model parity first, then read paths, "
                         "then write paths, with a feature flag at each step.")
@@ -1005,7 +1061,8 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     if len(sys.argv) > 2:
         FLAVOR = sys.argv[2]
-        if FLAVOR not in ("lmstudio", "lmstudio-v0", "llamacpp", "vllm", "ollama", "plain", "strata-share", "strata-engine"):
+        if FLAVOR not in ("lmstudio", "lmstudio-v0", "llamacpp", "vllm", "ollama", "plain", "openai-strict",
+                          "strata-share", "strata-engine"):
             sys.exit("unknown flavor: %s" % FLAVOR)
     if len(sys.argv) > 3:
         API_KEY = sys.argv[3]

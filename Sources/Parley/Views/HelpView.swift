@@ -34,6 +34,7 @@ struct HelpView: View {
 
                 section("Thinking", "brain", [
                     "Reasoning from models that send it (reasoning_content, reasoning, or <think> tags) is shown in a collapsible section with how long the model thought. It is never sent back to the server.",
+                    "Reasoning Effort “None (no thinking)” (Conversation Settings, ⌘I) asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored.",
                 ])
 
                 section("Encryption", "lock", [
