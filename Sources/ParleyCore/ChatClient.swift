@@ -527,9 +527,10 @@ public final class ChatClient: @unchecked Sendable {
             // chat_template_kwargs is not read at all.
             return effortNone
         case .lmStudio, .hosted, nil:
-            // Best effort. LM Studio accepts reasoning_effort on chat completions since 0.4.8 (its
-            // values are not documented; chat_template_kwargs is ignored, bug tracker #1990). OpenAI
-            // (gpt-5.1+), OpenRouter and Gemini 2.5 Flash document "none"; other models refuse it.
+            // LM Studio: reasoning_effort on chat completions since 0.4.8; "none" is undocumented but
+            // turned thinking off in a live check (Qwen 3.8 27B, 2026-11-04). chat_template_kwargs is
+            // ignored (bug tracker #1990). Hosted, best effort: OpenAI (gpt-5.1+), OpenRouter and
+            // Gemini 2.5 Flash document "none"; other models refuse it.
             return effortNone
         }
     }

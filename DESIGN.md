@@ -365,7 +365,7 @@ The reasoning picker offers Not sent (default, unchanged), "None (no thinking)",
 | llama.cpp | `chat_template_kwargs: {enable_thinking: false}` | confirmed (`server-common.cpp`; since b5780; `"none"` only from b10121) |
 | vLLM | `chat_template_kwargs: {enable_thinking: false}` | confirmed (`chat_completion/protocol.py`; `"none"` is a 400 up to v0.17.1 and on gpt-oss, so it is not sent) |
 | Ollama | `reasoning_effort: "none"` | confirmed (`openai/openai.go`, `think=false`, v0.12.4+; it does not read `chat_template_kwargs`) |
-| LM Studio | `reasoning_effort: "none"` | best effort: the field exists on chat completions since 0.4.8, its values are not documented; `chat_template_kwargs` is ignored (bug tracker #1990) |
+| LM Studio | `reasoning_effort: "none"` | verified live 2026-11-04 (Qwen 3.8 27B, `capabilities.reasoning` off/on, default on): no reasoning, `reasoning_tokens` 0. The values are not documented (field since 0.4.8); `chat_template_kwargs` is ignored (bug tracker #1990) |
 | hosted / unknown | `reasoning_effort: "none"` | best effort: OpenAI gpt-5.1+, OpenRouter, Gemini 2.5 Flash document it; original gpt-5, GPT-6 Astra/6.1 Sol, Gemini 2.5 Pro / 3 and OpenRouter "mandatory" models refuse it |
 
 Whether thinking really stops depends on the model's chat template on llama.cpp and vLLM (Qwen3 reads `enable_thinking`; gpt-oss does not). The thinking budget stays Strata-only: no other server has a confirmed per-request equivalent.

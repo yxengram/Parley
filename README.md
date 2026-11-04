@@ -16,8 +16,8 @@ swift test            # 260 个测试：核心层 187 个，App 层 73 个；集
 - 消息上的悬停按钮：复制、回滚到此处、从此处分叉、编辑并重发（用户消息）、重新生成（模型消息）。
 - 思考内容：兼容 `reasoning_content`、`reasoning`，以及内联的 `<think>…</think>` 标签。
 - **不思考（None）**：会话设置（⌘I）的推理强度可以直接选“None (no thinking)”，所有服务器都可以选（默认仍是“Not sent”，什么都不发）。按服务器类型发送：
-  - 已确认的：Strata 发 `reasoning_effort: "none"`（实测）；llama.cpp 和 vLLM 发 `chat_template_kwargs: {"enable_thinking": false}`（是否生效取决于模型的聊天模板，例如 Qwen3 支持，gpt-oss 不支持；vLLM 旧版和 gpt-oss 会以 400 拒绝 `"none"`，所以不发它）；Ollama 发 `reasoning_effort: "none"`（0.12.4 起等于 `think: false`）。
-  - 尽力而为的：LM Studio、在线 API 和还没识别出类型的服务器发 `reasoning_effort: "none"`。LM Studio 的文档没有写明它接受这个值（未验证）；OpenAI gpt-5.1 及以后、OpenRouter、Gemini 2.5 Flash 支持，有些模型会拒绝。
+  - 已确认的：Strata 发 `reasoning_effort: "none"`（实测）；llama.cpp 和 vLLM 发 `chat_template_kwargs: {"enable_thinking": false}`（是否生效取决于模型的聊天模板，例如 Qwen3 支持，gpt-oss 不支持；vLLM 旧版和 gpt-oss 会以 400 拒绝 `"none"`，所以不发它）；Ollama 发 `reasoning_effort: "none"`（0.12.4 起等于 `think: false`）；LM Studio 发 `reasoning_effort: "none"`（文档没写，2026-11-04 实测 Qwen 3.8 27B 生效：没有思考内容，reasoning_tokens 为 0）。
+  - 尽力而为的：在线 API 和还没识别出类型的服务器发 `reasoning_effort: "none"`。OpenAI gpt-5.1 及以后、OpenRouter、Gemini 2.5 Flash 支持，有些模型会拒绝。
   - 服务器以 400/422 拒绝这个字段（错误里提到这个字段、reasoning 或 thinking）时，Parley 去掉它重试一次。重试成功，才在回复下方说明服务器没有接受 None、这条回复用了默认的思考方式，并在本次运行中对这个 Provider 的这个模型记住被拒的字段，之后不再发送，回复照样标注；重试也失败，说明不是这个字段的问题，显示原来的错误，什么都不记。上下文超长等其他 400 不重试；Strata 已确认接受 None，它的 400 也不重试。
   - 发了 None 却仍收到思考内容时，回复下方注明服务器或模型忽略了它（LM Studio 会提示该模型的设置里可能有思考开关，界面位置未核实）。连续几条回复是同一种情况时，后面的只显示一行简短说明。这些标注保存在会话文件里，旧版本仍能打开文件。
   - 刚启动、还没识别出服务器类型时，用 None 的消息会先等识别结果（最多 4 秒），用思考预算的最多等约 6.5 秒（没识别出 Strata 就不能发预算）；Stop 可以立即取消。其他设置不等待。
