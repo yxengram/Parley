@@ -8,6 +8,9 @@ struct SettingsView: View {
             ProvidersSettingsView()
                 .frame(width: 700, height: 460)
                 .tabItem { Label("Providers", systemImage: "server.rack") }
+            MCPSettingsView()
+                .frame(width: 760, height: 540)
+                .tabItem { Label("MCP", systemImage: "wrench.and.screwdriver") }
             GeneralSettingsView()
                 .frame(width: 560, height: 500)
                 .tabItem { Label("General", systemImage: "gearshape") }
@@ -199,6 +202,11 @@ struct ProviderEditor: View {
         return h.hasSuffix(".ts.net")
     }
 
+    /// Addresses whose plain http stays off the internet (for the URL warnings only, not for probes).
+    static func isPrivateRoute(_ host: String) -> Bool {
+        ChatClient.isLocalHost(host) || isTailscaleName(host)
+    }
+
     static func urlWarning(_ base: String) -> String? {
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -213,7 +221,7 @@ struct ProviderEditor: View {
         }
         // Loopback, LAN and Tailscale (100.64/10 and MagicDNS *.ts.net names, WireGuard-encrypted)
         // addresses stay quiet. (.ts.net counts as private for this warning only, not for probes.)
-        if scheme == "http" && !ChatClient.isLocalHost(host) && !Self.isTailscaleName(host) {
+        if scheme == "http" && !Self.isPrivateRoute(host) {
             var https = comps
             https.scheme = "https"
             https.port = nil
@@ -329,7 +337,7 @@ private struct GeneralSettingsView: View {
             }
 
             Section("Privacy") {
-                Label("Parley only contacts the API endpoints you configure. No telemetry.", systemImage: "hand.raised.fill")
+                Label("Parley only contacts the API endpoints and MCP servers you configure. No telemetry.", systemImage: "hand.raised.fill")
                 Text("API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

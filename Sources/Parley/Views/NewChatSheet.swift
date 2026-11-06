@@ -13,6 +13,11 @@ struct NewChatSheet: View {
     @ViewState private var confirm = ""
     @ViewState private var isWorking = false
     @ViewState private var error: String?
+    /// The servers ticked here; starts as those marked "Use in new chats".
+    @ViewState private var toolServers: Set<UUID> = []
+
+    private var servers: [MCPServerConfig] { appState.settings.mcpServers.filter(\.isEnabled) }
+    private static let unscrolledServers = 5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -48,10 +53,26 @@ struct NewChatSheet: View {
                         PasswordFields(password: $password, confirm: $confirm)
                     }
                 }
+                if !servers.isEmpty {
+                    Section("Tools") {
+                        ForEach(servers) { server in
+                            Toggle(isOn: Binding(
+                                get: { toolServers.contains(server.id) },
+                                set: { on in
+                                    if on { toolServers.insert(server.id) } else { toolServers.remove(server.id) }
+                                }
+                            )) {
+                                Text(verbatim: ToolDisplay.visible(server.name))
+                            }
+                        }
+                    }
+                }
             }
             .formStyle(.grouped)
-            .scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
+            // With many servers the list scrolls, or Create would fall off a laptop's screen.
+            .scrollDisabled(servers.count <= Self.unscrolledServers)
+            .frame(height: servers.count <= Self.unscrolledServers ? nil : 540)
+            .fixedSize(horizontal: false, vertical: servers.count <= Self.unscrolledServers)
 
             if let error {
                 Label(error, systemImage: "xmark.circle.fill")
@@ -77,6 +98,7 @@ struct NewChatSheet: View {
         .frame(width: 500)
         .onAppear {
             if directoryPath.isEmpty { directoryPath = appState.settings.defaultDirectoryURL.path }
+            toolServers = Set(servers.filter(\.useInNewChats).map(\.id))
         }
     }
 
@@ -102,7 +124,8 @@ struct NewChatSheet: View {
         let dir = URL(fileURLWithPath: directoryPath, isDirectory: true)
         Task {
             do {
-                try await appState.createConversation(title: title, directory: dir, password: pw)
+                try await appState.createConversation(title: title, directory: dir, password: pw,
+                                                       mcpServerIDs: servers.map(\.id).filter(toolServers.contains))
                 password = ""
                 confirm = ""
                 dismiss()

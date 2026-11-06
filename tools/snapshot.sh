@@ -7,10 +7,12 @@
 # - builds the debug app (./build.sh debug)
 # - starts tools/mock_server.py on a free 127.0.0.1 port (killed afterwards)
 # - runs the app binary with PARLEY_SNAPSHOT_DIR / PARLEY_SNAPSHOT_MOCK_URL; it never activates,
-#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 160 s otherwise)
+#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 310 s otherwise)
 # - a second mock (flavor strata-share, no API key) backs the Strata states; MOCK_STRATA_PROGRESS=1
 #   makes it send prompt progress (as Strata's engine does; the live share port sends none) so the
 #   "Reading the prompt" state can be captured
+# - PARLEY_SNAPSHOT_MCP_COMMAND points at tools/mock_mcp_server.py, which the app starts on stdio
+#   for the MCP states; its secrets stay in memory, so no Keychain item is touched
 # - checks that the user's real settings, conversations and saved state were not touched
 #
 # The binary runs from a temporary copy of the bundle with the identifier
@@ -105,19 +107,19 @@ for _ in {1..100}; do
 done
 curl -fsS "http://127.0.0.1:$STRATA_PORT/v1/models" >/dev/null || { echo "Strata mock did not start" >&2; exit 1; }
 
-echo "==> Running snapshot harness (exits on its own; hard limit 160 s)"
+echo "==> Running snapshot harness (exits on its own; hard limit 310 s)"
 NO_GLASS=""
 [[ -n "${PARLEY_SNAPSHOT_SDK:-}" ]] && NO_GLASS=1
 PARLEY_SNAPSHOT_DIR="$OUT" PARLEY_SNAPSHOT_MOCK_URL="http://127.0.0.1:$PORT/v1" PARLEY_SNAPSHOT_STRATA_URL="http://127.0.0.1:$STRATA_PORT/v1" \
-    PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
+    PARLEY_SNAPSHOT_MCP_COMMAND="$ROOT/tools/mock_mcp_server.py" PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
 APP_PID=$!
 STATUS=0
-for _ in {1..1600}; do
+for _ in {1..3100}; do
     kill -0 "$APP_PID" 2>/dev/null || break
     sleep 0.1
 done
 if kill -0 "$APP_PID" 2>/dev/null; then
-    echo "harness did not exit within 160 s; killing it" >&2
+    echo "harness did not exit within 310 s; killing it" >&2
     kill -9 "$APP_PID" 2>/dev/null || true
     STATUS=1
 fi

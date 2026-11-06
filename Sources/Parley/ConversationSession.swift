@@ -2,6 +2,54 @@ import Foundation
 import Observation
 import ParleyCore
 
+/// What a session needs from the app to run tools. Set when the session is registered; nil never
+/// offers any.
+@MainActor
+struct ConversationToolServices {
+    var host: MCPToolHost
+    /// The servers this conversation lists that are switched on.
+    var enabledServers: (ConversationSettings) -> [MCPServerConfig]
+    /// What this provider's model refused of `tools` this launch.
+    var refusal: (Provider, String) -> ToolsRefusal?
+    var markRefused: (Provider, String, ToolsRefusal) -> Void
+    var allowance: (MCPToolBinding) -> ToolAllowance
+    var setAlwaysAllowed: (MCPToolBinding) -> Void
+    /// A call waits for the user, who may be in another app.
+    var approvalNeeded: () -> Void = {}
+    var maxRounds: () -> Int
+    /// For ContextBudget.toolResultBudget.
+    var contextLimit: (Provider, String) -> ContextLimit?
+}
+
+enum ToolAllowance {
+    case ask, always
+    /// "Always Allow" was chosen for a definition that has changed since.
+    case changed
+}
+
+/// The call waiting for the user. Everything on the approval card comes from here.
+struct PendingToolApproval: Equatable, Identifiable {
+    /// The call id.
+    let id: String
+    let serverName: String
+    /// "Local command: npx", or the URL's host.
+    let serverDetail: String
+    let toolName: String
+    /// Shown in a disclosure, labelled as written by the server.
+    let description: String?
+    /// The parameters as the model was told about them, in the same disclosure.
+    let parameters: String
+    /// Pretty JSON of what will be sent.
+    let arguments: String
+    let definitionChanged: Bool
+}
+
+enum ToolApprovalDecision {
+    case allowOnce, alwaysAllow, deny
+    /// Stop, Lock, close or quit.
+    case cancelled
+}
+
 /// One open (decrypted, in-memory) conversation plus its streaming and save state.
 @MainActor
 @Observable
@@ -24,6 +72,23 @@ final class ConversationSession: Identifiable {
     /// only the views that show it re-render. Nil when nothing is streaming.
     private(set) var liveGeneration: LiveGeneration?
     var isStreaming: Bool { streamingMessageID != nil }
+    /// What the in-flight reply is doing. Nil when nothing is streaming.
+    private(set) var replyPhase: ReplyPhase?
+    /// The tool call waiting for the user, shown as a card in the reply.
+    private(set) var pendingApproval: PendingToolApproval?
+    /// The call running now.
+    private(set) var activeCallID: String?
+    /// When the current round's request went out (message.createdAt is wrong after round 1).
+    private(set) var roundStartedAt: Date?
+
+    enum ReplyPhase: Equatable {
+        case generating
+        /// Server names.
+        case connecting([String])
+        case awaitingApproval
+        /// Tool name.
+        case runningTool(String)
+    }
 
     struct LiveGeneration: Equatable {
         var tokensPerSecond: Double?
@@ -68,6 +133,10 @@ final class ConversationSession: Identifiable {
     /// and how a refusal is recorded (AppState.thinkingOffRejections).
     @ObservationIgnored var thinkingOffRejected: ((Provider, String, [String]) -> Bool)?
     @ObservationIgnored var markThinkingOffRejected: ((Provider, String, [String]) -> Void)?
+    /// Tool calling (AppState.toolServices).
+    @ObservationIgnored var tools: ConversationToolServices?
+    /// Resumed exactly once: by the card's buttons, or by `finalizeStreamingMessage`.
+    @ObservationIgnored private var approvalContinuation: CheckedContinuation<ToolApprovalDecision, Never>?
     /// What is known to be on disk: set only after a write succeeded (or on load). Lets
     /// Lock/quit skip rewriting an unchanged file, and never skip after a failed save.
     /// Copy-on-write keeps this cheap.
@@ -270,28 +339,35 @@ final class ConversationSession: Identifiable {
         options.maxRequestBytes = info?.maxRequestBytes
         // "None (no thinking)" and the thinking budget are shaped per server kind: right after
         // launch the probe may still be running, and sending without its answer would drop them.
-        // What was refused earlier is checked once the kind is known (runStream).
+        // What was refused earlier is checked once the kind is known (streamRound). Tools wait too:
+        // without the kind, a Strata runtime model would silently lose them.
+        let servers = tools?.enabledServers(conversation.settings) ?? []
         let waitsForServer = info == nil
-            && (conversation.settings.disablesThinking == true || conversation.settings.reasoningBudgetTokens != nil)
+            && (conversation.settings.disablesThinking == true || conversation.settings.reasoningBudgetTokens != nil
+                || !servers.isEmpty)
 
         conversation.messages.append(placeholder)
         conversation.updatedAt = Date()
         // Reset before the stream task can run: a Stop/Lock/quit in between must not apply
         // the previous reply's accumulator to this new message.
-        liveAccumulator = StreamAccumulator()
-        liveMeter = GenerationMeter(requestStartedAt: Date())
-        liveGeneration = LiveGeneration(tokensPerSecond: nil, tokens: 0, isEstimated: true)
+        beginRound()
         streamingMessageID = placeholder.id
-        streamIsReasoning = false
-        streamReasoningStartedAt = nil
         liveSendsThinkingOff = false
         saveNow()
 
         let messageID = placeholder.id
-        let target = (provider: provider, model: model, waitsForServer: waitsForServer)
+        let target = ReplyTarget(provider: provider, model: model, waitsForServer: waitsForServer, servers: servers)
         streamTask = Task { [weak self] in
-            await self?.runStream(client: client, history: history, options: options, messageID: messageID, target: target)
+            await self?.runReply(client: client, history: history, options: options, messageID: messageID, target: target)
         }
+    }
+
+    private struct ReplyTarget {
+        let provider: Provider
+        let model: String
+        let waitsForServer: Bool
+        /// Empty: no tools are offered and the request is today's.
+        var servers: [MCPServerConfig]
     }
 
     static func effectiveModel(settings: ConversationSettings, provider: Provider?) -> String {
@@ -309,31 +385,143 @@ final class ConversationSession: Identifiable {
     /// How often the live speed is published.
     static let liveStatsInterval: TimeInterval = 0.25
 
-    private func runStream(
-        client: ChatClient, history: [Message], options: ChatRequestOptions, messageID: UUID,
-        target: (provider: Provider, model: String, waitsForServer: Bool)
+    private enum RoundOutcome {
+        /// The request finished.
+        case ended
+        case stopped
+        case failed(Error)
+    }
+
+    private func isCurrent(_ messageID: UUID) -> Bool {
+        streamingMessageID == messageID && !isClosed
+    }
+
+    /// The whole reply: requests, and the tool calls between them, until the model answers.
+    /// One Task from send to end, so Stop and Lock cancel it wherever it is. Every await is followed
+    /// by `isCurrent`: Stop has already finalized the message by then.
+    private func runReply(
+        client: ChatClient, history: [Message], options: ChatRequestOptions, messageID: UUID, target: ReplyTarget
     ) async {
         // Stopped (or closed) before the task first ran: never open the request.
-        guard streamingMessageID == messageID, !isClosed else { return }
+        guard isCurrent(messageID) else { return }
         if Task.isCancelled {
             finalizeStreamingMessage(stoppedEarly: true)
             return
         }
         var options = options
+        var info = serverInfo?(target.provider, target.model)
         if target.waitsForServer, let awaitServerInfo {
-            let forBudget = options.reasoningBudgetTokens != nil && !options.disablesThinking
-            let info = await awaitServerInfo(target.provider, target.model, forBudget)
+            let forBudget = (options.reasoningBudgetTokens != nil && !options.disablesThinking) || !target.servers.isEmpty
+            info = await awaitServerInfo(target.provider, target.model, forBudget)
             // Stop (or Lock) during the wait has already finalized the message.
-            guard streamingMessageID == messageID, !isClosed else { return }
+            guard isCurrent(messageID) else { return }
             if Task.isCancelled {
                 finalizeStreamingMessage(stoppedEarly: true)
                 return
             }
             options.serverKind = info?.serverKind
             options.maxRequestBytes = info?.maxRequestBytes
-            // Time to first token measures the server, not the probe.
-            liveMeter = GenerationMeter(requestStartedAt: Date())
         }
+
+        // The wait above can be long, and the user may have switched a server off in it.
+        var target = target
+        if !target.servers.isEmpty, let tools { target.servers = tools.enabledServers(conversation.settings) }
+
+        var catalog: MCPToolCatalog?
+        if !target.servers.isEmpty, let tools {
+            if info?.ignoresTools == true {
+                addNote(ToolNote.toolsNotOffered, to: messageID)
+            } else if let refusal = tools.refusal(target.provider, target.model) {
+                addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
+            } else {
+                replyPhase = .connecting(target.servers.map(\.name))
+                let listed = await tools.host.catalog(for: target.servers)
+                guard isCurrent(messageID) else { return }
+                if Task.isCancelled {
+                    finalizeStreamingMessage(stoppedEarly: true)
+                    return
+                }
+                for failure in listed.unavailable {
+                    addNote(ToolNote.serverUnavailable, "\(failure.name): \(failure.reason)", to: messageID)
+                }
+                catalog = listed
+                if !listed.chatTools.isEmpty {
+                    options.tools = listed.chatTools
+                    if let idx = index(of: messageID) {
+                        conversation.messages[idx].toolDefinitionTokens = listed.definitionTokens
+                    }
+                }
+            }
+        }
+
+        var roundsRun = 0
+        while true {
+            beginRound()
+            let outcome = await streamRound(client: client, messages: history + inFlightCopy(messageID), options: &options,
+                                            messageID: messageID, target: target)
+            // Stop/lock may already have finalized the message.
+            guard isCurrent(messageID) else { return }
+            liveAccumulator.finish()
+            applyAccumulator(to: messageID)
+            switch outcome {
+            case .stopped:
+                finalizeStreamingMessage(stoppedEarly: true)
+                return
+            case .failed(let failure):
+                if let idx = index(of: messageID) {
+                    conversation.messages[idx].error = failure.localizedDescription
+                    conversation.messages[idx].isComplete = false
+                }
+                endStreaming()
+                return
+            case .ended:
+                break
+            }
+
+            // The accumulated calls drive the loop, not finish_reason, except that a reply cut off
+            // by "length" never runs them: its last call may be incomplete.
+            let calls = liveAccumulator.toolCalls.finalCalls(existingIDs: callIDs(in: messageID))
+            guard !calls.isEmpty else {
+                finishReply(messageID)
+                return
+            }
+            guard ChatClient.sendsTools(options), liveAccumulator.finishReason != "length", let catalog, let tools else {
+                addNote(ToolNote.callsNotRun, to: messageID)
+                finishReply(messageID)
+                return
+            }
+            commitRound(messageID, calls: calls, catalog: catalog)
+            await runCalls(calls.map(\.id), messageID: messageID, catalog: catalog, tools: tools, target: target)
+            guard isCurrent(messageID) else { return }
+            if Task.isCancelled {
+                finalizeStreamingMessage(stoppedEarly: true)
+                return
+            }
+            roundsRun += 1
+            if roundsRun >= tools.maxRounds() {
+                options.omitsTools = true
+                addNote(ToolNote.roundLimit, "\(roundsRun)", to: messageID)
+            }
+        }
+    }
+
+    /// A fresh accumulator and meter for one request: tool time never lowers tok/s, and time to
+    /// first token measures the server.
+    private func beginRound() {
+        liveAccumulator = StreamAccumulator()
+        liveMeter = GenerationMeter(requestStartedAt: Date())
+        liveGeneration = LiveGeneration(tokensPerSecond: nil, tokens: 0, isEstimated: true)
+        streamIsReasoning = false
+        streamReasoningStartedAt = nil
+        roundStartedAt = Date()
+        replyPhase = .generating
+        activeCallID = nil
+    }
+
+    /// One request and its stream. `options` keeps what the server refused, for the later rounds.
+    private func streamRound(
+        client: ChatClient, messages: [Message], options: inout ChatRequestOptions, messageID: UUID, target: ReplyTarget
+    ) async -> RoundOutcome {
         // The fields "None" takes on this server kind; left out when this provider's model refused
         // one of them earlier this launch. That reply says so once the server has answered it.
         var notedNotAccepted = false
@@ -349,8 +537,17 @@ final class ConversationSession: Identifiable {
         var lastStats = Date.distantPast
         var failure: Error?
         do {
-            for try await delta in client.streamChat(messages: history, options: options) {
+            for try await delta in client.streamChat(messages: messages, options: options) {
                 if Task.isCancelled { break }
+                if let refusal = delta.toolsRejected {
+                    // The server refused `tools` and accepted the request without them. One bad
+                    // schema from one server must not turn tools off for the model: only a plain
+                    // lack of support is remembered.
+                    options.omitsTools = true
+                    if refusal.kind == .unsupported { tools?.markRefused(target.provider, target.model, refusal) }
+                    addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
+                    continue
+                }
                 if delta.thinkingOffRejected {
                     // The server refused "no thinking" and accepted the request without it.
                     markThinkingOffRejected?(target.provider, target.model, thinkingOffFields)
@@ -381,55 +578,254 @@ final class ConversationSession: Identifiable {
         } catch {
             failure = error
         }
+        if Task.isCancelled || Self.isCancellation(failure) { return .stopped }
+        if let failure { return .failed(failure) }
+        return .ended
+    }
 
-        // Stop/lock may already have finalized the message.
-        guard streamingMessageID == messageID, !isClosed else { return }
-        liveAccumulator.finish()
-        applyAccumulator(to: messageID)
+    /// A request needs the reply's finished rounds, as a message after the history. Empty until
+    /// there is one, so the first request carries today's history.
+    private func inFlightCopy(_ messageID: UUID) -> [Message] {
+        guard let idx = index(of: messageID), !(conversation.messages[idx].toolRounds ?? []).isEmpty else { return [] }
+        return [conversation.messages[idx]]
+    }
 
-        if Task.isCancelled || Self.isCancellation(failure) {
-            finalizeStreamingMessage(stoppedEarly: true)
-        } else if let failure {
-            if let idx = index(of: messageID) {
-                conversation.messages[idx].error = failure.localizedDescription
+    private func callIDs(in messageID: UUID) -> Set<String> {
+        guard let idx = index(of: messageID) else { return [] }
+        return Set((conversation.messages[idx].toolRounds ?? []).flatMap { $0.calls.map(\.id) })
+    }
+
+    private func addNote(_ kind: String, _ detail: String? = nil, to messageID: UUID) {
+        guard let idx = index(of: messageID) else { return }
+        let note = ToolNote(kind: kind, detail: detail)
+        if conversation.messages[idx].toolNotes?.contains(note) == true { return }
+        conversation.messages[idx].toolNotes = (conversation.messages[idx].toolNotes ?? []) + [note]
+    }
+
+    /// Ends a reply whose last request finished. Empty text is a failure only with no tool rounds:
+    /// after them the model may simply have nothing to add.
+    private func finishReply(_ messageID: UUID) {
+        if let idx = index(of: messageID) {
+            let msg = conversation.messages[idx]
+            let isEmpty = msg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && (msg.reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if isEmpty, (msg.toolRounds ?? []).isEmpty {
+                // A 200 stream that ended with nothing: show it as a failure with Retry.
+                conversation.messages[idx].error = "The server ended the reply without sending any content."
                 conversation.messages[idx].isComplete = false
+            } else {
+                if isEmpty { addNote(ToolNote.emptyAfterTools, to: messageID) }
+                conversation.messages[idx].isComplete = true
             }
-            endStreaming()
-        } else {
-            if let idx = index(of: messageID) {
-                let msg = conversation.messages[idx]
-                let isEmpty = msg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    && (msg.reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                if isEmpty {
-                    // A 200 stream that ended with nothing: show it as a failure with Retry.
-                    conversation.messages[idx].error = "The server ended the reply without sending any content."
-                    conversation.messages[idx].isComplete = false
-                } else {
-                    conversation.messages[idx].isComplete = true
+        }
+        endStreaming()
+    }
+
+    // MARK: - Tool rounds
+
+    /// Moves the current round from the top-level fields into `toolRounds` and resets everything
+    /// live in the same step: otherwise a Stop during approval would write this round's text back as
+    /// the final round's, and the strip would count it twice while a tool runs.
+    private func commitRound(_ messageID: UUID, calls: [ToolCallRecord], catalog: MCPToolCatalog) {
+        guard let idx = index(of: messageID) else { return }
+        var msg = conversation.messages[idx]
+        let records = calls.map { call -> ToolCallRecord in
+            var call = call
+            if let binding = catalog.binding(forFunctionName: call.name) {
+                call.serverID = binding.serverID
+                call.serverName = binding.serverName
+                call.toolName = binding.tool.name
+            }
+            return call
+        }
+        let round = ToolRound(content: msg.content, reasoning: msg.reasoning, reasoningDuration: msg.reasoningDuration,
+                              calls: records, usage: msg.usage, stats: liveMeter.finalStats())
+        msg.toolRounds = (msg.toolRounds ?? []) + [round]
+        msg.content = ""
+        msg.reasoning = nil
+        msg.reasoningDuration = nil
+        msg.usage = nil
+        conversation.messages[idx] = msg
+        liveAccumulator = StreamAccumulator()
+        liveMeter = GenerationMeter()
+        liveGeneration = nil
+        streamIsReasoning = false
+        streamReasoningStartedAt = nil
+        historyUsageCache = nil
+        conversation.updatedAt = Date()
+        saveNow()
+    }
+
+    /// Runs one round's calls one after another, which keeps approvals and side effects predictable.
+    private func runCalls(_ callIDs: [String], messageID: UUID, catalog: MCPToolCatalog,
+                          tools: ConversationToolServices, target: ReplyTarget) async {
+        for callID in callIDs {
+            guard isCurrent(messageID), !Task.isCancelled, let call = call(callID, in: messageID) else { return }
+            // What never runs asks for no approval, and the model hears why.
+            guard let arguments = ToolArguments.parse(call.arguments) else {
+                let reason = ToolArguments.problem(call.arguments)
+                setResult(ToolCallResult(status: .notCalled, text: ToolResultText.malformed(reason: reason, raw: call.arguments)),
+                          for: callID, in: messageID)
+                continue
+            }
+            guard let binding = catalog.binding(forFunctionName: call.name) else {
+                setResult(ToolCallResult(status: .notCalled, text: ToolResultText.unknownTool(call.name)), for: callID, in: messageID)
+                continue
+            }
+            guard let server = currentServer(for: binding, tools: tools) else {
+                setResult(ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff), for: callID, in: messageID)
+                continue
+            }
+            let allowance = tools.allowance(binding)
+            if allowance != .always {
+                replyPhase = .awaitingApproval
+                let approval = PendingToolApproval(
+                    id: callID,
+                    serverName: binding.serverName,
+                    serverDetail: Self.serverDetail(server),
+                    toolName: binding.tool.name,
+                    description: binding.tool.description,
+                    parameters: binding.tool.inputSchema.prettyJSONText,
+                    arguments: arguments.isEmpty ? "{}" : JSONValue.object(arguments).prettyJSONText,
+                    definitionChanged: allowance == .changed
+                )
+                let decision = await requestApproval(approval, messageID: messageID)
+                guard isCurrent(messageID) else { return }
+                switch decision {
+                case .deny:
+                    setResult(ToolCallResult(status: .denied, text: ToolResultText.denied), for: callID, in: messageID)
+                    continue
+                case .cancelled:
+                    return
+                case .alwaysAllow:
+                    tools.setAlwaysAllowed(binding)
+                case .allowOnce:
+                    break
+                }
+                // Switched off while the card was up: its Allow can no longer mean anything.
+                guard currentServer(for: binding, tools: tools) != nil else {
+                    setResult(ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff), for: callID, in: messageID)
+                    continue
                 }
             }
-            endStreaming()
+            // Saved first: a crash from here on may have run the tool.
+            updateCall(callID, in: messageID) { $0.startedAt = Date() }
+            saveNow()
+            replyPhase = .runningTool(binding.tool.name)
+            activeCallID = callID
+            let budget = ContextBudget.toolResultBudget(
+                configured: server.effectiveMaxResultCharacters,
+                limit: tools.contextLimit(target.provider, target.model),
+                used: contextUsage().tokens
+            )
+            let result = await tools.host.call(binding, arguments: arguments,
+                                               timeout: server.effectiveCallTimeout,
+                                               maxCharacters: budget)
+            // Stop has already written a result.
+            guard isCurrent(messageID) else { return }
+            activeCallID = nil
+            setResult(result, for: callID, in: messageID)
         }
+    }
+
+    /// The server as it is now, if this conversation may still use the tool: the catalog dates from
+    /// the start of the reply, and a loop of always-allowed calls has no other point to stop at.
+    private func currentServer(for binding: MCPToolBinding, tools: ConversationToolServices) -> MCPServerConfig? {
+        tools.enabledServers(conversation.settings).first {
+            $0.id == binding.serverID && !$0.disabledTools.contains(binding.tool.name)
+        }
+    }
+
+    private static func serverDetail(_ server: MCPServerConfig) -> String {
+        server.kind == MCPServerConfig.kindHTTP ? server.urlHost : "Local command: \(server.command)"
+    }
+
+    private func call(_ callID: String, in messageID: UUID) -> ToolCallRecord? {
+        guard let idx = index(of: messageID) else { return nil }
+        return (conversation.messages[idx].toolRounds ?? []).lazy.flatMap(\.calls).first { $0.id == callID }
+    }
+
+    private func updateCall(_ callID: String, in messageID: UUID, _ change: (inout ToolCallRecord) -> Void) {
+        guard let idx = index(of: messageID), var rounds = conversation.messages[idx].toolRounds else { return }
+        for r in rounds.indices {
+            if let c = rounds[r].calls.firstIndex(where: { $0.id == callID }) {
+                change(&rounds[r].calls[c])
+                conversation.messages[idx].toolRounds = rounds
+                return
+            }
+        }
+    }
+
+    private func setResult(_ result: ToolCallResult, for callID: String, in messageID: UUID) {
+        updateCall(callID, in: messageID) { $0.result = result }
+        conversation.updatedAt = Date()
+        saveNow()
+    }
+
+    /// Waits for the card's buttons. Approval never times out: the user may be away, and nothing is
+    /// sent while it waits.
+    private func requestApproval(_ approval: PendingToolApproval, messageID: UUID) async -> ToolApprovalDecision {
+        guard isCurrent(messageID), !Task.isCancelled else { return .cancelled }
+        return await withCheckedContinuation { continuation in
+            approvalContinuation = continuation
+            pendingApproval = approval
+            tools?.approvalNeeded()
+        }
+    }
+
+    /// Idempotent: a late press after Stop finds nothing to answer. A button names its call, so a
+    /// double press cannot answer the card that took the first one's place.
+    func answerApproval(_ decision: ToolApprovalDecision, for callID: String? = nil) {
+        guard callID == nil || callID == pendingApproval?.id, let continuation = approvalContinuation else { return }
+        approvalContinuation = nil
+        pendingApproval = nil
+        continuation.resume(returning: decision)
+    }
+
+    /// After Stop every call has a result, so the file and the next request are never left with a
+    /// dangling one. `startedAt` tells whether the tool may have run.
+    private func resolveUnfinishedCalls(_ messageID: UUID) {
+        guard let idx = index(of: messageID), var rounds = conversation.messages[idx].toolRounds else { return }
+        let now = Date()
+        for r in rounds.indices {
+            for c in rounds[r].calls.indices where rounds[r].calls[c].result == nil {
+                let started = rounds[r].calls[c].startedAt
+                rounds[r].calls[c].result = ToolCallResult(
+                    status: .cancelled,
+                    text: started == nil ? ToolResultText.notRun : ToolResultText.interrupted,
+                    duration: started.map { now.timeIntervalSince($0) }
+                )
+            }
+        }
+        conversation.messages[idx].toolRounds = rounds
     }
 
     /// Context tokens in use (ContextBudget.usage), the in-flight reply's live count included.
     /// While streaming, the history part is computed once per reply: the status strip
     /// re-renders on every message flush (20 Hz), and a long conversation or a large text
     /// attachment would otherwise be re-estimated each time.
-    func contextUsage() -> ContextUsage {
+    /// `idleToolDefinitionTokens`: what the next request's `tools` would cost, while nothing streams.
+    func contextUsage(idleToolDefinitionTokens: Int = 0) -> ContextUsage {
         let history: ContextUsage
         if let id = streamingMessageID {
+            let inFlight = index(of: id).map { conversation.messages[$0] }
+            let rounds = inFlight?.toolRounds ?? []
             let key = HistoryUsageKey(inFlightID: id, messageCount: conversation.messages.count,
-                                      systemPrompt: conversation.settings.systemPrompt)
+                                      systemPrompt: conversation.settings.systemPrompt,
+                                      toolRoundCount: rounds.count,
+                                      resolvedCallCount: rounds.reduce(0) { $0 + $1.calls.filter { $0.result != nil }.count },
+                                      toolDefinitionTokens: inFlight?.toolDefinitionTokens ?? 0)
             if let cached = historyUsageCache, cached.key == key {
                 history = cached.usage
             } else {
-                history = ContextBudget.usage(messages: conversation.messages, systemPrompt: key.systemPrompt, inFlightID: id)
+                history = ContextBudget.usage(messages: conversation.messages, systemPrompt: key.systemPrompt, inFlightID: id,
+                                              toolDefinitionTokens: key.toolDefinitionTokens)
                 historyUsageCache = (key, history)
             }
         } else {
             historyUsageCache = nil
-            history = ContextBudget.usage(messages: conversation.messages, systemPrompt: conversation.settings.systemPrompt)
+            history = ContextBudget.usage(messages: conversation.messages, systemPrompt: conversation.settings.systemPrompt,
+                                          toolDefinitionTokens: idleToolDefinitionTokens)
         }
         guard let live = liveGeneration, live.tokens > 0 else { return history }
         return ContextUsage(tokens: history.tokens + live.tokens, isEstimated: history.isEstimated || live.isEstimated)
@@ -439,6 +835,9 @@ final class ConversationSession: Identifiable {
         let inFlightID: UUID
         let messageCount: Int
         let systemPrompt: String
+        let toolRoundCount: Int
+        let resolvedCallCount: Int
+        let toolDefinitionTokens: Int
     }
 
     @ObservationIgnored private var historyUsageCache: (key: HistoryUsageKey, usage: ContextUsage)?
@@ -487,6 +886,9 @@ final class ConversationSession: Identifiable {
     /// Keeps the partial reply with isComplete=false.
     private func finalizeStreamingMessage(stoppedEarly: Bool) {
         guard let messageID = streamingMessageID else { return }
+        // Stop and close both come through here. A cancelled Task does not resume a continuation.
+        answerApproval(.cancelled)
+        resolveUnfinishedCalls(messageID)
         liveAccumulator.finish()
         applyAccumulator(to: messageID)
         if let idx = index(of: messageID) {
@@ -499,8 +901,10 @@ final class ConversationSession: Identifiable {
         if let id = streamingMessageID, let idx = index(of: id) {
             conversation.messages[idx].stats = liveMeter.finalStats()
             // "None" was sent and thinking came anyway (an empty <think></think> does not count).
-            if liveSendsThinkingOff, conversation.messages[idx].thinkingOffNotAccepted != true,
-               !(conversation.messages[idx].reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let message = conversation.messages[idx]
+            let thoughts = [message.reasoning] + (message.toolRounds ?? []).map(\.reasoning)
+            if liveSendsThinkingOff, message.thinkingOffNotAccepted != true,
+               thoughts.contains(where: { !($0 ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 conversation.messages[idx].thinkingOffIgnored = true
                 conversation.messages[idx].thinkingOffServerKind = liveThinkingOffServerKind?.rawValue
             }
@@ -508,6 +912,9 @@ final class ConversationSession: Identifiable {
         liveSendsThinkingOff = false
         liveThinkingOffServerKind = nil
         liveGeneration = nil
+        replyPhase = nil
+        activeCallID = nil
+        roundStartedAt = nil
         streamTask = nil
         streamingMessageID = nil
         streamIsReasoning = false

@@ -8,6 +8,7 @@ struct ComposerView: View {
     @Bindable var session: ConversationSession
     @ViewState private var editorHeight: CGFloat = ComposerTextView.minHeight
     @ViewState private var focusToken = 0
+    @ViewState private var showToolsPopover = false
 
     private var canSend: Bool {
         !session.isStreaming
@@ -84,6 +85,10 @@ struct ComposerView: View {
                 .help("Attach images or text files")
                 .accessibilityLabel("Attach Files")
 
+                if !appState.settings.mcpServers.isEmpty {
+                    toolsButton
+                }
+
                 ZStack(alignment: .topLeading) {
                     if session.draftText.isEmpty {
                         Text(placeholder)
@@ -145,6 +150,40 @@ struct ComposerView: View {
         .onChange(of: session.pendingEditMessageID) { _, id in
             if id != nil { focusToken += 1 }
         }
+        .onChange(of: appState.toolsPopoverRequest) { _, id in
+            guard id == session.id else { return }
+            appState.toolsPopoverRequest = nil
+            showToolsPopover = true
+        }
+    }
+
+    /// Only with a server configured. Accent-tinted, with a count, while servers are on.
+    private var toolsButton: some View {
+        let count = appState.enabledServers(for: session.conversation.settings).count
+        return Button {
+            showToolsPopover.toggle()
+        } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "wrench.and.screwdriver")
+                    .font(.system(size: 14))
+                if count > 0 {
+                    Text(verbatim: "\(count)")
+                        .font(.caption.weight(.medium))
+                        .monospacedDigit()
+                }
+            }
+            .foregroundStyle(count > 0 ? Color.accentColor : Color.secondary)
+            .frame(minWidth: 26, minHeight: 26)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(session.isStreaming)
+        .help("Tools: which MCP servers this conversation uses (⇧⌘T)")
+        .accessibilityLabel("Tools")
+        .accessibilityValue(count == 1 ? "1 server on" : "\(count) servers on")
+        .popover(isPresented: $showToolsPopover, arrowEdge: .top) {
+            ConversationToolsPopover(session: session)
+        }
     }
 
     /// Before sending: what the server is known to refuse. A warning, not a block: the server's
@@ -156,11 +195,12 @@ struct ComposerView: View {
         // What the next request sends again (a staged edit replaces its message and the later ones).
         let history = session.pendingEditIndex.map { Array(session.conversation.messages.prefix($0)) } ?? session.conversation.messages
         return Self.serverWarning(info: info, providerName: provider.name, model: model, history: history,
-                                  draft: session.draftAttachments, draftText: session.draftText)
+                                  draft: session.draftAttachments, draftText: session.draftText,
+                                  hasToolServers: !appState.enabledServers(for: session.conversation.settings).isEmpty)
     }
 
     static func serverWarning(info: ModelContextInfo, providerName: String, model: String, history: [Message],
-                              draft: [Attachment], draftText: String) -> String? {
+                              draft: [Attachment], draftText: String, hasToolServers: Bool = false) -> String? {
         let isImage = { (a: Attachment) in a.kind == .image && a.data != nil }
         let draftHasImages = draft.contains(where: isImage)
         let historyHasImages = history.contains { $0.role == .user && $0.attachments.contains(where: isImage) }
@@ -174,12 +214,18 @@ struct ComposerView: View {
                 ? "\(model) on \(providerName) does not read images (Pictures is off for it in Strata). Remove the image, or turn Pictures on in Strata first."
                 : "\(providerName) says \(model) does not read images. Remove the image, or choose a model that does."
         }
-        if let limit = info.maxRequestBytes, draftHasImages || history.contains(where: { !$0.attachments.isEmpty }) {
+        if let limit = info.maxRequestBytes, draftHasImages || history.contains(where: { !$0.attachments.isEmpty || $0.toolRounds != nil }) {
             let bytes = estimatedRequestBytes(history, draft: draft, text: draftText)
             if bytes > limit {
                 let mb = { (n: Int) in String(format: "%.1f MB", Double(n) / 1_048_576) }
+                if !draftHasImages, !historyHasImages {
+                    return "With its tool results this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends them again. Fork from an earlier message, or roll back."
+                }
                 return "With its images this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends the images again. Remove some, or fork from a message before the first image."
             }
+        }
+        if hasToolServers, info.ignoresTools {
+            return "Tools will not be offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata."
         }
         return nil
     }
@@ -189,7 +235,14 @@ struct ComposerView: View {
         func size(_ attachments: [Attachment]) -> Int {
             attachments.reduce(0) { $0 + ($1.data?.count ?? 0) * 4 / 3 + ($1.text?.utf8.count ?? 0) }
         }
-        let history = messages.reduce(0) { $0 + $1.content.utf8.count + 32 + ($1.role == .user ? size($1.attachments) : 0) }
+        func toolData(_ message: Message) -> Int {
+            (message.toolRounds ?? []).reduce(0) { total, round in
+                round.calls.reduce(total + round.content.utf8.count) {
+                    $0 + $1.name.utf8.count + $1.replayArguments.utf8.count + $1.replayResult.utf8.count + 64
+                }
+            }
+        }
+        let history = messages.reduce(0) { $0 + $1.content.utf8.count + 32 + ($1.role == .user ? size($1.attachments) : 0) + toolData($1) }
         return history + text.utf8.count + size(draft)
     }
 

@@ -66,6 +66,12 @@ private struct ConversationMenuContent: View {
         .keyboardShortcut("i", modifiers: .command)
         .disabled(open == nil)
 
+        Button("Tools…") {
+            if let open { appState.toolsPopoverRequest = open.id }
+        }
+        .keyboardShortcut("t", modifiers: [.command, .shift])
+        .disabled(open == nil || streaming || appState.settings.mcpServers.isEmpty)
+
         Button("Fork from Last Message") {
             if let open, let last = open.conversation.messages.indices.last {
                 appState.fork(open, through: last)
@@ -134,17 +140,22 @@ private struct MessageMenuContent: View {
     var body: some View {
         let messages = session?.conversation.messages ?? []
         let busy = session?.isStreaming ?? true
-        let lastReply = messages.last(where: { $0.role == .assistant && !$0.content.isEmpty })
+        let lastReply = messages.last(where: { $0.role == .assistant && !$0.visibleText.isEmpty })
 
         Button("Copy Last Reply") {
-            if let lastReply { Pasteboard.copy(lastReply.content) }
+            if let lastReply { Pasteboard.copy(lastReply.visibleText) }
         }
         .keyboardShortcut("c", modifiers: [.command, .shift])
         .disabled(lastReply == nil)
 
         Button("Regenerate Last Reply") {
             guard let session, let i = messages.indices.last, messages[i].role == .assistant else { return }
-            session.regenerate(messageAt: i, settings: appState.settings)
+            // A reply that ran tools asks first (ChatView).
+            if (messages[i].toolRounds ?? []).isEmpty {
+                session.regenerate(messageAt: i, settings: appState.settings)
+            } else {
+                appState.regenerateRequest = session.id
+            }
         }
         .keyboardShortcut("r", modifiers: .command)
         .disabled(busy || messages.last?.role != .assistant)
@@ -184,7 +195,7 @@ struct HelpCommand: View {
 enum AboutPanel {
     static func show() {
         let credits = NSAttributedString(
-            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints you configure. No telemetry; conversations stay in files on this Mac.",
+            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints and MCP servers you configure. No telemetry; conversations stay in files on this Mac.",
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11),
                 .foregroundColor: NSColor.secondaryLabelColor,

@@ -259,7 +259,14 @@ struct SidebarRow: View {
                 .foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
-            if session?.isStreaming == true {
+            if session?.pendingApproval != nil {
+                // Without this a background chat waits silently.
+                Image(systemName: "hand.raised.fill")
+                    .imageScale(.small)
+                    .foregroundStyle(.orange)
+                    .help("Waiting for your approval of a tool call")
+                    .accessibilityLabel("Waiting for approval")
+            } else if session?.isStreaming == true {
                 ProgressView().controlSize(.small)
             }
             if entry.isEncrypted || session?.isEncrypted == true {

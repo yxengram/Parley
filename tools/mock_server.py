@@ -28,6 +28,9 @@ FLAVOR picks which native (non-OpenAI) endpoints exist, for context-length disco
                (service "strata", max_context, images false), /v1/models without owned_by (status,
                meta.n_ctx, architecture.input_modalities ["text"]), /props (build_info "Strata …").
                Pictures are off: any image is a 400.
+  strata-runtime  the same port with no native model (Strata's runtime mode): model list meta has
+               mode, gpuIds and context, a body over 4 MiB gets the same 500, and the proxy reads only
+               messages, model and stream, so `tools` are ignored without a word.
   With API_KEY, the Strata flavors want "Authorization: Bearer API_KEY" (or x-api-key) on every
   route but /health and /mock/*, and answer 401 as Strata does. Other flavors ignore the key.
 
@@ -52,7 +55,39 @@ MOCK_PROBE_DELAY=<seconds> in the environment delays every native GET (/props, /
 by that much, so tests can send while a context probe is still running (/v1/models is not delayed).
 
 GET /mock/last-request (every flavor) returns the last chat request body without its messages
-(message_count instead), so tests can check which fields were sent.
+(message_count instead), so tests can check which fields were sent. GET /mock/last-messages returns
+its messages and tools as received.
+
+Tool calling (every non-Strata flavor), selected by model name like the mock-* modes below, but not
+listed by /v1/models. Last message from the user: call the tool named by tool=<name> in its text
+(default: the first in `tools`) with args=<json> (default {}). Last message from a tool: answer
+'tool said: <first 200 characters>', finish "stop". Without `tools`: a plain 'no tools here' answer.
+  mock-tools               LM Studio: {index,id,type,function:{name,arguments:""}}, then fragments
+                           {index,function:{arguments}}, finish_reason tool_calls
+  mock-tools-llamacpp      first delta content null, first fragment has no arguments key, finish
+                           delta empty, usage in a choices:[] chunk
+  mock-tools-vllm          Hermes: name and arguments fragments in one tool_calls array beside content
+  mock-tools-ollama        the whole call in one chunk, a separate finish chunk
+  mock-tools-nonstream     one JSON completion: message.tool_calls without index, arguments an object
+  mock-tools-content       content first, then a call split across chunks
+  mock-tools-parallel      two calls in one round, their fragments interleaved
+  mock-tools-malformed     arguments is {"a":
+  mock-tools-unknown       a name not in `tools`
+  mock-tools-length        cut inside a call, finish_reason length
+  mock-tools-loop          always calls again
+  mock-tools-noid          blank and repeated ids
+  mock-tools-empty-after   no content after the results
+  mock-tools-slow          the first round takes 2 s (for Stop)
+  mock-tools-refuse-ollama    400 "<model> does not support tools" when `tools` is present
+  mock-tools-refuse-llamacpp  500 "tools param requires --jinja flag"
+  mock-tools-refuse-vllm      400 "auto" tool choice requires ...
+  mock-tools-refuse-schema    400 "Failed to parse tools: JSON schema error at ..."
+  mock-tools-refuse-always    the same 400 with or without `tools`
+Every request with tool data is validated like the strictest server: a 400 unless each tool_calls
+entry has type, id and JSON arguments and is followed by a tool message with string content and a
+matching id, and `tools: []` is vLLM's 400. So a dangling call cannot pass unnoticed.
+Strata flavors: model strata-tools answers in Strata's chunk form ({role, content:""} first, the
+closing } always sent, usage on the finish chunk).
 
 Endpoints:
   GET  /v1/models             lists the mock models below
@@ -84,7 +119,8 @@ Usage and timing:
                            whenever the request has stream_options; a plain reply otherwise
   mock-timings             the last chunk carries llama.cpp-style "timings"
   mock-notloaded           listed by LM Studio endpoints as not loaded
-  GET /mock/requests       counters: chat requests, stream_options rejections, loads, unloads
+  GET /mock/requests       counters: chat requests, stream_options rejections, loads, unloads,
+                           requests that carried tools
 
 Broken streams (every non-Strata flavor):
   mock-drop      some content, then the connection is closed mid-body (no terminating chunk)
@@ -112,6 +148,7 @@ so attachment delivery is visible. Requests are never logged.
 
 import json
 import os
+import re
 import socket
 import struct
 import sys
@@ -141,6 +178,8 @@ MODELS = [
 ]
 # openai-strict only.
 STRICT_MODELS = ["mock-always-reject", "mock-overflow", "mock-refuse-unnamed"]
+# Selected by name only, so the model lists stay what they were.
+TOOL_MODEL_PREFIX = "mock-tools"
 
 FLAVOR = "lmstudio"
 API_KEY = ""
@@ -153,13 +192,17 @@ LLAMACPP_N_CTX_TRAIN = 131072
 STATE_LOCK = threading.Lock()
 # LM Studio-like model state, in memory: key -> {"max": int, "instances": [{"id", "context_length"}]}
 LMS_MODELS = {}
-COUNTERS = {"chat": 0, "stream_options_rejected": 0, "thinking_off_rejected": 0, "load": 0, "unload": 0, "get_other": 0}
+COUNTERS = {"chat": 0, "stream_options_rejected": 0, "thinking_off_rejected": 0, "load": 0, "unload": 0, "get_other": 0,
+            "requests_with_tools": 0}
 LAST_REQUEST = {}
+LAST_MESSAGES = {}
 
 STRATA_MODELS = ["strata-qwen", "strata-nofit", "strata-slow", "strata-loading", "strata-novision", "strata-length"]
 STRATA_CTX = 8192
 STRATA_SLACK = 8               # serve/server.py CTX_SLACK
 STRATA_SHARE_BODY_LIMIT = 12 * 1024 * 1024
+STRATA_RUNTIME_BODY_LIMIT = 4 * 1024 * 1024
+STRATA_SHARE_FLAVORS = ("strata-share", "strata-runtime")
 
 
 def strata_sends_progress():
@@ -574,6 +617,14 @@ class Handler(BaseHTTPRequestHandler):
             LAST_REQUEST.clear()
             LAST_REQUEST.update({k: v for k, v in req.items() if k != "messages"})
             LAST_REQUEST["message_count"] = len(req.get("messages") or [])
+            LAST_MESSAGES.clear()
+            LAST_MESSAGES.update({"messages": req.get("messages"), "tools": req.get("tools")})
+            if req.get("tools"):
+                COUNTERS["requests_with_tools"] += 1
+        problem = self.tool_request_problem(req)
+        if problem:
+            self.send_json(400, {"error": {"message": problem}})
+            return
         if model == "mock-no-stream-options" and "stream_options" in req:
             with STATE_LOCK:
                 COUNTERS["stream_options_rejected"] += 1
@@ -604,6 +655,10 @@ class Handler(BaseHTTPRequestHandler):
                     "type": "invalid_request_error", "param": "reasoning_effort", "code": "unsupported_value"}})
                 return
 
+        if model.startswith(TOOL_MODEL_PREFIX):
+            self.tool_reply(req, model)
+            return
+
         text, images = last_user_message(req.get("messages"))
         echo = 'You said: "%s" (%d image%s received)' % (text, images, "" if images == 1 else "s")
 
@@ -633,6 +688,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/mock/last-request":
             with STATE_LOCK:
                 self.send_json(200, dict(LAST_REQUEST))
+            return True
+        if path == "/mock/last-messages":
+            with STATE_LOCK:
+                self.send_json(200, dict(LAST_MESSAGES))
             return True
         return False
 
@@ -668,7 +727,7 @@ class Handler(BaseHTTPRequestHandler):
         return auth == "Bearer " + API_KEY or (self.headers.get("x-api-key") or "") == API_KEY
 
     def strata_unauthorized(self):
-        if FLAVOR == "strata-share":
+        if FLAVOR in STRATA_SHARE_FLAVORS:
             self.send_json_utf8(401, {"error": "Invalid API key"})
         else:
             self.send_json(401, {"error": {"type": "authentication_error", "message": "missing or wrong API key"}})
@@ -688,13 +747,18 @@ class Handler(BaseHTTPRequestHandler):
         return self.strata_share_path_ok(path)
 
     def strata_get(self, path):
-        if FLAVOR == "strata-share":
+        if FLAVOR in STRATA_SHARE_FLAVORS:
             if not self.strata_share_path_ok(path):
                 return
             if not self.strata_authorized():
                 self.strata_unauthorized()
                 return
-            if path == "/v1/models":
+            if path == "/v1/models" and FLAVOR == "strata-runtime":
+                self.send_json_utf8(200, {"object": "list", "data": [{
+                    "id": m, "object": "model", "owned_by": "strata",
+                    "meta": {"instanceId": "inst-%d" % i, "mode": "cpu", "gpuIds": [], "context": STRATA_CTX},
+                } for i, m in enumerate(STRATA_MODELS) if m != "strata-loading"]})
+            elif path == "/v1/models":
                 self.send_json_utf8(200, {"object": "list", "data": [{
                     "id": m, "object": "model", "owned_by": "strata",
                     "meta": {"instanceId": "inst-%d" % i, "gpus": [0], "label": "Qwen3.8 Flash Next", "aliases": []},
@@ -736,13 +800,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def strata_post(self, path, length):
         # Strata's order (local-share.mjs, index.mjs openai()): path, then key, then the body.
-        if FLAVOR == "strata-share" and not self.strata_share_path_ok_drained(path, length):
+        if FLAVOR in STRATA_SHARE_FLAVORS and not self.strata_share_path_ok_drained(path, length):
             return
         if not self.strata_authorized():
             self.drain(length)
             self.strata_unauthorized()
             return
-        if FLAVOR == "strata-share" and length > STRATA_SHARE_BODY_LIMIT:
+        limit = STRATA_RUNTIME_BODY_LIMIT if FLAVOR == "strata-runtime" else STRATA_SHARE_BODY_LIMIT
+        if FLAVOR in STRATA_SHARE_FLAVORS and length > limit:
             # readBody throws past 12 MiB, local-share.mjs's catch answers a bare 500.
             self.drain(length)
             self.send_text(500, "Request failed")
@@ -754,7 +819,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             req = json.loads(raw.decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):
-            if FLAVOR == "strata-share":
+            if FLAVOR in STRATA_SHARE_FLAVORS:
                 self.send_text(500, "Request failed")
             else:
                 self.send_json(400, {"error": {"type": "invalid_request_error", "message": "the request is not JSON"}})
@@ -766,12 +831,16 @@ class Handler(BaseHTTPRequestHandler):
             LAST_REQUEST.clear()
             LAST_REQUEST.update({k: v for k, v in req.items() if k != "messages"})
             LAST_REQUEST["message_count"] = len(messages)
+            LAST_MESSAGES.clear()
+            LAST_MESSAGES.update({"messages": messages, "tools": req.get("tools")})
+            if req.get("tools"):
+                COUNTERS["requests_with_tools"] += 1
 
         def invalid(message, status=400):
             self.send_json(status, {"error": {"type": "invalid_request_error", "message": message}})
 
         if model == "strata-loading":
-            if FLAVOR == "strata-share":
+            if FLAVOR in STRATA_SHARE_FLAVORS:
                 self.send_json(400, {"error": {"message": "This model is not ready.", "type": "invalid_request_error",
                                                "param": "model", "code": None}})
             else:
@@ -817,6 +886,15 @@ class Handler(BaseHTTPRequestHandler):
                         % (prompt, max_new, STRATA_CTX, max(0, room)))
                 return
             max_new = max(1, room)
+
+        if model == "strata-tools" and FLAVOR != "strata-runtime":
+            problem = self.tool_request_problem(req)
+            if problem:
+                invalid(problem)
+                return
+            if req.get("tools"):
+                self.strata_tool_reply(req, model)
+                return
 
         text, _ = last_user_message(messages)
         echo = 'You said: "%s" (%d image%s received)' % (text, images, "" if images == 1 else "s")
@@ -893,6 +971,209 @@ class Handler(BaseHTTPRequestHandler):
                            "predicted_per_token_ms": 1000.0 / 61.5, "predicted_per_second": 61.5}
         self.sse(last)
         self.write_chunk("data: [DONE]\n\n")
+
+    # ---- tool calling --------------------------------------------------
+
+    @staticmethod
+    def tool_request_problem(req):
+        """Why the strictest server would refuse this request's tool data, or None."""
+        if "tools" in req and not req["tools"]:
+            return "`tools` must not be an empty array. Either provide at least one tool or omit the field entirely."
+        messages = req.get("messages") or []
+        for i, message in enumerate(messages):
+            calls = message.get("tool_calls") if isinstance(message, dict) else None
+            if not calls:
+                continue
+            following = messages[i + 1:i + 1 + len(calls)]
+            for j, call in enumerate(calls):
+                function = call.get("function") or {}
+                if call.get("type") != "function" or not call.get("id") or not function.get("name"):
+                    return "tool call %d of message %d lacks type, id or name" % (j, i)
+                try:
+                    json.loads(function.get("arguments"))
+                except (TypeError, ValueError):
+                    return "invalid tool call arguments"
+                if j >= len(following) or following[j].get("role") != "tool":
+                    return "tool call %s has no result" % call.get("id")
+                if following[j].get("tool_call_id") != call.get("id") or not isinstance(following[j].get("content"), str):
+                    return "the result of tool call %s is malformed" % call.get("id")
+        return None
+
+    @staticmethod
+    def tool_plan(req):
+        """What the user text asks for: (tool name, arguments as JSON text)."""
+        text, _ = last_user_message(req.get("messages"))
+        names = [((t or {}).get("function") or {}).get("name") for t in req.get("tools") or []]
+        name = names[0] if names else "no_tool"
+        match = re.search(r"tool=(\S+)", text)
+        if match:
+            name = match.group(1)
+        match = re.search(r"args=(\{.*\})", text)
+        return name, match.group(1) if match else "{}", names
+
+    def tool_reply(self, req, model):
+        refusals = {
+            "mock-tools-refuse-ollama": (400, {"error": {"message": "%s does not support tools" % model,
+                                                         "type": "invalid_request_error", "param": None, "code": None}}),
+            "mock-tools-refuse-llamacpp": (500, {"error": {"code": 500, "message": "tools param requires --jinja flag",
+                                                           "type": "server_error"}}),
+            "mock-tools-refuse-vllm": (400, {"object": "error", "message": '"auto" tool choice requires '
+                                             '--enable-auto-tool-choice and --tool-call-parser to be set'}),
+            "mock-tools-refuse-schema": (400, {"error": {"message": "Failed to parse tools: JSON schema error at /properties/x: "
+                                                                    "schema must be an object"}}),
+        }
+        if model == "mock-tools-refuse-always":
+            self.send_json(400, {"error": {"message": "%s does not support tools" % model}})
+            return
+        if model in refusals and req.get("tools"):
+            self.send_json(*refusals[model])
+            return
+
+        messages = req.get("messages") or []
+        last = messages[-1] if messages else {}
+        options = req.get("stream_options")
+        include_usage = isinstance(options, dict) and options.get("include_usage") is True
+        calling = bool(req.get("tools")) and (last.get("role") != "tool" or model == "mock-tools-loop")
+
+        if model == "mock-tools-nonstream":
+            self.nonstream_tool_reply(req, model, calling, last)
+            return
+        try:
+            self.start_stream()
+            if calling:
+                self.stream_tool_call(req, model, include_usage)
+            else:
+                self.stream_after_tools(model, last, include_usage, req)
+            self.end_stream()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    @staticmethod
+    def after_tools_text(model, last, req):
+        if model == "mock-tools-empty-after":
+            return ""
+        if last.get("role") == "tool":
+            return "tool said: " + str(last.get("content"))[:200]
+        return "no tools here"
+
+    def stream_after_tools(self, model, last, include_usage, req):
+        self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+        for piece in split_tokens(self.after_tools_text(model, last, req)):
+            self.sse(self.chunk(model, {"content": piece}))
+        self.finish_tool_stream(model, "stop", include_usage)
+
+    def finish_tool_stream(self, model, reason, include_usage):
+        self.sse(self.chunk(model, {}, finish=reason))
+        if include_usage:
+            self.sse({"id": "chatcmpl-mock", "object": "chat.completion.chunk", "created": int(time.time()),
+                      "model": model, "choices": [],
+                      "usage": {"prompt_tokens": 50, "completion_tokens": 12, "total_tokens": 62}})
+        self.write_chunk("data: [DONE]\n\n")
+
+    def stream_tool_call(self, req, model, include_usage):
+        name, arguments, names = self.tool_plan(req)
+        call_id = "call_%04d" % len(req.get("messages") or [])
+        pieces = split_tokens(arguments, 4)
+
+        def tool(entries, **extra):
+            self.sse(self.chunk(model, dict({"tool_calls": entries}, **extra)))
+
+        if model == "mock-tools-llamacpp":
+            self.sse(self.chunk(model, {"role": "assistant", "content": None}))
+            tool([{"index": 0, "id": call_id, "type": "function", "function": {"name": name}}])
+            for piece in pieces:
+                tool([{"index": 0, "function": {"arguments": piece}}])
+        elif model == "mock-tools-vllm":
+            self.sse(self.chunk(model, {"role": "assistant"}))
+            tool([{"index": 0, "type": "function", "id": call_id, "function": {"name": name}},
+                  {"index": 0, "function": {"arguments": arguments}}], content="Let me look.")
+        elif model == "mock-tools-ollama":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            tool([{"id": call_id, "index": 0, "type": "function", "function": {"name": name, "arguments": arguments}}])
+        elif model == "mock-tools-parallel":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            second = names[1] if len(names) > 1 else name
+            second_pieces = split_tokens('{"n":2}', 3)
+            tool([{"index": 0, "id": call_id + "a", "type": "function", "function": {"name": name, "arguments": ""}}])
+            tool([{"index": 1, "id": call_id + "b", "type": "function", "function": {"name": second, "arguments": ""}}])
+            for i in range(max(len(pieces), len(second_pieces))):
+                if i < len(pieces):
+                    tool([{"index": 0, "function": {"arguments": pieces[i]}}])
+                if i < len(second_pieces):
+                    tool([{"index": 1, "function": {"arguments": second_pieces[i]}}])
+        elif model == "mock-tools-malformed":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            tool([{"index": 0, "id": call_id, "type": "function", "function": {"name": name, "arguments": '{"a":'}}])
+        elif model == "mock-tools-unknown":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            tool([{"index": 0, "id": call_id, "type": "function", "function": {"name": "no_such_tool", "arguments": "{}"}}])
+        elif model == "mock-tools-length":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            tool([{"index": 0, "id": call_id, "type": "function", "function": {"name": name, "arguments": '{"text":"cut'}}])
+            self.finish_tool_stream(model, "length", include_usage)
+            return
+        elif model == "mock-tools-noid":
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            tool([{"index": 0, "id": "", "type": "function", "function": {"name": name, "arguments": "{}"}}])
+            tool([{"index": 1, "id": "same", "type": "function", "function": {"name": name, "arguments": "{}"}}])
+            tool([{"index": 2, "id": "same", "type": "function", "function": {"name": name, "arguments": "{}"}}])
+        else:
+            # mock-tools, mock-tools-content, mock-tools-loop, mock-tools-slow, mock-tools-empty-after
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            if model == "mock-tools-content":
+                for piece in split_tokens("Let me check that for you."):
+                    self.sse(self.chunk(model, {"content": piece}))
+            if model == "mock-tools-slow":
+                time.sleep(2)
+            tool([{"index": 0, "id": call_id, "type": "function", "function": {"name": name, "arguments": ""}}])
+            for piece in pieces:
+                tool([{"index": 0, "function": {"arguments": piece}}])
+        self.finish_tool_stream(model, "tool_calls", include_usage)
+
+    def nonstream_tool_reply(self, req, model, calling, last):
+        if calling:
+            name, arguments, _ = self.tool_plan(req)
+            call = {"id": "call_whole", "type": "function", "function": {"name": name, "arguments": json.loads(arguments)}}
+            message = {"role": "assistant", "content": None, "tool_calls": [call]}
+            reason = "tool_calls"
+        else:
+            message = {"role": "assistant", "content": self.after_tools_text(model, last, req)}
+            reason = "stop"
+        self.send_json(200, {"id": "chatcmpl-mock", "object": "chat.completion", "created": int(time.time()), "model": model,
+                             "choices": [{"index": 0, "message": message, "finish_reason": reason}],
+                             "usage": {"prompt_tokens": 50, "completion_tokens": 12, "total_tokens": 62}})
+
+    def strata_tool_reply(self, req, model):
+        """serve/server.py: {role, content:""}, the call, the closing } always sent, usage on the finish chunk."""
+        messages = req.get("messages") or []
+        last = messages[-1] if messages else {}
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        self.wfile.flush()
+        try:
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            if last.get("role") == "tool":
+                self.sse(self.chunk(model, {"content": "tool said: " + str(last.get("content"))[:200]}))
+                reason = "stop"
+            else:
+                name, arguments, _ = self.tool_plan(req)
+                body = arguments[:-1]
+                self.sse(self.chunk(model, {"tool_calls": [{"index": 0, "id": "call_strata", "type": "function",
+                                                            "function": {"name": name, "arguments": ""}}]}))
+                for piece in split_tokens(body, 3):
+                    self.sse(self.chunk(model, {"tool_calls": [{"index": 0, "function": {"arguments": piece}}]}))
+                self.sse(self.chunk(model, {"tool_calls": [{"index": 0, "function": {"arguments": "}"}}]}))
+                reason = "tool_calls"
+            final = self.chunk(model, {}, finish=reason)
+            final["usage"] = {"prompt_tokens": 50, "completion_tokens": 12, "total_tokens": 62}
+            self.sse(final)
+            self.write_chunk("data: [DONE]\n\n")
+            self.end_stream()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     # ---- responses -----------------------------------------------------
 
@@ -1062,7 +1343,7 @@ def main():
     if len(sys.argv) > 2:
         FLAVOR = sys.argv[2]
         if FLAVOR not in ("lmstudio", "lmstudio-v0", "llamacpp", "vllm", "ollama", "plain", "openai-strict",
-                          "strata-share", "strata-engine"):
+                          "strata-share", "strata-engine", "strata-runtime"):
             sys.exit("unknown flavor: %s" % FLAVOR)
     if len(sys.argv) > 3:
         API_KEY = sys.argv[3]

@@ -260,7 +260,7 @@ public enum ResponseText {
 
     static func isJSON(_ text: String) -> Bool {
         guard let first = text.first, first == "{" || first == "[" else { return false }
-        return (try? JSONSerialization.jsonObject(with: Data(text.utf8))) != nil
+        return JSONValue.parsed(Data(text.utf8)) != nil
     }
 
     static func isHTML(_ text: String) -> Bool {

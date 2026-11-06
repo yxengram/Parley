@@ -37,6 +37,15 @@ struct HelpView: View {
                     "Reasoning Effort “None (no thinking)” (Conversation Settings, ⌘I) asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored.",
                 ])
 
+                section("Tools (MCP)", "wrench.and.screwdriver", [
+                    "Parley can connect to MCP servers you add in Settings > MCP, by a local command or a remote URL, or by pasting a config from another MCP client. It offers their tools to the model, runs the calls the model makes, and sends the results back until the model answers.",
+                    "Turn servers on for a conversation with the wrench button next to the paperclip (⇧⌘T). Nothing starts until you send a message in a conversation that uses the server, or press Connect in Settings. Turning a server off for a chat does not stop it: it runs until you press Stop in Settings or quit.",
+                    "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call.",
+                    "Tool results stay in the conversation, encrypted when the conversation is. They are sent again with every message, like images. Regenerate does not undo what a tool did, and the model may run it again.",
+                    "A local server is a program that runs on your Mac with your permissions, so add only servers you trust. Tool names, descriptions and parameters go to the model's provider with every request, tool or no tool call; arguments and results go to the server and to the model's provider. npx and uvx contact their package registries themselves.",
+                    "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers for sign-in. Resources, prompts, sampling, elicitation, OAuth and the old HTTP+SSE transport are not supported.",
+                ])
+
                 section("Encryption", "lock", [
                     "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory.",
                     "There is no way to recover a forgotten password.",
@@ -50,7 +59,7 @@ struct HelpView: View {
                 ])
 
                 section("Privacy", "hand.raised", [
-                    "Parley only contacts the API endpoints you configure. No telemetry, no analytics, no remote images.",
+                    "Parley only contacts the API endpoints and MCP servers you configure. No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.",
                     "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.",
                 ])
             }

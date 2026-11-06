@@ -8,6 +8,7 @@ struct ChatView: View {
 
     @ViewState private var isDropTargeted = false
     @ViewState private var showSettingsPopover = false
+    @ViewState private var confirmRegenerateLast = false
 
     var body: some View {
         let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
@@ -61,6 +62,20 @@ struct ChatView: View {
             guard id == session.id else { return }
             appState.conversationSettingsRequest = nil
             showSettingsPopover = true
+        }
+        // ⌘R on a reply that ran tools asks first, like the row's own Regenerate.
+        .onChange(of: appState.regenerateRequest) { _, id in
+            guard id == session.id else { return }
+            appState.regenerateRequest = nil
+            confirmRegenerateLast = true
+        }
+        .confirmationDialog("Regenerate this reply?", isPresented: $confirmRegenerateLast) {
+            Button("Regenerate", role: .destructive) {
+                guard let last = session.conversation.messages.indices.last else { return }
+                session.regenerate(messageAt: last, settings: appState.settings)
+            }
+        } message: {
+            Text(MessageRow.regenerateWarning(laterCount: 0, ranTools: true))
         }
         .focusedSceneValue(\.activeSession, session)
         .navigationTitle(session.conversation.title)
@@ -195,6 +210,10 @@ private struct MessageListView: View {
                             promptProgress: streamingThis ? session.liveGeneration?.promptProgress : nil,
                             maxTokens: session.conversation.settings.maxTokens,
                             repeatsThinkingOffNote: repeatsNote[index],
+                            replyPhase: streamingThis ? session.replyPhase : nil,
+                            roundStartedAt: streamingThis ? session.roundStartedAt : nil,
+                            pendingApproval: streamingThis ? session.pendingApproval : nil,
+                            activeCallID: streamingThis ? session.activeCallID : nil,
                             actions: actions
                         )
                         .equatable()
@@ -244,6 +263,13 @@ private struct MessageListView: View {
                     proxy.scrollTo(Self.bottomID, anchor: .bottom)
                 }
             }
+            // Once per card, wherever the user was reading: the reply waits for it.
+            .onChange(of: session.pendingApproval?.id) { _, id in
+                guard id != nil else { return }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(Self.bottomID, anchor: .bottom)
+                }
+            }
             .onAppear {
                 proxy.scrollTo(Self.bottomID, anchor: .bottom)
             }
@@ -273,7 +299,9 @@ private struct MessageListView: View {
     private var streamingProgress: Int {
         guard let id = session.streamingMessageID,
               let m = session.conversation.messages.last(where: { $0.id == id }) else { return -1 }
-        return m.content.utf8.count &+ (m.reasoning?.utf8.count ?? 0)
+        let rounds = m.toolRounds ?? []
+        let calls = rounds.reduce(0) { $0 &+ $1.calls.count &+ $1.calls.filter { $0.result != nil }.count }
+        return m.content.utf8.count &+ (m.reasoning?.utf8.count ?? 0) &+ rounds.count &+ calls
     }
 
     private var actions: MessageRow.Actions {
@@ -284,7 +312,8 @@ private struct MessageListView: View {
             fork: { appState.fork(session, through: $0) },
             edit: { session.beginEdit(messageAt: $0) },
             regenerate: { session.regenerate(messageAt: $0, settings: appState.settings) },
-            getReply: { session.startReply(settings: appState.settings) }
+            getReply: { session.startReply(settings: appState.settings) },
+            answerApproval: { session.answerApproval($1, for: $0) }
         )
     }
 }

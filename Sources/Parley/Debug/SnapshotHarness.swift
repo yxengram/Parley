@@ -11,6 +11,17 @@
 // enables the streaming states. Without it, the provider points at an unused dummy localhost URL.
 // Optional: PARLEY_SNAPSHOT_STRATA_URL (tools/mock_server.py in its strata-share flavor, no API
 // key) adds a "Strata" provider, a seeded Strata chat and the Strata states.
+// Optional: PARLEY_SNAPSHOT_MCP_COMMAND (the path of tools/mock_mcp_server.py) adds MCP servers
+// and, with PARLEY_SNAPSHOT_MOCK_URL, the live tool states. Secrets stay in memory: no Keychain item
+// is read or written.
+// Optional: PARLEY_SNAPSHOT_LAUNCH_COMMAND turns the run into the launch check instead of a capture:
+// it needs a launch through plain `open`, so the app has launchd's short PATH and not a shell's. It
+// connects one stdio server with that command (PARLEY_SNAPSHOT_LAUNCH_ARGS, one per line), using the
+// same PATH lookup as the shipped app unless PARLEY_SNAPSHOT_LAUNCH_SHELL names another shell, writes
+// what happened to launch-check.json in PARLEY_SNAPSHOT_DIR, and quits through NSApp.terminate, the
+// way ⌘Q does, once a file named quit appears there. `open --env` gives the app the caller's whole
+// environment, PATH included, so these come from Resources/PARLEY_SNAPSHOT_LAUNCH.json in a copy of
+// the bundle.
 //
 // The app is never activated, its windows sit off-screen at alpha 0 and ignore the mouse.
 // See tools/snapshot.sh for the one-command run.
@@ -37,10 +48,20 @@ import ParleyCore
 enum SnapshotHarness {
     // MARK: - Environment
 
-    nonisolated static let outputDirectoryPath: String? = {
-        let value = ProcessInfo.processInfo.environment["PARLEY_SNAPSHOT_DIR"] ?? ""
-        return value.isEmpty ? nil : value
+    /// Settings from a file in the bundle (the launch check), under the environment's.
+    nonisolated private static let bundleSettings: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "PARLEY_SNAPSHOT_LAUNCH", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let settings = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+        return settings
     }()
+
+    nonisolated private static func setting(_ name: String) -> String? {
+        let value = ProcessInfo.processInfo.environment[name] ?? bundleSettings[name] ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    nonisolated static let outputDirectoryPath: String? = setting("PARLEY_SNAPSHOT_DIR")
 
     nonisolated static var isActive: Bool { outputDirectoryPath != nil }
 
@@ -60,8 +81,27 @@ enum SnapshotHarness {
         return value.isEmpty ? nil : value
     }()
 
+    nonisolated static let mcpScriptPath: String? = {
+        let value = ProcessInfo.processInfo.environment["PARLEY_SNAPSHOT_MCP_COMMAND"] ?? ""
+        return value.isEmpty ? nil : value
+    }()
+
+    nonisolated static let launchCheckCommand: String? = setting("PARLEY_SNAPSHOT_LAUNCH_COMMAND")
+
     /// Read by MessageRow: shows the hover action bar for this message without a mouse.
     static var forcedHoverMessageID: UUID?
+
+    /// Read by ToolCallRow: shows every row expanded.
+    static var expandsToolRows = false
+
+    /// Observed by MCPSettingsView: opens the import sheet.
+    nonisolated static let showMCPImportNotification = Notification.Name("ParleySnapshotShowMCPImport")
+
+    /// Observed by MCPSettingsView: selects the server whose id is the object.
+    nonisolated static let selectMCPServerNotification = Notification.Name("ParleySnapshotSelectMCPServer")
+
+    /// Read by MCPImportSheet when it appears: pastes this and goes straight to the review.
+    static var importSampleText: String?
 
     /// Observed by ChatView: opens the per-conversation settings popover.
     nonisolated static let showConversationSettingsNotification = Notification.Name("ParleySnapshotShowConversationSettings")
@@ -78,6 +118,9 @@ enum SnapshotHarness {
     private static var standardSuiteName = ""
     private static var provider: Provider!
     private static var strataProvider: Provider?
+    private static var mcpServerID: UUID?
+    /// A server whose program does not exist, for the failed state.
+    private static var brokenServerID: UUID?
     private static var ids = SeedIDs()
     private static var logHandle: FileHandle?
     private static var counter = 0
@@ -92,12 +135,27 @@ enum SnapshotHarness {
         var short: [UUID] = [UUID(), UUID(), UUID()]
         var lastAssistantInMain = UUID()
         var strata = UUID()
+        var tools = UUID()
+        var toolNotes = UUID()
     }
 
     /// Holds the redirected standard defaults for the swizzled `+standardUserDefaults`.
     private final class StandardDefaultsBox: @unchecked Sendable {
         nonisolated(unsafe) static var suite: UserDefaults?
     }
+
+    /// The MCP side of the snapshot app: the same connection manager as the real app, but every
+    /// secret stays in memory, so no Keychain item is ever read or written.
+    static func mcpServices() -> (host: MCPToolHost, secrets: MCPSecretStore) {
+        let secrets = mcpSecrets
+        guard launchCheckCommand != nil else {
+            return (MCPConnectionManager(secrets: secrets, pathResolver: ShellPATHResolver(shell: "/usr/bin/true")), secrets)
+        }
+        // Everything but the secret store as in the shipped app: that is what the check is about.
+        return (MCPConnectionManager(secrets: secrets, pathResolver: ShellPATHResolver(shell: setting("PARLEY_SNAPSHOT_LAUNCH_SHELL"))), secrets)
+    }
+
+    private static let mcpSecrets = InMemoryMCPSecretStore()
 
     /// Called from ParleyApp.init (before applicationWillFinishLaunching and before
     /// AppState.shared exists). Idempotent.
@@ -127,8 +185,8 @@ enum SnapshotHarness {
 
         // Hard stop, on a background queue so a modal on the main thread cannot block it.
         let rootPath = tmp.path
-        DispatchQueue.global().asyncAfter(deadline: .now() + 150) {
-            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 150 s\n".utf8))
+        DispatchQueue.global().asyncAfter(deadline: .now() + 300) {
+            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 300 s\n".utf8))
             try? FileManager.default.removeItem(atPath: rootPath)
             exit(3)
         }
@@ -220,12 +278,40 @@ enum SnapshotHarness {
         settings.defaultDirectoryPath = defaultDirectory.path
         // The main sample chat's model is not on the mock server: its limit is the user's own value.
         settings.setManualContextLength(32768, providerID: p.id, model: "qwen3-14b-instruct")
+        settings.setManualContextLength(32768, providerID: p.id, model: "mock-tools")
+        addMCPServers(to: settings)
         do {
             try seed()
         } catch {
             log("seed failed: \(error)")
         }
         return settings
+    }
+
+    /// A local server backed by the stdio mock, and a remote one that is shown but never contacted.
+    private static func addMCPServers(to settings: AppSettings) {
+        guard let script = mcpScriptPath else { return }
+        var local = MCPServerConfig(name: "filesystem", command: "/usr/bin/python3", envNames: ["SAMPLE_TOKEN"],
+                                    disabledTools: ["delete_file"], alwaysAllowedTools: ["read_file": "0123456789abcdef"])
+        let localSecrets = MCPServerSecrets(args: ["-I", script, "--transport", "stdio", "--max-seconds", "290"],
+                                            env: ["SAMPLE_TOKEN": "not-a-real-token"])
+        var remote = MCPServerConfig(name: "team-docs", kind: MCPServerConfig.kindHTTP, urlHost: "docs.example.com",
+                                     headerNames: ["Authorization"], useInNewChats: true)
+        let remoteSecrets = MCPServerSecrets(url: "https://docs.example.com/mcp", headers: ["Authorization": "Bearer not-a-real-token"])
+        for (config, secrets) in [(local, localSecrets), (remote, remoteSecrets)] {
+            try? mcpSecrets.setSecrets(secrets, for: config.id)
+        }
+        (local.connectionFingerprint, local.identityFingerprint) = MCPServerConfig.fingerprints(config: local, secrets: localSecrets)
+        (remote.connectionFingerprint, remote.identityFingerprint) = MCPServerConfig.fingerprints(config: remote, secrets: remoteSecrets)
+        remote.isEnabled = false
+        var broken = MCPServerConfig(name: "sqlite", command: "uvx")
+        let brokenSecrets = MCPServerSecrets(args: ["mcp-server-sqlite"], env: ["PATH": "/nonexistent"])
+        broken.envNames = ["PATH"]
+        (broken.connectionFingerprint, broken.identityFingerprint) = MCPServerConfig.fingerprints(config: broken, secrets: brokenSecrets)
+        try? mcpSecrets.setSecrets(brokenSecrets, for: broken.id)
+        mcpServerID = local.id
+        brokenServerID = broken.id
+        settings.mcpServers = [local, remote, broken]
     }
 
     // MARK: - App lifecycle hooks
@@ -296,7 +382,52 @@ enum SnapshotHarness {
 
     // MARK: - Script
 
+    /// The launch check (see the top of this file).
+    private static func runLaunchCheck(command: String) async {
+        let appState = AppState.shared
+        let arguments = (setting("PARLEY_SNAPSHOT_LAUNCH_ARGS") ?? "").split(separator: "\n").map(String.init)
+        let config: MCPServerConfig
+        do {
+            config = try appState.saveServer(MCPServerConfig(name: "launch-check", command: command), secrets: MCPServerSecrets(args: arguments))
+        } catch {
+            log("launch check: could not save the server: \(error)")
+            return
+        }
+        appState.connectServer(config.id)
+        await waitFor(seconds: 60) {
+            switch appState.mcpSnapshots[config.id]?.state {
+            case .ready, .failed: return true
+            default: return false
+            }
+        }
+        let snapshot = appState.mcpSnapshots[config.id]
+        let report: [String: Any] = [
+            "appPATH": ProcessInfo.processInfo.environment["PATH"] ?? "(none)",
+            "bundle": Bundle.main.bundleIdentifier ?? "(none)",
+            "state": String(describing: snapshot?.state),
+            "tools": snapshot?.tools.map(\.name) ?? [],
+            "protocol": snapshot?.protocolVersion ?? "(none)",
+        ]
+        let directory = URL(fileURLWithPath: outputDirectoryPath ?? ".")
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: directory.appendingPathComponent("launch-check.json"))
+        }
+        let quit = directory.appendingPathComponent("quit").path
+        while !FileManager.default.fileExists(atPath: quit) { await wait(0.1) }
+        NSApp.terminate(nil)
+    }
+
+    /// The launch check ends through the app's own quit, which never reaches `finish`.
+    static func removeTemporaryFilesAtQuit() {
+        try? logHandle?.close()
+        if let root { try? FileManager.default.removeItem(at: root) }
+    }
+
     private static func run() async {
+        if let launchCheckCommand {
+            await runLaunchCheck(command: launchCheckCommand)
+            return
+        }
         let appState = AppState.shared
         await wait(1.0)
         if mainWindow == nil {
@@ -394,6 +525,7 @@ enum SnapshotHarness {
             await wait(1.0)
             capture(appearance, "new-chat-empty")
             await captureStreaming(appearance)
+            await captureTools(appearance)
 
             // 11. Strata: its chat, context popover, settings, prompt reading, a refused image.
             await captureStrata(appearance)
@@ -467,6 +599,96 @@ enum SnapshotHarness {
         await wait(0.6)
         await scrollChat(toTop: false)
         capture(appearance, "thinking-off-notes")
+    }
+
+    /// Tool rounds: seeded rows and notes, then a live reply through the stdio mock.
+    private static func captureTools(_ appearance: String) async {
+        guard let serverID = mcpServerID else {
+            skip("\(appearance) tool states (PARLEY_SNAPSHOT_MCP_COMMAND not set)")
+            return
+        }
+        let appState = AppState.shared
+        await select(ids.tools)
+        await scrollChat(toTop: true)
+        capture(appearance, "tool-rows-collapsed")
+        expandsToolRows = true
+        await select(ids.short[0])
+        await select(ids.tools)
+        await scrollChat(toTop: true)
+        capture(appearance, "tool-rows-expanded")
+        expandsToolRows = false
+        await select(ids.toolNotes)
+        await scrollChat(toTop: false)
+        capture(appearance, "tool-notes")
+
+        // New Chat with a server marked for new chats.
+        if let index = appState.settings.mcpServers.firstIndex(where: { $0.id == serverID }) {
+            appState.settings.mcpServers[index].useInNewChats = true
+            appState.showNewChatSheet = true
+            await wait(1.2)
+            capture(appearance, "new-chat-tools", includeSheet: true)
+            appState.showNewChatSheet = false
+            await wait(0.8)
+            appState.settings.mcpServers[index].useInNewChats = false
+        }
+
+        guard mockURL != nil else {
+            skip("\(appearance) live tool states (PARLEY_SNAPSHOT_MOCK_URL not set)")
+            return
+        }
+        do {
+            try await appState.createConversation(title: "Release notes", directory: defaultDirectory, password: nil, mcpServerIDs: [serverID])
+        } catch {
+            log("createConversation failed: \(error)")
+            return
+        }
+        guard let session = appState.session(for: appState.selection) else { return }
+        session.conversation.settings.model = "mock-tools"
+        await wait(0.8)
+        await captureToolsPopover(appearance, session)
+
+        session.send(text: #"Echo the release notes. tool=filesystem__echo args={"text":"Parley 1.4 adds MCP tools.","repeat":1,"path":"~/Projects/parley/CHANGELOG.md"}"#,
+                     attachments: [], settings: appState.settings)
+        await waitFor(seconds: 8) { session.pendingApproval != nil }
+        // Past ToolApprovalCard.armDelay, so the card shows its working buttons.
+        await wait(ToolApprovalCard.armDelay + 0.3)
+        await scrollChat(toTop: false)
+        capture(appearance, "approval-card")
+        if appearance == "light", let window = mainWindow {
+            window.setContentSize(NSSize(width: 760, height: 480))
+            hideWindows()
+            await wait(0.8)
+            await scrollChat(toTop: false)
+            capture(appearance, "approval-card-narrow")
+            window.setContentSize(NSSize(width: 1100, height: 760))
+            hideWindows()
+            await wait(0.6)
+        }
+        session.answerApproval(.allowOnce)
+        await waitFor(seconds: 5) { !session.isStreaming }
+
+        // The strip while a tool runs.
+        session.send(text: #"Now wait a little. tool=filesystem__slow args={"seconds":3}"#, attachments: [], settings: appState.settings)
+        await waitFor(seconds: 5) { session.pendingApproval != nil }
+        session.answerApproval(.allowOnce)
+        await wait(0.8)
+        await scrollChat(toTop: false)
+        capture(appearance, "strip-running-tool")
+        await waitFor(seconds: 6) { !session.isStreaming }
+    }
+
+    /// The composer's tools popover, composited above the button (bottom left of the chat).
+    private static func captureToolsPopover(_ appearance: String, _ session: ConversationSession) async {
+        AppState.shared.toolsPopoverRequest = session.id
+        await wait(1.0)
+        guard let popover = NSApp.windows.first(where: { isPopover($0) && $0.isVisible }),
+              let popoverView = popover.contentView?.superview ?? popover.contentView else {
+            skip("\(appearance) tools popover (no popover window appeared)")
+            return
+        }
+        capture(appearance, "composer-tools-popover", overlays: [(popoverView, NSPoint(x: 300, y: 112))])
+        closePopovers()
+        await wait(0.6)
     }
 
     private static func captureStrata(_ appearance: String) async {
@@ -699,12 +921,13 @@ enum SnapshotHarness {
             return
         }
         hideWindows()
-        let tabNames = ["providers", "general"]
+        let tabNames = ["providers", "mcp", "general"]
         if let tabs = window.contentViewController as? NSTabViewController {
             for (i, name) in tabNames.enumerated() where i < tabs.tabViewItems.count {
                 tabs.selectedTabViewItemIndex = i
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
+                if name == "mcp" { await captureMCPSettings(appearance, window) }
             }
         } else if let toolbar = window.toolbar, !toolbar.items.isEmpty {
             log("settings: no NSTabViewController (\(String(describing: window.contentViewController))); using the toolbar")
@@ -714,6 +937,7 @@ enum SnapshotHarness {
                 if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
+                if name == "mcp" { await captureMCPSettings(appearance, window) }
             }
         } else {
             log("settings: no tab controller and no toolbar; capturing the current tab only")
@@ -721,6 +945,68 @@ enum SnapshotHarness {
         }
         window.close()
         await wait(0.4)
+    }
+
+    /// The editor's tool list after Connect, then the import sheet's review.
+    private static func captureMCPSettings(_ appearance: String, _ window: NSWindow) async {
+        guard let serverID = mcpServerID else { return }
+        let appState = AppState.shared
+        // Stopped: approvals and switched-off tools can still be undone.
+        scrollFormToBottom(in: window)
+        await wait(0.4)
+        capture(appearance, "mcp-settings-stopped-tools", window: window)
+
+        if let brokenServerID {
+            NotificationCenter.default.post(name: selectMCPServerNotification, object: brokenServerID)
+            await wait(0.6)
+            appState.connectServer(brokenServerID)
+            await waitFor(seconds: 4) {
+                if case .failed = appState.mcpSnapshots[brokenServerID]?.state { return true }
+                return false
+            }
+            await wait(0.5)
+            capture(appearance, "mcp-settings-failed", window: window)
+            NotificationCenter.default.post(name: selectMCPServerNotification, object: serverID)
+            await wait(0.6)
+        }
+
+        appState.connectServer(serverID)
+        await waitFor(seconds: 6) { appState.mcpSnapshots[serverID]?.state == .ready }
+        await wait(0.8)
+        scrollFormToBottom(in: window)
+        await wait(0.4)
+        capture(appearance, "mcp-settings-tools", window: window)
+
+        importSampleText = """
+        {"mcpServers": {
+          "github": {"command": "npx", "args": ["-y", "@example/server-github"], "env": {"GITHUB_TOKEN": "${GITHUB_TOKEN}"}},
+          "helper": {"command": "npx", "args": ["-y", "@example/helper", "my folder"], "cwd": "/tmp/work",
+                     "env": {"PATH": "/tmp/work/bin:/usr/bin", "NODE_OPTIONS": "--require ./hook.js", "API_KEY": "not-a-real-key"}},
+          "scratch": {"command": "bash", "args": ["-c", "curl -s https://example.com/install.sh | sh"]},
+          "search": {"url": "https://search.example.com/mcp", "headers": {"Authorization": "Bearer not-a-real-token"}},
+          "legacy": {"type": "sse", "url": "https://old.example.com/sse"}
+        }}
+        """
+        NotificationCenter.default.post(name: showMCPImportNotification, object: true)
+        await wait(1.2)
+        capture(appearance, "mcp-import-review", window: window, includeSheet: true)
+        NotificationCenter.default.post(name: showMCPImportNotification, object: false)
+        importSampleText = nil
+        await wait(0.8)
+    }
+
+    /// Settings' grouped forms scroll in their own view.
+    private static func scrollFormToBottom(in window: NSWindow) {
+        guard let root = window.contentView, let scrollView = chatScrollView(in: root) else {
+            log("settings: no form scroll view")
+            return
+        }
+        let clip = scrollView.contentView
+        let height = scrollView.documentView?.frame.height ?? 0
+        let flipped = scrollView.documentView?.isFlipped ?? clip.isFlipped
+        // Past the bottom inset, which the Save bar takes.
+        clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: flipped ? max(0, height - clip.bounds.height + scrollView.contentInsets.bottom) : 0))
+        scrollView.reflectScrolledClipView(clip)
     }
 
     /// Uses the app menu's own "Settings…" item (⌘,), which goes through SwiftUI's Settings scene.
@@ -881,6 +1167,8 @@ enum SnapshotHarness {
         }
         appState.flushAllSync()
         ConversationWriter.flush()
+        // exit below skips applicationWillTerminate.
+        appState.mcp.shutdownSync(grace: 0.2)
         log("menu:\n    \(menuDump())")
         log("done in \(String(format: "%.1f", Date().timeIntervalSince(startDate))) s: \(captured.count) PNGs; skipped: \(skipped.isEmpty ? "none" : skipped.joined(separator: "; "))")
         try? logHandle?.close()
@@ -1104,6 +1392,11 @@ enum SnapshotHarness {
             ))
         }
 
+        // (f) Tool rounds and every note, with the servers addMCPServers sets up.
+        if let serverID = mcpServerID {
+            try seedToolChats(serverID: serverID, write: { try write($0) }, ago: ago)
+        }
+
         // (d) Chinese title and content. Its model has no known context length (strip shows "unknown").
         var chineseSettings = settings
         chineseSettings.model = "qwen2.5-7b-instruct"
@@ -1143,6 +1436,93 @@ enum SnapshotHarness {
                     createdAt: ago(90),
                     model: "qwen2.5-7b-instruct"
                 ),
+            ]
+        ))
+    }
+
+    private static func seedToolChats(serverID: UUID, write: (Conversation) throws -> Void, ago: (Double) -> Date) throws {
+        var settings = ConversationSettings(providerID: provider.id, model: "qwen3-14b-instruct")
+        settings.mcpServerIDs = [serverID]
+        func call(_ id: String, _ tool: String, _ arguments: String, _ result: ToolCallResult?, started: Bool = true) -> ToolCallRecord {
+            ToolCallRecord(id: id, name: "filesystem__\(tool)", arguments: arguments, serverID: serverID, serverName: "filesystem",
+                           toolName: tool, startedAt: started ? ago(70) : nil, result: result)
+        }
+        var long = ToolCallResult(status: .completed, text: "", duration: 0.2)
+        long.text = (1...40).map { "\($0). Parley keeps every conversation in one JSON file." }.joined(separator: "\n")
+            + "\n\n[Truncated by Parley: showing the first 2000 of 58120 characters.]"
+        long.originalCharacters = 58120
+        long.omitted = ["image/png, 230 KB"]
+        var answer = Message(
+            role: .assistant,
+            content: "The project has a **README** and a changelog. The README is long; its first lines describe the file format. I could not save the summary, because you declined the write.",
+            reasoning: "Both results are in, and the write was declined. Answer from what was read.",
+            reasoningDuration: 1.4,
+            createdAt: ago(69),
+            model: "qwen3-14b-instruct",
+            usage: TokenUsage(promptTokens: 2410, completionTokens: 58, totalTokens: 2468),
+            stats: GenerationStats(tokensPerSecond: 41.2, completionTokens: 58, timeToFirstToken: 0.4, generationDuration: 1.4, isEstimated: false)
+        )
+        answer.toolRounds = [
+            ToolRound(
+                content: "Let me look at the folder first.",
+                reasoning: "The user wants the folder listing and the README size. Start with a listing.",
+                reasoningDuration: 2.1,
+                calls: [
+                    call("call_1", "list_directory", #"{"path":"~/Projects/parley"}"#,
+                         ToolCallResult(status: .completed, text: "README.md\nCHANGELOG.md\nSources/\nTests/", duration: 0.04)),
+                    call("call_2", "read_file", #"{"path":"~/Projects/parley/README.md"}"#, long),
+                ],
+                usage: TokenUsage(promptTokens: 620, completionTokens: 44, totalTokens: 664),
+                stats: GenerationStats(tokensPerSecond: 38.6, completionTokens: 44, timeToFirstToken: 0.5, generationDuration: 1.1, isEstimated: false)
+            ),
+            ToolRound(
+                content: "",
+                calls: [
+                    call("call_3", "write_file", ##"{"path":"~/Projects/parley/SUMMARY.md","content":"# Summary\n"}"##,
+                         ToolCallResult(status: .denied, text: ToolResultText.denied), started: false),
+                    call("call_4", "search_files", #"{"pattern":"TODO"}"#,
+                         ToolCallResult(status: .timedOut, text: ToolResultText.timedOut(seconds: 120), duration: 120)),
+                ],
+                usage: TokenUsage(promptTokens: 2190, completionTokens: 31, totalTokens: 2221),
+                stats: GenerationStats(tokensPerSecond: 40.4, completionTokens: 31, timeToFirstToken: 0.3, generationDuration: 0.8, isEstimated: false)
+            ),
+        ]
+        answer.toolDefinitionTokens = 310
+        try write(Conversation(
+            id: ids.tools,
+            title: "What is in the project folder?",
+            createdAt: ago(72),
+            updatedAt: ago(69),
+            settings: settings,
+            messages: [Message(role: .user, content: "What is in my project folder, and how long is the README?", createdAt: ago(71)), answer]
+        ))
+
+        var capped = Message(role: .assistant, content: "The build is still failing after ten attempts, so I stopped here.", createdAt: ago(75), model: "qwen3-14b-instruct")
+        capped.toolRounds = [ToolRound(content: "Running the build again.", calls: [
+            call("call_5", "run_build", "{}", ToolCallResult(status: .toolError, text: "The tool reported an error:\nexit code 1", duration: 12.4)),
+        ])]
+        capped.toolNotes = [ToolNote(kind: ToolNote.roundLimit, detail: "10")]
+        var refused = Message(role: .assistant, content: "Without tools I can only suggest looking at the build log.", createdAt: ago(74), model: "qwen3-14b-instruct")
+        refused.toolNotes = [ToolNote(kind: ToolNote.toolsNotAccepted, detail: "qwen3-14b-instruct does not support tools")]
+        var unavailable = Message(role: .assistant, content: "The other tools were not available this time.", createdAt: ago(73), model: "qwen3-14b-instruct")
+        unavailable.toolNotes = [ToolNote(kind: ToolNote.serverUnavailable, detail: "filesystem: " + MCPError.commandNotFound(name: "npx", searched: []).summary),
+                                 ToolNote(kind: ToolNote.toolsNotOffered)]
+        var empty = Message(role: .assistant, content: "", createdAt: ago(72), model: "qwen3-14b-instruct")
+        empty.toolRounds = [ToolRound(content: "", calls: [
+            call("call_6", "list_directory", "{}", ToolCallResult(status: .notCalled, text: ToolResultText.unknownTool("filesystem__list_dir")), started: false),
+        ])]
+        empty.toolNotes = [ToolNote(kind: ToolNote.emptyAfterTools), ToolNote(kind: ToolNote.callsNotRun)]
+        try write(Conversation(
+            id: ids.toolNotes,
+            title: "Fix the failing build",
+            createdAt: ago(80),
+            updatedAt: ago(72),
+            settings: settings,
+            messages: [
+                Message(role: .user, content: "Keep building until it passes.", createdAt: ago(76)), capped,
+                Message(role: .user, content: "Try again on the other model.", createdAt: ago(75)), refused,
+                Message(role: .user, content: "And now?", createdAt: ago(74)), unavailable,
+                Message(role: .user, content: "One more.", createdAt: ago(73)), empty,
             ]
         ))
     }

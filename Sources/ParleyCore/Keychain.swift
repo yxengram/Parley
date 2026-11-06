@@ -6,6 +6,9 @@ import Security
 /// Items are never synchronizable (kSecAttrSynchronizable is left at its default, false).
 public enum KeychainStore {
     public static let service = "local.parley.chat.apikey"
+    /// MCP server secrets (MCPConfig.swift). A service of its own, so accounts cannot collide with
+    /// API keys even when UUIDs match.
+    public static let mcpService = "local.parley.chat.mcp"
 
     /// Upserts the key. An empty string deletes the item.
     public static func setAPIKey(_ key: String, for providerID: UUID) throws {
@@ -32,7 +35,7 @@ public enum KeychainStore {
         ]
     }
 
-    static func setValue(_ value: String, service: String, account: String) throws {
+    static func setValue(_ value: String, service: String, account: String, label: String = "Parley API key") throws {
         if value.isEmpty {
             try deleteValue(service: service, account: account)
             return
@@ -49,7 +52,7 @@ public enum KeychainStore {
             var add = query
             add[kSecValueData as String] = data
             add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
-            add[kSecAttrLabel as String] = "Parley API key"
+            add[kSecAttrLabel as String] = label
             let addStatus = SecItemAdd(add as CFDictionary, nil)
             guard addStatus == errSecSuccess else { throw ParleyError.keychain(addStatus) }
         default:

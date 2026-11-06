@@ -22,20 +22,20 @@ import Testing
 
 // MARK: - Mock server
 
-private let python3Path = "/usr/bin/python3"
+let python3Path = "/usr/bin/python3"
 
-private let mockServerScript: URL = URL(fileURLWithPath: #filePath)
+let mockServerScript: URL = URL(fileURLWithPath: #filePath)
     .resolvingSymlinksInPath()
     .deletingLastPathComponent()   // ParleyAppTests
     .deletingLastPathComponent()   // Tests
     .deletingLastPathComponent()   // package root
     .appendingPathComponent("tools/mock_server.py")
 
-private struct FlowTestError: Error, CustomStringConvertible {
+struct FlowTestError: Error, CustomStringConvertible {
     let description: String
 }
 
-private func freeLocalPort() throws -> Int {
+func freeLocalPort() throws -> Int {
     let fd = socket(AF_INET, SOCK_STREAM, 0)
     guard fd >= 0 else { throw POSIXError(.EIO) }
     defer { close(fd) }
@@ -55,7 +55,7 @@ private func freeLocalPort() throws -> Int {
 }
 
 /// Set from the process's termination handler (a background queue).
-private final class ExitFlag: @unchecked Sendable {
+final class ExitFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var exited = false
     func set() { lock.lock(); exited = true; lock.unlock() }
@@ -63,7 +63,7 @@ private final class ExitFlag: @unchecked Sendable {
 }
 
 /// A running mock server.
-private struct MockServer {
+struct MockServer {
     let process: Process
     let exited: ExitFlag
     let baseURL: String
@@ -83,7 +83,7 @@ private struct MockServer {
 /// Starts the mock server on a free port. Retries with a new port if the server exits before
 /// it answers (another suite may have grabbed the same free port in the meantime).
 @MainActor
-private func startMockServer(flavor: String? = nil, environment: [String: String] = [:]) async throws -> MockServer {
+func startMockServer(flavor: String? = nil, environment: [String: String] = [:]) async throws -> MockServer {
     guard FileManager.default.fileExists(atPath: mockServerScript.path) else {
         throw FlowTestError(description: "mock server not found at \(mockServerScript.path)")
     }
@@ -117,7 +117,7 @@ private func startMockServer(flavor: String? = nil, environment: [String: String
 
 // MARK: - Fixture
 
-private func makeTempRoot() throws -> URL {
+func makeTempRoot() throws -> URL {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ParleyAppTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -128,18 +128,18 @@ private func makeTempRoot() throws -> URL {
 /// plist lives there (CFPreferences treats an absolute path as the plist location) and goes away
 /// with it. A plain reverse-DNS suite name leaves an empty plist in ~/Library/Preferences, because
 /// cfprefsd writes the emptied domain back after the test has deleted the file.
-private func defaultsSuiteName(in root: URL) -> String {
+func defaultsSuiteName(in root: URL) -> String {
     root.appendingPathComponent("defaults").path
 }
 
-private func removeDefaultsSuite(_ name: String, _ suite: UserDefaults, root: URL) {
+func removeDefaultsSuite(_ name: String, _ suite: UserDefaults, root: URL) {
     suite.removePersistentDomain(forName: name)
     try? FileManager.default.removeItem(at: root)
 }
 
 /// One isolated app: its own defaults suite, temp directories and a provider pointing at the mock.
 @MainActor
-private final class Fixture {
+final class Fixture {
     let suiteName: String
     let defaults: UserDefaults
     let root: URL
@@ -147,8 +147,11 @@ private final class Fixture {
     let settings: AppSettings
     let state: AppState
     let provider: Provider
+    /// Stands in for the Keychain: nothing here reads or writes an MCP item.
+    let mcpSecrets = InMemoryMCPSecretStore()
 
-    init(baseURL: String, defaultModel: String) throws {
+    /// `mcp` nil gets a real manager that cannot run a real login shell.
+    init(baseURL: String, defaultModel: String, mcp: MCPToolHost? = nil) throws {
         root = try makeTempRoot()
         suiteName = defaultsSuiteName(in: root)
         defaultDir = root.appendingPathComponent("Default", isDirectory: true)
@@ -164,7 +167,9 @@ private final class Fixture {
         settings.providers = [provider]
         settings.defaultProviderID = provider.id
         settings.defaultDirectoryPath = defaultDir.path
-        state = AppState(settings: settings)
+        let resolver = ShellPATHResolver(launchPATH: "/usr/bin:/bin", shell: "/usr/bin/true", home: NSTemporaryDirectory(), timeout: 2)
+        let host = mcp ?? MCPConnectionManager(secrets: mcpSecrets, pathResolver: resolver, clientVersion: "test", stopGrace: 0.3)
+        state = AppState(settings: settings, mcp: host, mcpSecrets: mcpSecrets)
     }
 
     /// A directory other than the default one (created lazily by the app on first write).
@@ -176,6 +181,7 @@ private final class Fixture {
         for session in state.sessions.values {
             session.close(saving: false)
         }
+        state.mcp.shutdownSync(grace: 0.2)
         // A queued write landing after removeItem would recreate the directory.
         ConversationWriter.flush()
         removeDefaultsSuite(suiteName, defaults, root: root)
@@ -202,15 +208,16 @@ private final class Fixture {
 }
 
 @MainActor
-private func withFixture(
+func withFixture(
     model: String = "mock-plain",
     flavor: String? = nil,
     environment: [String: String] = [:],
+    mcp: MCPToolHost? = nil,
     _ body: (Fixture) async throws -> Void
 ) async throws {
     let server = try await startMockServer(flavor: flavor, environment: environment)
     do {
-        let fixture = try Fixture(baseURL: server.baseURL, defaultModel: model)
+        let fixture = try Fixture(baseURL: server.baseURL, defaultModel: model, mcp: mcp)
         defer { fixture.cleanup() }
         try await body(fixture)
     } catch {
@@ -222,7 +229,7 @@ private func withFixture(
 
 /// Polls `condition` on the main actor until it holds or `timeout` elapses.
 @MainActor
-private func waitUntil(timeout: TimeInterval = 10, _ condition: () -> Bool) async -> Bool {
+func waitUntil(timeout: TimeInterval = 10, _ condition: () -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while !condition() {
         if Date() > deadline { return false }
@@ -234,31 +241,31 @@ private func waitUntil(timeout: TimeInterval = 10, _ condition: () -> Bool) asyn
 // MARK: - Disk helpers
 
 /// Waits for every queued background save, then reads the file.
-private func readFile(_ url: URL) throws -> Data {
+func readFile(_ url: URL) throws -> Data {
     ConversationWriter.flush()
     return try Data(contentsOf: url)
 }
 
-private func readPlain(_ url: URL) throws -> Conversation {
+func readPlain(_ url: URL) throws -> Conversation {
     try ConversationFile.decodePlain(readFile(url))
 }
 
-private func contains(_ data: Data, _ text: String) -> Bool {
+func contains(_ data: Data, _ text: String) -> Bool {
     data.range(of: Data(text.utf8)) != nil
 }
 
 /// Every entry in the directory, hidden files included.
-private func listing(_ dir: URL) -> [String] {
+func listing(_ dir: URL) -> [String] {
     ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).sorted()
 }
 
-private func echo(_ text: String) -> String {
+func echo(_ text: String) -> String {
     #"You said: "\#(text)" (0 images received)"#
 }
 
 /// Field-wise equality. Dates are written as ISO 8601 without fractional seconds, so they only
 /// round-trip to within a second.
-private func expectSameMessages(_ disk: [Message], _ memory: [Message], sourceLocation: SourceLocation = #_sourceLocation) {
+func expectSameMessages(_ disk: [Message], _ memory: [Message], sourceLocation: SourceLocation = #_sourceLocation) {
     #expect(disk.count == memory.count, sourceLocation: sourceLocation)
     for (d, m) in zip(disk, memory) {
         #expect(d.id == m.id, sourceLocation: sourceLocation)

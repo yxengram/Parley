@@ -31,7 +31,7 @@
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Parley connects to the LLM server you configure, which may be on your local network.</string>
+    <string>Parley connects to the LLM server and MCP servers you configure, which may be on your local network.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <!-- Plain HTTP to any host the user configures (LAN, Tailscale 100.x, etc.).

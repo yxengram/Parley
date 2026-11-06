@@ -20,9 +20,15 @@ public struct ChatDelta: Sendable, Equatable {
     /// Not from the server: ChatClient yields a delta with only this set when the server refused
     /// the "no thinking" field and accepted the request sent again without it (see streamChat).
     public var thinkingOffRejected = false
+    /// This chunk's `tool_calls` fragments, in array order (a chunk can carry several).
+    public var toolCalls: [ToolCallDelta] = []
+    /// Not from the server, like `thinkingOffRejected`: the server refused the request's `tools`
+    /// and accepted it sent again without them (see streamChat).
+    public var toolsRejected: ToolsRefusal? = nil
 
     public init(content: String? = nil, reasoning: String? = nil, usage: TokenUsage? = nil, finishReason: String? = nil,
-                timings: ServerTimings? = nil, promptProgress: PromptProgress? = nil, thinkingOffRejected: Bool = false) {
+                timings: ServerTimings? = nil, promptProgress: PromptProgress? = nil, thinkingOffRejected: Bool = false,
+                toolCalls: [ToolCallDelta] = [], toolsRejected: ToolsRefusal? = nil) {
         self.content = content
         self.reasoning = reasoning
         self.usage = usage
@@ -30,6 +36,8 @@ public struct ChatDelta: Sendable, Equatable {
         self.timings = timings
         self.promptProgress = promptProgress
         self.thinkingOffRejected = thinkingOffRejected
+        self.toolCalls = toolCalls
+        self.toolsRejected = toolsRejected
     }
 }
 
@@ -146,7 +154,7 @@ public struct SSEDecoder {
     /// "error" key is kept; another object becomes the error; anything else is its message.
     static func errorPayload(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parsed = trimmed.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0, options: [.fragmentsAllowed]) }
+        let parsed = trimmed.data(using: .utf8).flatMap { JSONValue.parsed($0, options: [.fragmentsAllowed]) }
         let error: Any
         if let dict = parsed as? [String: Any] {
             if let inner = dict["error"], !(inner is NSNull) { return trimmed }
@@ -172,7 +180,7 @@ public struct SSEDecoder {
         guard let first = trimmed.first, first == "{" || first == "[",
               let last = trimmed.last, last == "}" || last == "]" else { return false }
         guard let data = trimmed.data(using: .utf8) else { return false }
-        return (try? JSONSerialization.jsonObject(with: data)) != nil
+        return JSONValue.parsed(data) != nil
     }
 }
 
@@ -185,8 +193,7 @@ public enum ChunkParser {
         let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "[DONE]" { return nil }
         guard let data = trimmed.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let root = object as? [String: Any] else {
+              let root = JSONValue.parsed(data) as? [String: Any] else {
             return nil
         }
 
@@ -202,7 +209,8 @@ public enum ChunkParser {
 
         if let choices = root["choices"] as? [[String: Any]], let choice = choices.first {
             // Streaming chunks carry "delta"; a non-streaming completion carries "message".
-            let body = (choice["delta"] as? [String: Any]) ?? (choice["message"] as? [String: Any])
+            let streamed = choice["delta"] as? [String: Any]
+            let body = streamed ?? (choice["message"] as? [String: Any])
             if let body {
                 delta.content = body["content"] as? String
                 let reasoningContent = body["reasoning_content"] as? String
@@ -215,6 +223,7 @@ public enum ChunkParser {
                 } else {
                     delta.reasoning = reasoningContent ?? reasoning
                 }
+                delta.toolCalls = toolCalls(from: body["tool_calls"], whole: streamed == nil)
             }
             delta.finishReason = choice["finish_reason"] as? String
         }
@@ -255,10 +264,37 @@ public enum ChunkParser {
         }
 
         if delta.content == nil, delta.reasoning == nil, delta.usage == nil, delta.finishReason == nil, delta.timings == nil,
-           delta.promptProgress == nil {
+           delta.promptProgress == nil, delta.toolCalls.isEmpty {
             return nil
         }
         return delta
+    }
+
+    /// `tool_calls` entries as fragments. `whole`: a non-streaming `message`, whose calls need not
+    /// have an `index`, so the array position stands in for it. `function.arguments` is normally a
+    /// String; some servers send the object itself, which becomes its JSON text.
+    private static func toolCalls(from value: Any?, whole: Bool) -> [ToolCallDelta] {
+        guard let list = value as? [[String: Any]] else { return [] }
+        var out: [ToolCallDelta] = []
+        out.reserveCapacity(list.count)
+        for (position, entry) in list.enumerated() {
+            let function = entry["function"] as? [String: Any]
+            var arguments: String?
+            switch function?["arguments"] {
+            case let text as String:
+                arguments = text
+            case let other?:
+                // What cannot be JSON stays visibly wrong: as no arguments it would run the tool bare.
+                if !(other is NSNull) { arguments = JSONValue(any: other)?.sortedJSONText ?? String(describing: other) }
+            case nil:
+                break
+            }
+            out.append(ToolCallDelta(index: intValue(entry["index"]) ?? (whole ? position : nil),
+                                     id: entry["id"] as? String,
+                                     name: function?["name"] as? String,
+                                     arguments: arguments))
+        }
+        return out
     }
 
     static func errorMessage(from error: Any) -> String {
@@ -298,6 +334,8 @@ public struct StreamAccumulator: Sendable {
     public private(set) var reasoningStartedAt: Date?
     /// Set when the first content token after reasoning arrives, or at finish.
     public private(set) var reasoningEndedAt: Date?
+    /// The `tool_calls` fragments so far.
+    public private(set) var toolCalls = ToolCallAccumulator()
 
     /// Inside an inline <think> block.
     private var inThinkTag = false
@@ -332,6 +370,9 @@ public struct StreamAccumulator: Sendable {
         }
         if let c = delta.content, !c.isEmpty {
             processContent(c, now: now)
+        }
+        for call in delta.toolCalls {
+            toolCalls.apply(call)
         }
         if let u = delta.usage {
             usage = u

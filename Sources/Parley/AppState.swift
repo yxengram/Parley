@@ -11,7 +11,8 @@ final class AppState {
         #if DEBUG
         // Debug snapshot mode (PARLEY_SNAPSHOT_DIR): isolated settings, temp folder, sample data.
         if let settings = SnapshotHarness.isolatedSettingsIfActive() {
-            return AppState(settings: settings)
+            let services = SnapshotHarness.mcpServices()
+            return AppState(settings: settings, mcp: services.host, mcpSecrets: services.secrets)
         }
         #endif
         return AppState()
@@ -96,6 +97,10 @@ final class AppState {
     var sidebarRequest: SidebarRequest?
     /// Set by the Conversation menu: ChatView opens its settings popover for this conversation.
     var conversationSettingsRequest: UUID?
+    /// Set by the Conversation menu: the composer opens its tools popover for this conversation.
+    var toolsPopoverRequest: UUID?
+    /// Set by the Message menu when the last reply ran tools: ChatView asks before regenerating.
+    var regenerateRequest: UUID?
 
     enum SidebarRequest: Equatable {
         case rename(UUID), encrypt(UUID), changePassword(UUID), removeEncryption(UUID), moveToTrash(UUID)
@@ -112,8 +117,40 @@ final class AppState {
         let message: String
     }
 
-    init(settings: AppSettings? = nil) {
+    /// Every MCP server connection. Constructing it starts nothing and reads no secret.
+    let mcp: MCPToolHost
+    /// Arguments, URLs, environment values and headers of the servers (the Keychain, except in
+    /// tests and the snapshot harness). Read when a server starts or its editor opens.
+    let mcpSecrets: MCPSecretStore
+    /// The latest status of each server that ran this launch (memory only).
+    private(set) var mcpSnapshots: [UUID: MCPServerSnapshot] = [:]
+    /// What each provider + model refused of `tools` this launch (memory only). Later replies leave
+    /// tools out and say so. Per AppState instance, like `thinkingOffRejections`.
+    private(set) var toolRejections: [ContextKey: ToolsRefusal] = [:]
+
+    init(settings: AppSettings? = nil, mcp: MCPToolHost? = nil, mcpSecrets: MCPSecretStore? = nil) {
         self.settings = settings ?? AppSettings()
+        let secrets = mcpSecrets ?? KeychainMCPSecretStore()
+        self.mcpSecrets = secrets
+        self.mcp = mcp ?? MCPConnectionManager(secrets: secrets)
+        drainMCPUpdates()
+    }
+
+    /// Weak, so a test's AppState goes away; the stream ends at `shutdownSync`.
+    private func drainMCPUpdates() {
+        let updates = mcp.updates
+        Task { [weak self] in
+            for await snapshot in updates {
+                guard let self else { return }
+                // A stop reported after the server was deleted.
+                guard self.mcpServer(snapshot.serverID) != nil else { continue }
+                self.mcpSnapshots[snapshot.serverID] = snapshot
+            }
+        }
+    }
+
+    func forgetMCPSnapshot(_ id: UUID) {
+        mcpSnapshots[id] = nil
     }
 
     // MARK: - Library
@@ -224,6 +261,7 @@ final class AppState {
         session.markThinkingOffRejected = { [weak self] provider, model, fields in
             self?.markThinkingOffRejected(provider: provider, model: model, fields: fields)
         }
+        session.tools = toolServices()
         sessions[session.id] = session
     }
 
@@ -288,16 +326,26 @@ final class AppState {
     /// Returns the save error, or nil once the session is locked.
     private func lockSession(_ id: UUID) -> String? {
         guard let session = sessions[id], session.isEncrypted else { return nil }
+        let servers = session.conversation.settings.mcpServerIDs ?? []
         if let error = session.close(saving: true) { return error }
         sessions[id] = nil
+        // The server keeps running for other chats, but its stderr may hold this one's data.
+        if !servers.isEmpty {
+            let mcp = self.mcp
+            Task { await mcp.clearLogs(serverIDs: servers) }
+        }
         return nil
     }
 
     // MARK: - Creating
 
-    func createConversation(title: String, directory: URL, password: String?) async throws {
+    /// `mcpServerIDs` nil takes the enabled servers marked "Use in new chats". An empty result stores
+    /// nil, so a new file without servers has no extra key.
+    func createConversation(title: String, directory: URL, password: String?, mcpServerIDs: [UUID]? = nil) async throws {
         var settingsValue = ConversationSettings(providerID: settings.defaultProvider?.id)
         settingsValue.model = settings.defaultProvider?.defaultModel ?? ""
+        let servers = mcpServerIDs ?? settings.mcpServers.filter { $0.isEnabled && $0.useInNewChats }.map(\.id)
+        settingsValue.mcpServerIDs = servers.isEmpty ? nil : servers
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let conversation = Conversation(
             title: trimmedTitle.isEmpty ? ConversationSession.defaultTitle : trimmedTitle,
@@ -610,6 +658,22 @@ final class AppState {
     /// Forgets every refusal (tests; a later launch starts empty anyway).
     func resetThinkingOffRejections() {
         thinkingOffRejections.removeAll()
+    }
+
+    // MARK: - Tool refusals
+
+    /// What this provider's model refused of `tools` this launch.
+    func toolRefusal(provider: Provider, model: String) -> ToolsRefusal? {
+        toolRejections[ContextKey(provider: provider, model: model)]
+    }
+
+    func markToolsRefused(provider: Provider, model: String, refusal: ToolsRefusal) {
+        toolRejections[ContextKey(provider: provider, model: model)] = refusal
+    }
+
+    /// Try Again in the tools popover: the next send offers tools again.
+    func clearToolRefusal(provider: Provider, model: String) {
+        toolRejections[ContextKey(provider: provider, model: model)] = nil
     }
 
     private func store(_ info: ModelContextInfo, for key: ContextKey) {

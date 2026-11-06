@@ -70,6 +70,17 @@ struct ErrorPresentation: Equatable {
         self.retryable = retryable
     }
 
+    /// A context error says nothing of tools, which may be what filled the context.
+    func naming(toolDefinitionTokens tokens: Int?, in error: String) -> ErrorPresentation {
+        guard let tokens, tokens > 0, ContextBudget.contextLength(fromError: error) != nil || error.lowercased().contains("context") else {
+            return self
+        }
+        var out = self
+        let note = "Tool definitions take about \(TokenFormat.grouped(tokens)) tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T)."
+        out.detail = detail.map { "\($0) \(note)" } ?? note
+        return out
+    }
+
     /// `serverKind` is what the app learned about the server (only a few messages need it; the
     /// Strata texts below are recognized by their wording). `partialReply`: the failed reply
     /// already shows some text or thinking.

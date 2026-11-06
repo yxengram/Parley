@@ -67,10 +67,41 @@ public enum ContextBudget {
         return cjk + (other + 3) / 4
     }
 
-    /// What one message costs in a request: its text, text attachments and images (never reasoning,
-    /// which is not sent back).
+    /// What one tool definition costs in a request.
+    public static func estimateTokens(tool: ChatTool) -> Int {
+        var function: [String: JSONValue] = ["name": .string(tool.name), "parameters": tool.parameters]
+        if let description = tool.description { function["description"] = .string(description) }
+        return estimateTokens(JSONValue.object(function).sortedJSONText) + 8
+    }
+
+    /// What one tool round costs in a request: its text, then each call and its result.
+    /// `resolvedOnly` leaves out calls still waiting for a result (the reply in flight).
+    public static func estimateTokens(round: ToolRound, resolvedOnly: Bool = false) -> Int {
+        var tokens = messageOverhead + estimateTokens(round.content)
+        for call in round.calls where !resolvedOnly || call.result != nil {
+            tokens += estimateTokens(call: call) + estimateResultTokens(call: call)
+        }
+        return tokens
+    }
+
+    private static func estimateTokens(call: ToolCallRecord) -> Int {
+        8 + estimateTokens(call.name) + estimateTokens(call.replayArguments)
+    }
+
+    private static func estimateResultTokens(call: ToolCallRecord) -> Int {
+        messageOverhead + estimateTokens(call.replayResult)
+    }
+
+    /// What one message costs in a request: its text, text attachments, images and tool rounds
+    /// (never reasoning, which is not sent back).
     public static func estimateTokens(message: Message) -> Int {
-        var tokens = messageOverhead + estimateTokens(message.content)
+        var tokens = 0
+        let rounds = message.toolRounds ?? []
+        // A reply that ended in a tool round has no final message.
+        if rounds.isEmpty || !Message.isBlank(message.content) {
+            tokens += messageOverhead + estimateTokens(message.content)
+        }
+        for round in rounds { tokens += estimateTokens(round: round) }
         guard message.role == .user else { return tokens }
         for attachment in message.attachments {
             switch attachment.kind {
@@ -90,21 +121,38 @@ public enum ContextBudget {
     /// estimates only what came after it. Without any count, everything
     /// is estimated, system prompt included. `inFlightID` (the reply being streamed) is left
     /// out; its tokens so far are `liveCompletionTokens`.
+    ///
+    /// A message's `usage` is always its last request's, whose prompt holds the earlier rounds. A
+    /// reply that has none (stopped or failed between rounds, or still in flight) anchors on its
+    /// newest round that has one instead, plus estimates for what came after that request: this
+    /// keeps the figure honest during a tool loop. `toolDefinitionTokens` are what the next request
+    /// sends as `tools`: added in full without an anchor, otherwise only what the anchor's request
+    /// did not already carry.
     public static func usage(
         messages: [Message],
         systemPrompt: String,
         inFlightID: UUID? = nil,
         liveCompletionTokens: Int = 0,
-        liveIsEstimated: Bool = false
+        liveIsEstimated: Bool = false,
+        toolDefinitionTokens: Int = 0
     ) -> ContextUsage {
         var tokens = 0
         var estimated = false
         var start = messages.startIndex
+        var anchored = false
+        var anchorDefinitions = 0
 
-        if let i = messages.lastIndex(where: { $0.id != inFlightID && $0.role == .assistant && counted($0) != nil }),
-           let counted = counted(messages[i]) {
-            tokens = counted
+        if let i = messages.lastIndex(where: { hasAnchor($0, inFlightID: inFlightID) }) {
+            let message = messages[i]
+            anchored = true
+            anchorDefinitions = message.toolDefinitionTokens ?? 0
             start = messages.index(after: i)
+            if message.id != inFlightID, let counted = counted(message) {
+                tokens = counted
+            } else if let anchor = roundAnchor(message, inFlight: message.id == inFlightID) {
+                tokens = anchor
+                estimated = true
+            }
         } else {
             let system = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             if !system.isEmpty {
@@ -112,9 +160,18 @@ public enum ContextBudget {
                 estimated = true
             }
         }
-        for message in messages[start...] where message.id != inFlightID {
+        for message in messages[start...] {
+            let rounds = message.toolRounds ?? []
+            if message.id == inFlightID {
+                // Its finished rounds are part of the next request; its current text is live.
+                for round in rounds {
+                    tokens += estimateTokens(round: round, resolvedOnly: true)
+                    estimated = true
+                }
+                continue
+            }
             // Empty (failed) replies are not sent.
-            if message.role == .assistant && message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
+            if message.role == .assistant && rounds.isEmpty && message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
             tokens += estimateTokens(message: message)
             estimated = true
         }
@@ -122,20 +179,46 @@ public enum ContextBudget {
             tokens += liveCompletionTokens
             estimated = estimated || liveIsEstimated
         }
+        let definitions = anchored ? max(0, toolDefinitionTokens - anchorDefinitions) : toolDefinitionTokens
+        if definitions > 0 {
+            tokens += definitions
+            estimated = true
+        }
         return ContextUsage(tokens: tokens, isEstimated: estimated)
     }
 
-    private static func counted(_ message: Message) -> Int? {
-        guard let usage = message.usage else { return nil }
-        let total: Int
-        if let prompt = usage.promptTokens {
-            total = prompt + (usage.completionTokens ?? 0)
-        } else if let all = usage.totalTokens {
-            total = all
-        } else {
-            return nil
+    private static func hasAnchor(_ message: Message, inFlightID: UUID?) -> Bool {
+        guard message.role == .assistant else { return false }
+        if message.id != inFlightID && counted(message) != nil { return true }
+        return roundAnchor(message, inFlight: message.id == inFlightID) != nil
+    }
+
+    /// Tokens up to and including the newest round the server counted, its reasoning left out, plus
+    /// estimates for that round's results, later rounds and any final text.
+    private static func roundAnchor(_ message: Message, inFlight: Bool) -> Int? {
+        let rounds = message.toolRounds ?? []
+        guard let i = rounds.lastIndex(where: { countedTotal($0.usage) != nil }),
+              let usage = rounds[i].usage, let total = countedTotal(usage) else { return nil }
+        var tokens = max(0, total - reasoningTokens(usage: usage, reasoning: rounds[i].reasoning))
+        for call in rounds[i].calls where !inFlight || call.result != nil {
+            tokens += estimateResultTokens(call: call)
         }
+        for round in rounds[(i + 1)...] { tokens += estimateTokens(round: round, resolvedOnly: inFlight) }
+        if !inFlight, !Message.isBlank(message.content) {
+            tokens += messageOverhead + estimateTokens(message.content)
+        }
+        return tokens
+    }
+
+    private static func counted(_ message: Message) -> Int? {
+        guard let usage = message.usage, let total = countedTotal(usage) else { return nil }
         return max(0, total - reasoningTokens(in: message))
+    }
+
+    private static func countedTotal(_ usage: TokenUsage?) -> Int? {
+        guard let usage else { return nil }
+        if let prompt = usage.promptTokens { return prompt + (usage.completionTokens ?? 0) }
+        return usage.totalTokens
     }
 
     /// The reply's thinking tokens, which the next request leaves out: the server's count, else
@@ -143,11 +226,23 @@ public enum ContextBudget {
     /// never more than the reply's completion tokens.
     static func reasoningTokens(in message: Message) -> Int {
         guard let usage = message.usage else { return 0 }
+        return reasoningTokens(usage: usage, reasoning: message.reasoning)
+    }
+
+    private static func reasoningTokens(usage: TokenUsage, reasoning: String?) -> Int {
         if let reported = usage.reasoningTokens { return reported }
-        guard let reasoning = message.reasoning, !reasoning.isEmpty else { return 0 }
+        guard let reasoning, !reasoning.isEmpty else { return 0 }
         let estimate = estimateTokens(reasoning)
         if let completion = usage.completionTokens { return min(estimate, completion) }
         return estimate
+    }
+
+    /// The most characters a tool result may hand the model: the configured cap, within half the
+    /// room left at about 4 characters per token, so one result does not end a small context with
+    /// an overflow error. Never below 2,000, or a nearly full context would get nothing useful.
+    public static func toolResultBudget(configured: Int, limit: ContextLimit?, used: Int) -> Int {
+        guard let limit else { return configured }
+        return min(configured, max(2_000, (limit.tokens - used) * 2))
     }
 
     /// The context size named in an overflow error, if any:

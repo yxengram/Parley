@@ -10,6 +10,8 @@ struct MessageRow: View, Equatable {
         var regenerate: (Int) -> Void
         /// Requests a reply to a trailing user message.
         var getReply: () -> Void
+        /// The buttons of the approval card.
+        var answerApproval: (String, ToolApprovalDecision) -> Void = { _, _ in }
     }
 
     enum EditState: Equatable {
@@ -41,6 +43,14 @@ struct MessageRow: View, Equatable {
     /// An earlier reply (the nearest one) carries the same "None (no thinking)" note: this one
     /// gets the short form, the full text is in its help tag.
     var repeatsThinkingOffNote = false
+    /// What this reply is doing while it streams.
+    var replyPhase: ConversationSession.ReplyPhase? = nil
+    /// When this reply's current request went out.
+    var roundStartedAt: Date? = nil
+    /// The tool call of this reply waiting for the user.
+    var pendingApproval: PendingToolApproval? = nil
+    /// The tool call of this reply running now.
+    var activeCallID: String? = nil
     let actions: Actions
 
     @ViewState private var isHovering = false
@@ -64,10 +74,15 @@ struct MessageRow: View, Equatable {
             && lhs.promptProgress == rhs.promptProgress
             && lhs.maxTokens == rhs.maxTokens
             && lhs.repeatsThinkingOffNote == rhs.repeatsThinkingOffNote
+            && lhs.replyPhase == rhs.replyPhase
+            && lhs.roundStartedAt == rhs.roundStartedAt
+            && lhs.pendingApproval == rhs.pendingApproval
+            && lhs.activeCallID == rhs.activeCallID
     }
 
     private var isUser: Bool { message.role == .user }
     private var isLast: Bool { index == messageCount - 1 }
+    private var hasToolRounds: Bool { !(message.toolRounds ?? []).isEmpty }
     private var laterCount: Int { max(0, messageCount - index - 1) }
 
     var body: some View {
@@ -105,9 +120,7 @@ struct MessageRow: View, Equatable {
         .confirmationDialog("Regenerate this reply?", isPresented: $confirmRegenerate) {
             Button("Regenerate", role: .destructive) { actions.regenerate(index) }
         } message: {
-            Text(laterCount == 1
-                 ? "This reply and the message after it will be replaced."
-                 : "This reply and the \(laterCount) messages after it will be replaced.")
+            Text(Self.regenerateWarning(laterCount: laterCount, ranTools: hasToolRounds))
         }
     }
 
@@ -168,6 +181,11 @@ struct MessageRow: View, Equatable {
                     }
                 }
 
+            if let rounds = message.toolRounds, !rounds.isEmpty {
+                ToolRoundsView(rounds: rounds, replyInProgress: isStreamingThis, activeCallID: activeCallID,
+                               pendingApproval: pendingApproval, answer: actions.answerApproval)
+            }
+
             if let reasoning = message.reasoning, !reasoning.isEmpty {
                 ThinkingDisclosure(
                     reasoning: reasoning,
@@ -185,7 +203,15 @@ struct MessageRow: View, Equatable {
             if !message.content.isEmpty {
                 MarkdownView(text: message.content)
             } else if isStreamingThis && (message.reasoning ?? "").isEmpty {
-                WaitingIndicator(startedAt: message.createdAt, progress: promptProgress, serverKind: serverKind)
+                if replyPhase == nil || replyPhase == .generating {
+                    WaitingIndicator(startedAt: roundStartedAt ?? message.createdAt, progress: promptProgress, serverKind: serverKind)
+                } else if case .connecting(let servers) = replyPhase {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(verbatim: Self.startingText(servers))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             if !isStreamingThis, message.error == nil, let note = Self.finishNote(message, maxTokens: maxTokens) {
@@ -203,10 +229,21 @@ struct MessageRow: View, Equatable {
                     .help(Self.thinkingOffNote(message) ?? note)
             }
 
+            if !isStreamingThis {
+                ForEach(message.toolNotes ?? [], id: \.self) { note in
+                    Label(Self.toolNoteText(note), systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(note.detail ?? "")
+                }
+            }
+
             if let error = message.error {
-                let partial = !message.content.isEmpty || !(message.reasoning ?? "").isEmpty
+                let partial = !message.content.isEmpty || !(message.reasoning ?? "").isEmpty || hasToolRounds
                 let presentation = ErrorPresentation.make(error, providerName: providerName, baseURL: providerBaseURL,
                                                           serverKind: serverKind, partialReply: partial)
+                    .naming(toolDefinitionTokens: message.toolDefinitionTokens, in: error)
                 ErrorCallout(
                     presentation: presentation,
                     raw: ErrorPresentation.displayText(error),
@@ -261,7 +298,10 @@ struct MessageRow: View, Equatable {
 
     @ViewBuilder
     private var footer: some View {
-        if showUsage, let line = Self.footerText(usage: message.usage, stats: message.stats) {
+        // While the reply runs, an earlier round's figures would read as the reply's.
+        let usage = isStreamingThis ? message.usage : message.usage ?? message.toolRounds?.last(where: { $0.usage != nil })?.usage
+        let stats = isStreamingThis ? message.stats : message.latestStats
+        if showUsage, let line = Self.footerText(usage: usage, stats: stats, toolRounds: isStreamingThis ? 0 : message.toolRounds?.count ?? 0) {
             Text(line)
                 .font(.caption2)
                 .foregroundStyle(.secondary.opacity(0.8))
@@ -330,6 +370,32 @@ struct MessageRow: View, Equatable {
         }
     }
 
+    /// The text of a note about tools. A kind a later version added shows its `detail`.
+    static func toolNoteText(_ note: ToolNote) -> String {
+        switch note.kind {
+        case ToolNote.toolsNotAccepted:
+            return "The model's server did not accept tools, so this reply was written without them."
+        case ToolNote.toolsNotOffered:
+            return "Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata."
+        case ToolNote.serverUnavailable:
+            let detail = (note.detail ?? "A server").trimmingCharacters(in: CharacterSet(charactersIn: ". \n"))
+            return "\(detail). Its tools were not offered."
+        case ToolNote.roundLimit:
+            return "Reached the limit of \(note.detail ?? "") tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP."
+        case ToolNote.callsNotRun:
+            return "The reply ended inside a tool call, so it was not run."
+        case ToolNote.emptyAfterTools:
+            return "The model wrote nothing after the tool results."
+        default:
+            return note.detail ?? ""
+        }
+    }
+
+    /// "Starting filesystem…", while a first start may take minutes (a first `npx` downloads).
+    static func startingText(_ servers: [String]) -> String {
+        "Starting \(servers.map(ToolDisplay.visible).joined(separator: ", "))…"
+    }
+
     /// For each message, whether the nearest earlier reply carries the same thinking-off note.
     static func repeatsThinkingOffNotes(_ messages: [Message]) -> [Bool] {
         var previous: ThinkingOffNoteKind?
@@ -343,7 +409,7 @@ struct MessageRow: View, Equatable {
 
     /// "1184 prompt · 236 completion · 1420 total tokens · 42.3 tok/s · 0.21 s to first token".
     /// Without server usage, the chunk count stands in, marked "≈".
-    static func footerText(usage: TokenUsage?, stats: GenerationStats?) -> String? {
+    static func footerText(usage: TokenUsage?, stats: GenerationStats?, toolRounds: Int = 0) -> String? {
         var groups: [String] = []
         if let usage {
             let parts: [String] = [
@@ -365,28 +431,45 @@ struct MessageRow: View, Equatable {
                 groups.append(TokenFormat.seconds(t) + " to first token")
             }
         }
+        if toolRounds > 0 { groups.append(toolRounds == 1 ? "1 tool round" : "\(toolRounds) tool rounds") }
         return groups.isEmpty ? nil : groups.joined(separator: " · ")
     }
 
     // MARK: Actions
 
     private func copy() {
-        Pasteboard.copy(message.content)
+        Pasteboard.copy(message.visibleText)
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
     }
 
-    /// Regenerating the last reply needs no confirmation; an earlier one drops later messages.
+    /// Regenerating the last reply needs no confirmation; an earlier one drops later messages, and
+    /// one that ran tools may run them again.
     private func requestRegenerate() {
         guard !conversationBusy else { return }
-        if isLast { actions.regenerate(index) } else { confirmRegenerate = true }
+        if isLast && !hasToolRounds { actions.regenerate(index) } else { confirmRegenerate = true }
     }
+
+    static func regenerateWarning(laterCount: Int, ranTools: Bool) -> String {
+        let replaced: String
+        switch laterCount {
+        case 0: replaced = "This reply will be replaced."
+        case 1: replaced = "This reply and the message after it will be replaced."
+        default: replaced = "This reply and the \(laterCount) messages after it will be replaced."
+        }
+        return ranTools ? replaced + " " + toolRegenerateWarning : replaced
+    }
+
+    static let toolRegenerateWarning = "This reply ran tools. Their effects are not undone, and the model may run them again."
 
     @ViewBuilder
     private var contextMenuItems: some View {
         Button("Copy Message") { copy() }
         if let reasoning = message.reasoning, !reasoning.isEmpty {
             Button("Copy Thinking") { Pasteboard.copy(reasoning) }
+        }
+        if let rounds = message.toolRounds, !rounds.isEmpty {
+            Button("Copy Tool Calls") { Pasteboard.copy(ToolDisplay.copyText(rounds)) }
         }
         Divider()
         if isUser {
@@ -397,7 +480,7 @@ struct MessageRow: View, Equatable {
                     .disabled(conversationBusy)
             }
         } else {
-            Button(isLast ? "Regenerate" : "Regenerate…") { requestRegenerate() }
+            Button(isLast && !hasToolRounds ? "Regenerate" : "Regenerate…") { requestRegenerate() }
                 .disabled(conversationBusy)
         }
         Button("Fork from Here") { actions.fork(index) }

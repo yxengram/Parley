@@ -5,8 +5,9 @@ import ParleyCore
 /// App-wide settings persisted in `UserDefaults` (never iCloud).
 ///
 /// Only non-sensitive configuration lives here: provider profiles (no API keys;
-/// those are in the Keychain), directory paths and UI preferences. Conversation
-/// titles or content are never written to UserDefaults.
+/// those are in the Keychain), MCP server definitions (their arguments, URLs and values are in the
+/// Keychain too), directory paths and UI preferences. Conversation titles or content are never
+/// written to UserDefaults.
 @MainActor
 @Observable
 final class AppSettings {
@@ -20,7 +21,12 @@ final class AppSettings {
         static let contextLengthOverrides = "contextLengthOverrides"
         static let learnedContextLengths = "learnedContextLengths"
         static let contextInstanceLinks = "contextInstanceLinks"
+        static let mcpServers = "mcpServers"
+        static let maxToolRounds = "maxToolRounds"
     }
+
+    static let defaultMaxToolRounds = 10
+    static let toolRoundsRange = 1...50
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -49,6 +55,21 @@ final class AppSettings {
     /// UI preference: show token usage under assistant messages.
     var showTokenUsage: Bool {
         didSet { defaults.set(showTokenUsage, forKey: Key.showTokenUsage) }
+    }
+
+    /// MCP servers the user added. Empty by default: Parley discovers none and starts none on its
+    /// own. Nothing here can hold a token (see MCPServerConfig).
+    var mcpServers: [MCPServerConfig] {
+        didSet { persistMCPServers() }
+    }
+
+    /// How many tool rounds one reply may run before the model is asked to answer without tools.
+    var maxToolRounds: Int {
+        didSet {
+            let clamped = min(max(maxToolRounds, Self.toolRoundsRange.lowerBound), Self.toolRoundsRange.upperBound)
+            if clamped != maxToolRounds { maxToolRounds = clamped }
+            defaults.set(maxToolRounds, forKey: Key.maxToolRounds)
+        }
     }
 
     /// Context lengths the user entered. Keyed by `contextKey(providerID:model:)`, or by
@@ -259,6 +280,14 @@ final class AppSettings {
         self.extraConversationPaths = defaults.stringArray(forKey: Key.extraConversationPaths) ?? []
         self.hiddenConversationPaths = defaults.stringArray(forKey: Key.hiddenConversationPaths) ?? []
         self.showTokenUsage = defaults.object(forKey: Key.showTokenUsage) as? Bool ?? true
+        if let data = defaults.data(forKey: Key.mcpServers),
+           let decoded = try? JSONDecoder().decode([MCPServerConfig].self, from: data) {
+            self.mcpServers = decoded
+        } else {
+            self.mcpServers = []
+        }
+        let storedRounds = defaults.object(forKey: Key.maxToolRounds) as? Int ?? Self.defaultMaxToolRounds
+        self.maxToolRounds = min(max(storedRounds, Self.toolRoundsRange.lowerBound), Self.toolRoundsRange.upperBound)
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }
         self.learnedContextLengths = (defaults.dictionary(forKey: Key.learnedContextLengths) ?? [:])
@@ -275,6 +304,12 @@ final class AppSettings {
     private func persistProviders() {
         if let data = try? JSONEncoder().encode(providers) {
             defaults.set(data, forKey: Key.providers)
+        }
+    }
+
+    private func persistMCPServers() {
+        if let data = try? JSONEncoder().encode(mcpServers) {
+            defaults.set(data, forKey: Key.mcpServers)
         }
     }
 

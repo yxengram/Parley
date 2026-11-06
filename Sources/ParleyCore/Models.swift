@@ -87,6 +87,13 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     /// value), so the note's hint fits the server that wrote this reply, not the one the
     /// conversation uses now. A String, so a kind a later version adds cannot break decoding.
     public var thinkingOffServerKind: String?
+    /// The tool rounds before the final one, oldest first (see ToolRound). `content`, `reasoning`,
+    /// `usage` and `stats` always hold the current or final round only. Optional, like the notes
+    /// above: older files still decode, and a reply without tools encodes as it always did.
+    public var toolRounds: [ToolRound]?
+    public var toolNotes: [ToolNote]?
+    /// Estimated tokens of the tool definitions sent with this reply's requests.
+    public var toolDefinitionTokens: Int?
 
     public init(
         id: UUID = UUID(),
@@ -139,6 +146,9 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     /// The most tokens the model may think per reply (Strata: reasoning_budget_tokens). Only
     /// sent to Strata. Optional, so files written before it existed still decode.
     public var reasoningBudgetTokens: Int?
+    /// MCP servers this conversation uses. Nil and [] both mean none. A list of ids only, so a
+    /// conversation file can never name a command or URL.
+    public var mcpServerIDs: [UUID]?
 
     public init(
         providerID: UUID? = nil,

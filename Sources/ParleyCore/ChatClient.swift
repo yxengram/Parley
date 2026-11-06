@@ -24,6 +24,12 @@ public struct ChatRequestOptions: Sendable {
     public var serverKind: InferenceServerKind?
     /// ModelContextInfo.maxRequestBytes: a larger request is refused before it is sent.
     public var maxRequestBytes: Int?
+    /// Offered to the model. Nil or empty sends no `tools` key, and the body is what it was before
+    /// tools existed.
+    public var tools: [ChatTool]? = nil
+    /// Leave `tools` out, and flatten earlier tool rounds into text: the server refused them, or
+    /// the round cap was reached.
+    public var omitsTools = false
 
     public init(model: String, systemPrompt: String = "", temperature: Double? = nil, maxTokens: Int? = nil, reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
@@ -189,7 +195,9 @@ public final class ChatClient: @unchecked Sendable {
     /// remembers the refusal (per provider and model) and tells the user that this reply used the
     /// server's default thinking. When the second request fails too, the field was not the cause:
     /// the first answer's error is thrown and nothing is yielded.
-    /// Each of the two retries happens at most once per call, in either order.
+    /// A request carrying `tools` that the server refuses (ToolsSupport.refusal) goes the same way:
+    /// it is sent once more without them, and only a 2xx answer makes the stream first yield a
+    /// `ChatDelta` with only `toolsRejected` set. Each retry happens at most once per call, in any order.
     public func streamChat(messages: [Message], options: ChatRequestOptions) -> AsyncThrowingStream<ChatDelta, Error> {
         let includeUsage = !StreamOptionsSupport.isRejected(by: baseURL)
         let request: URLRequest
@@ -209,25 +217,32 @@ public final class ChatClient: @unchecked Sendable {
                     // The first answer's error while the request is being retried without the
                     // "no thinking" fields: thrown if that retry is refused too.
                     var thinkingOffRefusal: ParleyError?
+                    // Likewise for the retry without `tools`.
+                    var toolsRefusal: (refusal: ToolsRefusal, error: ParleyError)?
                     while true {
                         let thinkingOff = Self.sentThinkingOffFields(options)
                         do {
                             try await self.runStream(request: request, rejectsStreamOptions: includeUsage,
                                                      thinkingOffFields: thinkingOff, serverKind: options.serverKind,
+                                                     sentTools: Self.sendsTools(options),
                                                      announcesThinkingOffRefusal: thinkingOffRefusal != nil,
+                                                     announcesToolsRefusal: toolsRefusal?.refusal,
                                                      continuation: continuation)
                             break
                         } catch is StreamOptionsRejected {
                             // Nothing was yielded yet (the server answered with an error status).
                             StreamOptionsSupport.markRejected(by: self.baseURL)
                             includeUsage = false
+                        } catch let rejected as ToolsRejected {
+                            options.omitsTools = true
+                            toolsRefusal = (rejected.refusal, rejected.error)
                         } catch let rejected as ThinkingOffRejected {
                             options.omitsThinkingOff = true
                             thinkingOffRefusal = rejected.error
                         } catch let error as ParleyError {
                             // The retry without the field was refused as well: the field was not
                             // the cause, so the server's first answer is the one to show.
-                            if case .http = error, let first = thinkingOffRefusal { throw first }
+                            if case .http = error, let first = toolsRefusal?.error ?? thinkingOffRefusal { throw first }
                             throw error
                         }
                         // Each retry turns its own flag off, so neither can be thrown twice.
@@ -252,13 +267,16 @@ public final class ChatClient: @unchecked Sendable {
     /// StreamOptionsRejected instead of the HTTP error, so the caller can retry without it. With
     /// `thinkingOffFields` (the "no thinking" keys this request carries), one that refuses them
     /// throws ThinkingOffRejected. With `announcesThinkingOffRefusal` (this is that retry), a 2xx
-    /// answer first yields the `thinkingOffRejected` delta.
+    /// answer first yields the `thinkingOffRejected` delta. `sentTools` and `announcesToolsRefusal`
+    /// do the same for `tools`.
     private func runStream(
         request: URLRequest,
         rejectsStreamOptions: Bool,
         thinkingOffFields: [String],
         serverKind: InferenceServerKind?,
+        sentTools: Bool,
         announcesThinkingOffRefusal: Bool,
+        announcesToolsRefusal: ToolsRefusal?,
         continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
     ) async throws {
         let (bytes, response) = try await session.bytes(for: request)
@@ -276,6 +294,10 @@ public final class ChatClient: @unchecked Sendable {
             if rejectsStreamOptions, StreamOptionsSupport.isRejection(status: status, body: body) {
                 throw StreamOptionsRejected()
             }
+            if sentTools, let kind = ToolsSupport.refusal(status: status, body: body) {
+                throw ToolsRejected(refusal: ToolsRefusal(kind: kind, message: ToolsSupport.message(body: body)),
+                                    error: ParleyError.http(status: status, body: body))
+            }
             if ThinkingOffSupport.isRejection(status: status, body: body, sentFields: thinkingOffFields, serverKind: serverKind) {
                 throw ThinkingOffRejected(error: ParleyError.http(status: status, body: body))
             }
@@ -284,6 +306,9 @@ public final class ChatClient: @unchecked Sendable {
         if announcesThinkingOffRefusal {
             // The request without the "no thinking" fields was accepted: they were the cause.
             continuation.yield(ChatDelta(thinkingOffRejected: true))
+        }
+        if let announcesToolsRefusal {
+            continuation.yield(ChatDelta(toolsRejected: announcesToolsRefusal))
         }
 
         // From here on the server has answered: a transport error is a broken reply, not an
@@ -378,19 +403,36 @@ public final class ChatClient: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         applyAuthorization(to: &request)
-        let data = try JSONSerialization.data(withJSONObject: body)
+        let data = try Self.encodeBody(body, options: options)
         if let limit = options.maxRequestBytes, data.count > limit {
-            throw ParleyError.api(Self.requestTooLargeMessage(bytes: data.count, limit: limit))
+            let carriesToolData = Self.sendsTools(options) || messages.contains { !($0.toolRounds ?? []).isEmpty }
+            throw ParleyError.api(Self.requestTooLargeMessage(bytes: data.count, limit: limit, carriesToolData: carriesToolData))
         }
         request.httpBody = data
         return request
     }
 
+    /// The request's bytes. With tools the keys are sorted: dictionary order is not stable, and
+    /// llama.cpp and Strata render tools at the start of the prompt, so an order flip would miss
+    /// the prefix cache on every round. Without tools the options are the empty ones of old.
+    static func encodeBody(_ body: [String: Any], options: ChatRequestOptions) throws -> Data {
+        try JSONSerialization.data(withJSONObject: body, options: sendsTools(options) ? [.sortedKeys] : [])
+    }
+
+    /// Whether this request carries `tools`. Decides the shape of the whole body: tool messages go
+    /// out only with tools (see `buildRequestBody`).
+    public static func sendsTools(_ options: ChatRequestOptions) -> Bool {
+        !options.omitsTools && !(options.tools ?? []).isEmpty
+    }
+
     /// Strata's shared port answers an oversized body with a bare HTTP 500 "Request failed" (or
     /// drops the connection), and every later turn would fail the same way: images are re-sent.
-    static func requestTooLargeMessage(bytes: Int, limit: Int) -> String {
+    static func requestTooLargeMessage(bytes: Int, limit: Int, carriesToolData: Bool = false) -> String {
         func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
-        return "This request is \(mb(bytes)), more than the \(mb(limit)) the server accepts. Images are sent again with every message: remove some, or fork from a message before the first image."
+        let advice = carriesToolData
+            ? "Images and tool results are sent again with every message: fork from an earlier message or roll back."
+            : "Images are sent again with every message: remove some, or fork from a message before the first image."
+        return "This request is \(mb(bytes)), more than the \(mb(limit)) the server accepts. " + advice
     }
 
     /// The two sizes ("14.2 MB", "12.0 MB") of a `requestTooLargeMessage`, also with text appended.
@@ -432,6 +474,12 @@ public final class ChatClient: @unchecked Sendable {
 
     /// Pure, for tests. Returns the JSON body dictionary. With `includeUsage`, adds
     /// `stream_options: {include_usage: true}` (what streamChat sends unless the server refused it).
+    ///
+    /// Earlier tool rounds go out as `tool_calls` and `role: tool` messages only when this request
+    /// carries `tools`. Otherwise they are flattened into assistant text (Message.flattenedForRequest):
+    /// a retry without tools could fail the same way on a tool-shaped history, and Strata's runtime
+    /// path keeps only `{role, content}`. A reply that is still open then ends in a user turn asking
+    /// for the answer. `tool_choice` is never sent: Ollama has none, the rest default to auto.
     public static func buildRequestBody(messages: [Message], options: ChatRequestOptions, includeUsage: Bool = false) -> [String: Any] {
         var apiMessages: [[String: Any]] = []
 
@@ -447,8 +495,31 @@ public final class ChatClient: @unchecked Sendable {
 
             case .assistant:
                 // Never send reasoning back. Skip empty (e.g. failed) replies; partial content is sent as is.
-                guard !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                apiMessages.append(["role": "assistant", "content": message.content])
+                let rounds = message.toolRounds ?? []
+                if rounds.isEmpty {
+                    guard !Message.isBlank(message.content) else { continue }
+                    apiMessages.append(["role": "assistant", "content": message.content])
+                } else if sendsTools(options) {
+                    for round in rounds {
+                        var replay: [String: Any] = ["role": "assistant", "tool_calls": round.calls.map { call -> [String: Any] in
+                            ["id": call.id, "type": "function",
+                             "function": ["name": call.name, "arguments": call.replayArguments]]
+                        }]
+                        // LM Studio's documented form leaves `content` out when there is none.
+                        if !Message.isBlank(round.content) { replay["content"] = round.content }
+                        apiMessages.append(replay)
+                        for call in round.calls {
+                            apiMessages.append(["role": "tool", "tool_call_id": call.id, "name": call.name,
+                                                "content": call.replayResult])
+                        }
+                    }
+                    if !Message.isBlank(message.content) {
+                        apiMessages.append(["role": "assistant", "content": message.content])
+                    }
+                } else {
+                    let text = message.flattenedForRequest
+                    if !Message.isBlank(text) { apiMessages.append(["role": "assistant", "content": text]) }
+                }
 
             case .user:
                 var text = message.content
@@ -478,6 +549,12 @@ public final class ChatClient: @unchecked Sendable {
             }
         }
 
+        // A reply still open, going out without `tools` (the round limit, or tools were refused).
+        if !sendsTools(options), let last = messages.last, last.role == .assistant, !(last.toolRounds ?? []).isEmpty,
+           Message.isBlank(last.content) {
+            apiMessages.append(["role": "user", "content": ToolResultText.answerNow])
+        }
+
         var body: [String: Any] = [
             "model": options.model,
             "stream": true,
@@ -497,6 +574,13 @@ public final class ChatClient: @unchecked Sendable {
             body["return_progress"] = true
             if let budget = options.reasoningBudgetTokens, budget > 0, !options.disablesThinking {
                 body["reasoning_budget_tokens"] = budget
+            }
+        }
+        if sendsTools(options), let tools = options.tools {
+            body["tools"] = tools.map { tool -> [String: Any] in
+                var function: [String: Any] = ["name": tool.name, "parameters": tool.parameters.any]
+                if let description = tool.description { function["description"] = description }
+                return ["type": "function", "function": function]
             }
         }
         return body
@@ -662,6 +746,49 @@ enum ThinkingOffSupport {
         if names.contains("reasoning_effort") { names += ["reasoning", "thinking"] }
         if names.contains("chat_template_kwargs") { names += ["enable_thinking", "chat template kwargs", "thinking"] }
         return names.contains { lower.contains($0) }
+    }
+}
+
+/// Thrown inside runStream when the server refused `tools`; never escapes streamChat.
+struct ToolsRejected: Error {
+    let refusal: ToolsRefusal
+    /// The server's answer, shown if the retry without tools is refused as well.
+    let error: ParleyError
+}
+
+/// Whether an error answer refuses the request's `tools`. What is remembered about it lives in the
+/// app (per provider and model), not here: no process-wide state.
+enum ToolsSupport {
+    /// Being loose is safe: it counts only if the retry without tools is accepted. Never for a
+    /// context overflow. Status 400, 404, 422, 500 or 501, because llama.cpp's own refusals are 500s.
+    static func refusal(status: Int, body: String) -> ToolsRefusal.Kind? {
+        guard [400, 404, 422, 500, 501].contains(status) else { return nil }
+        let lower = body.lowercased()
+        if ContextBudget.contextLength(fromError: body) != nil
+            || lower.contains("context length") || lower.contains("context window") {
+            return nil
+        }
+        let definitions = ["failed to parse tools", "json schema error at"]
+        if definitions.contains(where: lower.contains) { return .definitions }
+        let unsupported = [
+            "does not support tools", "doesn't support tools",                  // Ollama
+            "tools param requires", "unable to generate parser",                // llama.cpp
+            "tool choice requires", "tool-call-parser",                         // vLLM
+            "support tool use", "tool use is not supported", "tools is not supported", "tools are not supported",
+            "function calling is not", "unrecognized request argument supplied: tools", "unknown parameter: 'tools'",
+        ]
+        if unsupported.contains(where: lower.contains) { return .unsupported }
+        if let object = JSONValue(jsonText: body), object["error"]?["param"]?.stringValue == "tools" { return .unsupported }
+        return nil
+    }
+
+    /// The server's own words: `error.message` when the body is that JSON, else the body.
+    static func message(body: String) -> String {
+        if let data = body.data(using: .utf8),
+           let root = JSONValue.parsed(data) as? [String: Any], let error = root["error"] {
+            return ChunkParser.errorMessage(from: error)
+        }
+        return body
     }
 }
 

@@ -127,14 +127,14 @@ public struct ServerTimings: Sendable, Equatable {
 }
 
 /// Measures generation speed on the client. Works with every OpenAI-compatible server: each
-/// stream chunk that carries reasoning or content counts as one token (true for llama.cpp,
+/// stream chunk that carries reasoning, content or a tool-call fragment counts as one token (true for llama.cpp,
 /// LM Studio, vLLM and OpenAI in practice) until the server reports an exact count in `usage`
 /// or llama.cpp `timings`.
 public struct GenerationMeter: Sendable {
     public private(set) var requestStartedAt: Date?
     public private(set) var firstTokenAt: Date?
     public private(set) var lastTokenAt: Date?
-    /// Chunks that carried non-empty reasoning or content.
+    /// Chunks that carried non-empty reasoning, content or a tool-call fragment.
     public private(set) var chunkCount = 0
     /// Of those, chunks that carried reasoning.
     public private(set) var reasoningChunkCount = 0
@@ -159,7 +159,7 @@ public struct GenerationMeter: Sendable {
     public mutating func record(_ delta: ChatDelta, now: Date = Date()) {
         // The opening {"role":"assistant","content":""} chunk is not a token.
         let hasReasoning = !(delta.reasoning ?? "").isEmpty
-        if !(delta.content ?? "").isEmpty || hasReasoning {
+        if !(delta.content ?? "").isEmpty || hasReasoning || !delta.toolCalls.isEmpty {
             chunkCount += 1
             if hasReasoning { reasoningChunkCount += 1 }
             if firstTokenAt == nil { firstTokenAt = now }

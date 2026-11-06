@@ -76,6 +76,8 @@ struct ContextSnapshot: Equatable {
     var cachedPromptTokens: Int? = nil
     /// While streaming, before the first token.
     var promptProgress: PromptProgress? = nil
+    /// What the reply is doing between requests: "Running read_file…".
+    var toolActivity: String? = nil
     var isStreaming: Bool
     var reload: AppState.ReloadState?
 
@@ -98,7 +100,8 @@ struct ContextSnapshot: Equatable {
         let learned = provider.flatMap { model.isEmpty ? nil : appState.learnedContextLength(provider: $0, model: model) }
         let instance = provider.flatMap { model.isEmpty ? nil : appState.contextInstanceID(provider: $0, model: model) }
         let live = session.liveGeneration
-        let usage = session.contextUsage()
+        let idleDefinitions = session.isStreaming ? 0 : appState.toolDefinitionTokens(for: session.conversation.settings)
+        let usage = session.contextUsage(idleToolDefinitionTokens: idleDefinitions)
         var rate: Double?
         var estimated = false
         var ttft: Double?
@@ -106,7 +109,7 @@ struct ContextSnapshot: Equatable {
         if let live {
             rate = live.tokensPerSecond
             estimated = live.isEstimated
-        } else if let stats = session.conversation.messages.last(where: { $0.role == .assistant && $0.stats != nil })?.stats {
+        } else if let stats = session.conversation.messages.last(where: { $0.role == .assistant && $0.latestStats != nil })?.latestStats {
             rate = stats.tokensPerSecond
             estimated = stats.isEstimated ?? false
             ttft = stats.timeToFirstToken
@@ -127,10 +130,20 @@ struct ContextSnapshot: Equatable {
             promptTokensRead: lastStats?.promptTokensRead,
             cachedPromptTokens: lastStats?.cachedPromptTokens,
             promptProgress: live?.promptProgress,
+            toolActivity: toolActivity(session.replyPhase),
             isStreaming: session.isStreaming,
             reload: provider.flatMap { model.isEmpty ? nil : appState.reloadState(provider: $0, model: model) }
         )
         return (snapshot, provider, model)
+    }
+
+    static func toolActivity(_ phase: ConversationSession.ReplyPhase?) -> String? {
+        switch phase {
+        case .connecting(let servers): return MessageRow.startingText(servers)
+        case .awaitingApproval: return "Waiting for your approval"
+        case .runningTool(let tool): return "Running \(ToolDisplay.visible(tool))…"
+        case .generating, nil: return nil
+        }
     }
 }
 
@@ -173,7 +186,15 @@ struct ContextStatusBar: View {
 
     private func label(_ snap: ContextSnapshot) -> some View {
         HStack(spacing: 6) {
-            if snap.isStreaming, let progress = snap.promptProgress {
+            if let activity = snap.toolActivity {
+                // Between requests there is no speed to show.
+                HStack(spacing: 3) {
+                    Image(systemName: "wrench.and.screwdriver")
+                        .imageScale(.small)
+                    Text(verbatim: activity)
+                }
+                Text("·").foregroundStyle(.tertiary)
+            } else if snap.isStreaming, let progress = snap.promptProgress {
                 // Prompt reading (Strata, llama.cpp) before the first token.
                 HStack(spacing: 3) {
                     Image(systemName: "text.viewfinder")
@@ -250,7 +271,9 @@ struct ContextStatusBar: View {
 
     static func accessibilityText(_ snap: ContextSnapshot) -> String {
         var parts: [String] = []
-        if snap.isStreaming, let progress = snap.promptProgress {
+        if let activity = snap.toolActivity {
+            parts.append(activity)
+        } else if snap.isStreaming, let progress = snap.promptProgress {
             let cached = progress.cached > 0 ? ", \(TokenFormat.grouped(progress.cached)) cached" : ""
             parts.append("Reading prompt \(Int((progress.fraction * 100).rounded(.down))) percent of \(TokenFormat.grouped(progress.total)) tokens\(cached)")
         } else if let r = snap.tokensPerSecond {

@@ -71,6 +71,8 @@ public struct ModelContextInfo: Sendable, Equatable {
     /// running model (e.g. one Strata over Tailscale and over a Cloudflare Tunnel), so what is
     /// known about its context is shared between them.
     public var serverInstanceID: String?
+    /// Strata's runtime mode: its proxy reads only messages, model and stream, so tools are dropped silently.
+    public var ignoresTools = false
 
     public init(
         model: String,
@@ -110,6 +112,7 @@ public struct ModelContextInfo: Sendable, Equatable {
         acceptsImages = other.acceptsImages ?? acceptsImages
         maxRequestBytes = other.maxRequestBytes ?? maxRequestBytes
         serverInstanceID = other.serverInstanceID ?? serverInstanceID
+        ignoresTools = ignoresTools || other.ignoresTools
     }
 }
 
@@ -325,6 +328,7 @@ extension ChatClient {
             let metas = data.compactMap { $0["meta"] as? [String: Any] }
             let runtime = !metas.isEmpty && metas.allSatisfy { $0["mode"] != nil || $0["gpuIds"] != nil }
             info.maxRequestBytes = runtime ? strataRuntimeBodyLimit : strataShareBodyLimit
+            info.ignoresTools = runtime
         }
 
         // Strata also answers to a model's aliases (meta.aliases).

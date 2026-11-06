@@ -12,13 +12,13 @@ third-party dependencies. `./build.sh` builds it and assembles `build/Parley.app
 ## Hard requirements (from the user)
 1. Chat through an OpenAI-compatible API, on the internet or on a LAN (plain http allowed, LAN allowed).
 2. API keys are stored in the Keychain.
-3. No agent or tool features. The app does support image and text-file attachments.
+3. Tools come only from MCP servers the user configures (see "MCP client"), and every call needs the user's approval unless they chose Always Allow for that tool. There are no other agent features. The app also supports image and text-file attachments.
 4. Thinking/reasoning is supported: stream it, show it collapsibly, and show its duration.
 5. Settings hold a default conversation directory, and each new conversation can pick its own directory. Each conversation is saved as one JSON file.
 6. One click copies any user or assistant message.
 7. Roll back to any past message.
 8. Fork from any message.
-9. **Privacy:** nothing leaves the machine except the configured API calls.
+9. **Privacy:** nothing leaves the machine except the configured API calls and calls to the MCP servers the user configured.
 10. Per-conversation encryption. The JSON file on disk is encrypted, and decryption happens only in memory.
 
 ## Encryption decision
@@ -110,7 +110,7 @@ public enum KeychainStore {
     public static func deleteAPIKey(for providerID: UUID) throws             // ignore errSecItemNotFound
 }
 ```
-The keychain must never be synced, so `kSecAttrSynchronizable` stays false (the default).
+The keychain must never be synced, so `kSecAttrSynchronizable` stays false (the default). `KeychainMCPSecretStore` uses the same calls under its own service, `local.parley.chat.mcp`, with one item per server (see "MCP client"), so accounts cannot collide with API keys.
 
 ### Streaming.swift (agent: core-network)
 ```swift
@@ -189,7 +189,7 @@ Request body rules:
 - If `systemPrompt` is not blank, it is sent first with role `system`.
 - User messages with no images send content as a string. Text attachments are appended as ``"\n\n<file name=\"NAME\">\nTEXT\n</file>"``.
 - User messages with images send content as an array: `[{"type":"text","text":...}, {"type":"image_url","image_url":{"url":"data:<mime>;base64,<b64>"}}...]`.
-- Assistant messages send only `content`. **Never** send `reasoning`.
+- Assistant messages send only `content`, plus `tool_calls` for tool rounds when the request carries `tools`. **Never** send `reasoning`.
 - Skip assistant messages whose content is empty, for example a failed request with an error set. Partial (stopped) assistant content is sent as is.
 - Headers: `Authorization: Bearer <key>` only if the key is non-empty, `Content-Type: application/json`, and `Accept: text/event-stream`.
 
@@ -308,10 +308,71 @@ Encryption UI flows:
 - `/v1/models`
 - `/v1/chat/completions`, streaming. Its mode is picked by model name: `mock-reasoning-content`, `mock-reasoning`, `mock-think-tags` (tags split across chunks), `mock-orphan-think`, `mock-error` (HTTP 400 with a JSON error), and `mock-slow` (one token every 200 ms, for testing Stop).
 - It echoes the last user message and the number of images received, so you can confirm that attachments arrived.
+- `mock-tools*` models script tool calls in each server's chunk shape (the user text picks the call: `tool=<name> args=<json>`), and any request with tool data is refused unless every call has its tool message. `tools/mock_mcp_server.py` is an MCP server for stdio and HTTP (standard library only, bound to 127.0.0.1); see its header for the tools and behaviors.
 - It sends the final usage chunk only when the request has `stream_options.include_usage`. `mock-no-stream-options` rejects `stream_options` with HTTP 400; `mock-timings` adds llama.cpp `timings` to the last chunk; `GET /mock/requests` returns counters.
 - A second argument picks the server flavor for context discovery: `lmstudio` (default; `/api/v1/models`, `/api/v0/models`, in-memory `/api/v1/models/load` and `/unload`, where loading an already-loaded model adds a `key:2` instance as LM Studio does), `lmstudio-v0`, `llamacpp` (`/props`, `meta`), `vllm` (`max_model_len`), `ollama` (`/api/ps`), `plain`, `strata-share` and `strata-engine` (see Strata below). An optional third argument is an API key the Strata flavors require (keyless by default, so app tests and the snapshot harness never need a Keychain item).
 - `GET /mock/last-request` (every flavor) returns the last chat request body without its messages, so tests can assert which fields were sent.
 - "No thinking": `llamacpp` and `vllm` honour `chat_template_kwargs.enable_thinking: false` and `ollama` honours `reasoning_effort: "none"` (the reasoning models then answer without thinking); `lmstudio`, `lmstudio-v0` and `plain` ignore both and still stream thinking. Flavor `openai-strict` (like `plain`) refuses `reasoning_effort: "none"` with OpenAI's 400 (`param: "reasoning_effort"`, `code: "unsupported_value"`); its `mock-always-reject` refuses every request that way and `mock-overflow` answers an OpenAI overflow 400. `mock-refuse-unnamed` refuses `"none"` with a 400 that does not name the field (Ollama's `invalid reasoning value: "none"`). `/mock/requests` counts `thinking_off_rejected`. `MOCK_PROBE_DELAY=<s>` delays native GETs (not `/v1/models`).
+
+## MCP client
+Parley is an MCP client: it connects to servers the user configures, offers their tools to the model as OpenAI `tools`, runs the returned `tool_calls` through `tools/call` after approval, feeds the results back and loops until the model answers.
+
+Scope for v1: stdio and Streamable HTTP, tools only, static HTTP headers. **Out of scope:** resources, prompts, sampling, elicitation, roots, tasks, OAuth, HTTP+SSE, `Last-Event-ID` resumption, progress, parallel execution of calls, images in results, a server registry, reading other apps' config files, idle shutdown, a sandbox for stdio servers, MCP-server mode.
+
+Rules that must keep holding:
+- **No servers by default, nothing starts on its own.** A server starts only on a send in a conversation that lists it, or on Connect in Settings. Constructing AppState reads no secret and starts no process. No telemetry, registry lookup, `.well-known` fetch or auto-discovery. A timer never restarts anything.
+- **No tools, no change.** With no enabled tools the request has no `tools` key and is byte-identical to the version before MCP (`NoToolsGoldens`). `tool_choice` is never sent; an empty `tools` is never sent.
+- **Tool-shaped messages go out only when the request carries `tools`.** Otherwise rounds are flattened into assistant text (`Message.flattenedForRequest`). This one rule covers the disabled-server, refused and round-cap cases. `ChatClient.sendsTools(_:)` alone decides. A reply still open then ends in a request-only user turn (`ToolResultText.answerNow`): llama.cpp and Ollama would continue a trailing assistant turn instead of answering it.
+- **Stopped means stopped.** A reply's catalog dates from its start, so `runCalls` reads the server and tool list again before a card and after it: what was switched off, unticked or removed in between is `notCalled`. Stop, a saved edit and Delete mark the connection (`stoppedByUser`, `forget`), so `call` restarts only what crashed; only `catalog` and `connect` start what the user stopped.
+- **stderr stays in memory.** It can hold tokens. `MCPError.summary`, which leaves out stderr and local folders, is what notes and tool results get; `errorDescription` is for the Settings status and the log, and `clearLogs` removes it from there too.
+- **Server JSON is bounded.** Every parse of what a server sent goes through `JSONValue.parsed` or `JSONValue(jsonData:)`: 128 levels (stacks here are 512 KiB, and JSONSerialization's own limit is 512), no number that cannot be written back (`-1e999` parses to infinity, and writing that raises an exception `try?` cannot catch).
+- **Approval is what is sent.** The card and `tools/call` use the same `ToolArguments.parse` value. The card has no keyboard shortcut: Return belongs to the composer. Approval never times out. `readOnlyHint` never skips it.
+- **Untrusted text.** A tool description reaches the model only as that tool's `description`; a result only as a tool message or the marked flattened form. Neither goes into the system prompt; `instructions` is not used. The UI shows both with `Text(verbatim:)`, labelled, with control and bidi-override scalars escaped (`ToolDisplay.visible`).
+
+### Storage
+`Message.toolRounds: [ToolRound]?`, `toolNotes`, `toolDefinitionTokens`; `ConversationSettings.mcpServerIDs` (ids only, so a file can never name a command or URL). All optional, the file version stays 1: an older Parley shows the final text and drops the rounds if it saves.
+
+Top-level `content`/`reasoning`/`usage`/`stats` always hold the current or final round. A call and its result live in one `Message`, so rollback and fork stay atomic. `ToolCallRecord.startedAt` is saved before `tools/call` goes out; a nil `result` means the app died, and replay synthesizes one (`replayResult`). The file is not rewritten on load. Results are stored as the model saw them (truncated); the raw result is never stored.
+
+Config: `AppSettings.mcpServers` (`MCPServerConfig`: command, names, flags, the URL's host, two SHA-256 fingerprints) and `maxToolRounds`. Secrets: one Keychain item per server (service `local.parley.chat.mcp`, account = server UUID, JSON `MCPServerSecrets`) holding arguments, the URL, env values and header values, because pasted configs put tokens in all four. `AppState.saveServer` writes the Keychain first, so a failed write stores nothing. Read at server start and when the editor opens, never at launch. Tests and the snapshot harness use `InMemoryMCPSecretStore`.
+
+"Always Allow" is per server and tool, pinned to `MCPTool.fingerprint`, cleared when `identityFingerprint` (kind, command, arguments, URL, working folder, the server's own PATH) changes, revocable in Settings. A different fingerprint brings the card back with `definitionChanged`.
+
+### The reply loop (`ConversationSession.runReply`)
+One Task from send to end, so Stop reaches it wherever it is; `endStreaming` runs only at the very end. Every `await` is followed by `isCurrent(messageID)`.
+
+```
+wait for the server kind when servers are listed (a Strata runtime model must not lose tools silently)
+ignoresTools → note, start nothing | remembered refusal → note, start nothing | else host.catalog
+loop: beginRound → streamRound(history + inFlightCopy)
+  no calls → finishReply
+  no tools in this request, or finish_reason length → .callsNotRun note, finishReply
+  commitRound → runCalls → roundsRun += 1; at maxToolRounds: omitsTools, .roundLimit note
+```
+
+- `commitRound` moves the top-level fields into a `ToolRound` and resets accumulator, meter and `liveGeneration` in the same step, or Stop would write the round back as the final one and the strip would count it twice.
+- `finishReply`: empty text is an error only with no rounds; with rounds it is the `.emptyAfterTools` note.
+- `finalizeStreamingMessage` is the single place for Stop, Lock, close and quit: `answerApproval(.cancelled)` (a cancelled Task does not resume a continuation), then `resolveUnfinishedCalls` (`notRun` or `interrupted` by `startedAt`). `answerApproval` is idempotent.
+- Calls run sequentially in index order. Malformed arguments and unknown tools ask nothing and run nothing: the model gets a result saying why.
+- A crash mid-call yields the `crashed` text and is never re-run. A broken stream on `tools/call` is never re-issued, because that could repeat a side effect without approval.
+
+Refusals: `ToolsSupport` classifies 400/404/422/500/501 bodies; `streamChat` retries once without tools and yields `toolsRejected` on the 2xx. `.unsupported` is remembered per provider + model on the AppState instance (`toolRejections`, memory only); `.definitions` is not, because one bad schema from one server must not turn tools off for the model.
+
+Context: a fresh `GenerationMeter` per round, so tool time never lowers tok/s. `ContextBudget.usage` anchors on the newest counted round while a reply is in flight, and adds definitions only when the anchor did not already carry them. `toolResultBudget` clamps each result to half the room left (at least 2,000 characters), so one result cannot end a small context with an overflow.
+
+### MCP core (`Sources/ParleyCore/MCP/`)
+- `MCPToolHost` is the contract; ConversationSession sees only it. `MCPConnectionManager` (actor, owned by AppState) keeps one process per server, shared by conversations, lazy, restarted on next use after a crash, at most 3 crashes in 60 s. `disabledTools` are filtered in `catalog`; `connectionFingerprint` decides when a connection is replaced.
+- **Era detection opens with `initialize`** and falls forward to `server/discover` on rejection, reversing the spec's SHOULD for dual-era stdio clients: legacy is the deployed norm, and the probe stalls or kills exactly those servers. A dual-era server loses nothing, since Parley uses tools only.
+- stdio: `posix_spawn` with its own process group and `F_SETNOSIGPIPE`, `killpg` on stop, swept again if the leader left first. A descendant that calls `setsid` escapes; crash and force quit rely on stdin EOF. The child gets a minimal environment plus the server's own. `ShellPATHResolver` runs `$SHELL -l -c` once, lazily, for bare commands only. Never `-i`: it would source `.zshrc`, whose plugins can touch the network.
+- HTTP: the same ephemeral session and redirect refusal as ChatClient. User headers first, protocol headers last, CR/LF refused. Any message over 16 MiB is a transport failure.
+- Names: `<server>__<tool>`, lower snake case, at most 64 characters, deterministic (`MCPToolNamer`), stored on the record so old rounds replay unchanged. `binding(forFunctionName:)` also accepts a unique match ignoring case and punctuation, because LM Studio normalizes names.
+
+### UI
+Settings tab "MCP" (`MCPSettingsView`, a draft with Save and Revert: a live binding would replace a connection on every keystroke; the tool list and approvals are live). Paste-only import with a full review (`MCPImportSheet`). Composer tools button, only with a server configured (`ConversationToolsPopover`, ⇧⌘T). `ToolRoundsView`, `ToolCallRow` and `ToolApprovalCard` in `ToolCallViews.swift`. `ReplyPhase` feeds the status strip's `toolActivity`. The sidebar shows an orange hand while a chat waits for approval. ⌘R on a reply with rounds goes through `AppState.regenerateRequest`, so it asks first like the row does.
+
+Tests: `MCPHardeningTests` hold what the first review found; many of those used to end the process, so a regression shows up as a crashed run. `ToolLoopTests` drive the session with `FakeToolHost`; `MCPIntegrationTests` run the real manager with `tools/mock_mcp_server.py` and `tools/mock_server.py` (whose `mock-tools*` models refuse any dangling tool call). `tools/snapshot.sh` covers the Settings tab, import review, popover, approval card and rows.
+
+Known limits: whether LM Studio returns normalized names is unconfirmed. The snapshot harness's launch check (PARLEY_SNAPSHOT_LAUNCH_COMMAND) starts a bare command from an app with launchd's PATH. Nothing has been tested against real MCP servers, a modern-only server, or a real Keychain item. A running stdio server keeps tool arguments in its own memory after Lock. macOS 14's `addchdir_np` path has not been run.
 
 ## Generation speed and context length
 
