@@ -1348,10 +1348,10 @@ struct MCPIntegrationTests {
     }
 
     @Test func longArgumentsSaySo() {
-        #expect(ToolDisplay.overflowLine("{}", maxHeight: 220) == nil)
-        let tall = (0..<40).map(String.init).joined(separator: "\n")
-        #expect(ToolDisplay.overflowLine(tall, maxHeight: 220) == "About 40 lines. Scroll to see all of them.")
-        #expect(ToolDisplay.overflowLine(String(repeating: "x", count: 4000), maxHeight: 220) != nil, "wrapping counts")
+        #expect(ToolDisplay.overflowLine(height: 17, maxHeight: 220) == nil)
+        #expect(ToolDisplay.overflowLine(height: 220, maxHeight: 220) == nil, "exactly what fits")
+        #expect(ToolDisplay.overflowLine(height: 680, maxHeight: 220) == "About 40 lines. Scroll to see all of them.")
+        #expect(ToolDisplay.overflowLine(height: 221, maxHeight: 220) == "About 13 lines. Scroll to see all of them.")
     }
 }
 

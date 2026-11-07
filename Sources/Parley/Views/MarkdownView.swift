@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A small, local-only markdown renderer. It never loads remote resources:
-/// images in markdown are not fetched, and links open only when clicked
-/// (filtered by the OpenURLAction installed in ContentView).
+/// images in markdown are not fetched, and links are inert until the OpenURLAction installed in
+/// ContentView has shown the real address and the user has agreed.
 struct MarkdownView: View {
     let text: String
 
@@ -291,6 +291,11 @@ enum MarkdownParser {
             for run in attributed.runs where run.inlinePresentationIntent?.contains(.code) == true {
                 attributed[run.range].font = .system(size: 12, design: .monospaced)
                 attributed[run.range].backgroundColor = Color.secondary.opacity(0.16)
+            }
+            // A link Parley would refuse is plain text; the rest stay links in name only.
+            for run in attributed.runs {
+                guard let link = run.link else { continue }
+                attributed[run.range].link = PendingLink(link).flatMap { PendingLink.inert($0.url) }
             }
             return attributed
         }

@@ -6,7 +6,7 @@
 ```bash
 ./build.sh            # 生成 build/Parley.app（ad-hoc 签名）
 open build/Parley.app
-swift test            # 611 个测试：核心层 467 个，App 层 144 个；集成测试会自动启动 tools/mock_server.py 和 tools/mock_mcp_server.py
+swift test            # 623 个测试：核心层 467 个，App 层 156 个；集成测试会自动启动 tools/mock_server.py 和 tools/mock_mcp_server.py
 ```
 只装了 Command Line Tools 就能构建，不需要 Xcode。
 
@@ -103,5 +103,6 @@ Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做�
 - 读取上下文长度只会向同一个服务器（相同的协议、主机和端口）发送只读 GET 请求，超时 5 秒，失败时静默忽略。LM Studio、Strata 引擎（`/health`）、llama.cpp、Ollama 的原生接口只对本机、局域网或 Tailscale 地址（或模型列表显示是 LM Studio/llama.cpp/Strata 时）尝试；Strata 共享端口除了模型列表什么都不问，`/slots` 永远不读。不会查询任何第三方的模型数据库。
 - 聊天请求会附带 `stream_options: {include_usage: true}` 以获得 token 统计；如果服务器以 400/422 拒绝这个字段，会去掉它重试一次，并在本次运行中记住。
 - 没有遥测，也不会把消息内容写进日志。Markdown 渲染不会加载远程图片。
+- 模型回复里的链接不会直接打开。链接的地址里可能夹带对话内容（工具结果可以要求模型这样写），点击后会先弹出确认框，显示真实的网站和完整地址（而不是链接文字），隐藏字符和从右到左字符会写成 `\u{…}`，点「Open」才交给浏览器。只有带主机名的 http 和 https 链接能打开，其他链接（包括 `mailto:`，以及主机名含百分号编码或写成非标准 IPv4 的链接，因为浏览器实际访问的地址和显示的不一样）只显示为普通文字。
 - 复制按钮使用 `.currentHostOnly`，不会经由通用剪贴板同步到其他设备。
 - 已知限制：在消息正文里选中文字后按 ⌘C，走的是系统默认剪贴板。

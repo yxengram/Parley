@@ -469,11 +469,13 @@ struct AppFlowTests {
             #expect(decoded.title == title)
             expectSameMessages(decoded.messages, session.conversation.messages)
 
-            // Lock drops the session; the library entry keeps no title.
+            // Lock drops the session and any link waiting for an answer; the library entry keeps no title.
             let id = session.id
+            #expect(fx.state.requestOpen(URL(string: "https://example.com/?q=secret")!))
             fx.state.lock(id)
             #expect(fx.state.notice == nil)
             #expect(fx.state.session(for: id) == nil)
+            #expect(fx.state.pendingLink == nil)
             let entry = try #require(fx.state.entry(id: id))
             #expect(entry.isEncrypted)
             #expect(entry.title == nil)

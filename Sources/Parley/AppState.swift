@@ -117,6 +117,12 @@ final class AppState {
         let message: String
     }
 
+    /// The clicked link that LinkConfirmationSheet is asking about.
+    var pendingLink: PendingLink?
+    /// Opens a link the user confirmed. Tests and the snapshot harness replace it, so they never
+    /// start a browser.
+    @ObservationIgnored var openLink: (URL) -> Void = { NSWorkspace.shared.open($0) }
+
     /// Every MCP server connection. Constructing it starts nothing and reads no secret.
     let mcp: MCPToolHost
     /// Arguments, URLs, environment values and headers of the servers (the Keychain, except in
@@ -329,12 +335,29 @@ final class AppState {
         let servers = session.conversation.settings.mcpServerIDs ?? []
         if let error = session.close(saving: true) { return error }
         sessions[id] = nil
+        // The address may hold what was just locked.
+        pendingLink = nil
         // The server keeps running for other chats, but its stderr may hold this one's data.
         if !servers.isEmpty {
             let mcp = self.mcp
             Task { await mcp.clearLogs(serverIDs: servers) }
         }
         return nil
+    }
+
+    // MARK: - Links
+
+    /// A click on a link: asks first, and false when Parley does not open this kind of link at all.
+    func requestOpen(_ url: URL) -> Bool {
+        guard let link = PendingLink(url) else { return false }
+        pendingLink = link
+        return true
+    }
+
+    func confirmPendingLink() {
+        guard let link = pendingLink else { return }
+        pendingLink = nil
+        openLink(link.url)
     }
 
     // MARK: - Creating

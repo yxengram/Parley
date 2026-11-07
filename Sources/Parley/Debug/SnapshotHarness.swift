@@ -137,6 +137,7 @@ enum SnapshotHarness {
         var strata = UUID()
         var tools = UUID()
         var toolNotes = UUID()
+        var links = UUID()
     }
 
     /// Holds the redirected standard defaults for the swizzled `+standardUserDefaults`.
@@ -526,6 +527,7 @@ enum SnapshotHarness {
             capture(appearance, "new-chat-empty")
             await captureStreaming(appearance)
             await captureTools(appearance)
+            await captureLinks(appearance)
 
             // 11. Strata: its chat, context popover, settings, prompt reading, a refused image.
             await captureStrata(appearance)
@@ -675,6 +677,34 @@ enum SnapshotHarness {
         await scrollChat(toTop: false)
         capture(appearance, "strip-running-tool")
         await waitFor(seconds: 6) { !session.isStreaming }
+    }
+
+    /// The confirmation for the link in the seeded chat, taken from its rendered text. Nothing can
+    /// open: `openLink` only logs.
+    private static func captureLinks(_ appearance: String) async {
+        let appState = AppState.shared
+        appState.openLink = { log("ERROR: openLink called with \($0.absoluteString)") }
+        guard let window = mainWindow else { return }
+        await select(ids.links)
+        let reply = appState.session(for: ids.links)?.conversation.messages.last?.content ?? ""
+        guard let link = MarkdownParser.inline(reply).runs.compactMap(\.link).first, appState.requestOpen(link) else {
+            skip("\(appearance) link-confirmation (no link in the seeded reply)")
+            return
+        }
+        // Past the arm delay, so the sheet shows its working buttons.
+        await wait(ToolApprovalCard.armDelay + 0.8)
+        capture(appearance, "link-confirmation", includeSheet: true)
+        if appearance == "light" {
+            window.setContentSize(NSSize(width: 760, height: 480))
+            hideWindows()
+            await wait(0.8)
+            capture(appearance, "link-confirmation-narrow", includeSheet: true)
+            window.setContentSize(NSSize(width: 1100, height: 760))
+            hideWindows()
+            await wait(0.6)
+        }
+        appState.pendingLink = nil
+        await wait(0.8)
     }
 
     /// The composer's tools popover, composited above the button (bottom left of the chat).
@@ -1396,6 +1426,21 @@ enum SnapshotHarness {
         if let serverID = mcpServerID {
             try seedToolChats(serverID: serverID, write: { try write($0) }, ago: ago)
         }
+
+        // (g) A link whose text says one thing and whose address does another, with a long payload.
+        let payload = String(repeating: "c2VjcmV0LXByb2plY3Qtbm90ZXMtZnJvbS10aGlzLWNvbnZlcnNhdGlvbg", count: 14)
+        try write(Conversation(
+            id: ids.links,
+            title: "Release notes link",
+            createdAt: ago(600),
+            updatedAt: ago(600),
+            settings: settings,
+            messages: [
+                Message(role: .user, content: "Where are the release notes?", createdAt: ago(601)),
+                Message(role: .assistant, content: "[Read the release notes on the official site](https://docs.example@notes.example/view?id=\(payload)#end)",
+                        createdAt: ago(600), model: "qwen3-14b-instruct"),
+            ]
+        ))
 
         // (d) Chinese title and content. Its model has no known context length (strip shows "unknown").
         var chineseSettings = settings

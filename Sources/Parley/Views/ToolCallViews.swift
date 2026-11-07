@@ -23,17 +23,28 @@ enum ToolDisplay {
         "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
     }
 
-    /// Shows hidden scalars as `\u{…}`. Line breaks and tabs stay, for text blocks.
-    static func visible(_ text: String) -> String {
+    private static func escaping(_ text: String, where shouldEscape: (Unicode.Scalar) -> Bool) -> String {
         var out = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
-            if isHidden(scalar) {
+            if shouldEscape(scalar) {
                 out.append(contentsOf: escaped(scalar).unicodeScalars)
             } else {
                 out.append(scalar)
             }
         }
         return String(out)
+    }
+
+    /// Shows hidden scalars as `\u{…}`. Line breaks and tabs stay, for text blocks.
+    static func visible(_ text: String) -> String {
+        escaping(text, where: isHidden)
+    }
+
+    /// For a web address. What is sent is ASCII, so everything else is escaped as well as what
+    /// `isHidden` catches: right-to-left letters reorder a line around them, and lookalike letters
+    /// could fake a host. So are spaces and line breaks, which a real address does not have.
+    static func address(_ text: String) -> String {
+        escaping(text) { !(0x21...0x7E).contains($0.value) }
     }
 
     /// `visible` for one line: names and command words, where a line break could fake a row.
@@ -53,13 +64,14 @@ enum ToolDisplay {
         }.joined(separator: " ")
     }
 
-    /// For text longer than `maxHeight` can show: scroll bars may be hidden, and sorted keys can put
-    /// what matters last. Wrapping is estimated.
-    static func overflowLine(_ text: String, maxHeight: CGFloat) -> String? {
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            .reduce(0) { $0 + max(1, ($1.count + 79) / 80) }
-        return CGFloat(lines) * 16 > maxHeight ? "About \(lines) lines. Scroll to see all of them." : nil
+    /// For text taller than `maxHeight`: scroll bars may be hidden, and sorted keys can put what
+    /// matters last. `height` is measured, since how text wraps depends on its width and its breaks.
+    static func overflowLine(height: CGFloat, maxHeight: CGFloat) -> String? {
+        height > maxHeight ? "About \(Int((height / textBlockRowHeight).rounded(.up))) lines. Scroll to see all of them." : nil
     }
+
+    /// ToolTextBlock's 12 pt monospaced text with its line spacing.
+    private static let textBlockRowHeight: CGFloat = 17
 
     /// The model's raw arguments, indented when they are JSON.
     static func prettyArguments(_ raw: String) -> String {
@@ -240,6 +252,7 @@ struct ToolTextBlock: View {
     var maxHeight: CGFloat = 240
 
     @ViewState private var copied = false
+    @ViewState private var textHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -268,11 +281,12 @@ struct ToolTextBlock: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
             }
             .scrollIndicators(.visible)
             .frame(maxHeight: maxHeight)
             .fixedSize(horizontal: false, vertical: true)
-            if let overflow = ToolDisplay.overflowLine(text, maxHeight: maxHeight) {
+            if let overflow = ToolDisplay.overflowLine(height: textHeight, maxHeight: maxHeight) {
                 Text(verbatim: overflow)
                     .font(.caption)
                     .foregroundStyle(.secondary)

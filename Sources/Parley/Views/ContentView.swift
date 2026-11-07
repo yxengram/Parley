@@ -12,6 +12,11 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         } detail: {
             DetailView()
+                .sheet(item: $state.pendingLink) { link in
+                    LinkConfirmationSheet(link: link, open: appState.confirmPendingLink) {
+                        appState.pendingLink = nil
+                    }
+                }
         }
         .sheet(isPresented: $state.showNewChatSheet) {
             NewChatSheet()
@@ -20,10 +25,9 @@ struct ContentView: View {
         .alert(item: $state.notice) { notice in
             Alert(title: Text(notice.title), message: Text(notice.message), dismissButton: .default(Text("OK")))
         }
-        // Only open links the user clicked, and only for web/mail schemes.
+        // Every link click in this window ends here: nothing opens without LinkConfirmationSheet.
         .environment(\.openURL, OpenURLAction { url in
-            let scheme = url.scheme?.lowercased() ?? ""
-            return ["http", "https", "mailto"].contains(scheme) ? .systemAction : .discarded
+            appState.requestOpen(url) ? .handled : .discarded
         })
     }
 }
