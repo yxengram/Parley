@@ -51,12 +51,22 @@ import Testing
         ("100.64.0.1", .local), ("fd00::1", .local), ("fe80::1", .local), ("::ffff:10.0.0.1", .local),
         ("nas.local", .local), ("box.internal", .local), ("intranethost", .local),
         ("172.32.0.1", .remote), ("8.8.8.8", .remote), ("example.com", .remote), ("2001:4860::1", .remote),
+        // An IPv4 address in an IPv6 form is that address: IPv4-compatible, NAT64, 6to4.
+        ("::127.0.0.1", .loopback), ("::10.0.0.1", .local), ("::8.8.8.8", .remote),
+        ("64:ff9b::127.0.0.1", .loopback), ("64:ff9b::192.168.1.1", .local), ("64:ff9b::a00:1", .local), ("64:ff9b::8.8.8.8", .remote),
+        ("2002:7f00:1::", .loopback), ("2002:c0a8:101::1", .local), ("2002:0a00:0001:ffff::1", .local), ("2002:0808:0808::", .remote),
+        // The IETF range, and IPv6 documentation and discard: nothing public. 198.18.0.0/15 is not
+        // here on purpose: fake-IP proxies answer with it for public names.
+        ("198.18.0.1", .remote), ("198.19.255.255", .remote),
+        ("192.0.0.1", .local), ("192.0.1.1", .remote), ("192.0.2.1", .remote), ("2001:db8::1", .local), ("100::1", .local),
+        ("100:0:0:1::1", .remote), ("2001:db9::1", .remote), ("64:ff9c::8.8.8.8", .remote),
     ])
     func locality(_ host: String, _ expected: MCPOAuthLocality) {
         #expect(MCPOAuthPolicy.locality(ofHost: host) == expected)
     }
 
-    @Test(arguments: ["", "0.0.0.0", "0.1.2.3", "::", "224.0.0.1", "255.255.255.255", "ff02::1", "2130706433", "0x7f.1", "127.1", "017700000001"])
+    @Test(arguments: ["", "0.0.0.0", "0.1.2.3", "::", "224.0.0.1", "255.255.255.255", "ff02::1", "2130706433", "0x7f.1", "127.1", "017700000001",
+                      "::0.0.0.2", "64:ff9b::224.0.0.1", "2002:e000:1::", "2002:0000:0001::", "::ffff:0.0.0.0"])
     func refused(_ host: String) {
         #expect(MCPOAuthPolicy.locality(ofHost: host) == nil)
     }
@@ -114,6 +124,16 @@ import Testing
         #expect(MCPOAuthPolicy.floor(named: .loopback, addresses: [.loopback]) == .loopback)
         #expect(MCPOAuthPolicy.floor(named: .loopback, addresses: []) == .loopback)
         #expect(MCPOAuthPolicy.floor(named: nil, addresses: [.loopback]) == .remote)
+    }
+
+    /// Under a fake-IP proxy a sign-in provider's name resolves into 198.18.0.0/15, and an MCP server
+    /// there must keep the public floor, or it could name a LAN host.
+    @Test func aFakeIPAddressIsNeitherRefusedNorALoweredFloor() async throws {
+        try await MCPOAuthHTTP.check(host: "198.18.0.5", floor: .remote)
+        let floor = await MCPOAuthHTTP.floor(forServer: "198.18.0.5")
+        #expect(floor == .remote)
+        #expect(!MCPOAuthPolicy.allows(endpoint: URL(string: "https://192.168.1.1/x")!,
+                                       server: URL(string: "https://198.18.0.5/mcp")!, floor: floor))
     }
 
     /// `box.tailnet.ts.net` and `mcp.corp.example` read as remote and resolve to the LAN. The floor

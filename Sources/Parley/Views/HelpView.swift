@@ -47,6 +47,15 @@ struct HelpView: View {
                     "Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. Every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model.",
                 ])
 
+                section("Built-in tools", "hammer", [
+                    "Settings > Built-in Tools has five tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file and contacts nothing new.",
+                    "Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File and Fetch Web Page ask every time and can only be allowed once. In ReAct mode every call asks.",
+                    "List Files and Read File work inside the one folder you choose in Settings, and only after you choose it. They read, never write. Hidden files are never listed or read, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it.",
+                    "Fetch Web Page contacts the website directly from this Mac, so the site sees your IP address. It runs no scripts, loads no images, and sends no cookies, API keys or MCP headers. Private and local addresses are refused, and a redirect to another address is reported to the model instead of followed, so a new address means a new card.",
+                    "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it.",
+                    "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address. That is why these tools have no Always Allow: check the arguments on each card, the address above all.",
+                ])
+
                 section("Encryption", "lock", [
                     "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory.",
                     "There is no way to recover a forgotten password.",
@@ -60,7 +69,7 @@ struct HelpView: View {
                 ])
 
                 section("Privacy", "hand.raised", [
-                    "Parley only contacts the API endpoints and MCP servers you configure, and sign-in providers you approve. No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.",
+                    "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page, each website you approve for one call. No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.",
                     "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.",
                 ])
             }

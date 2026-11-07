@@ -23,6 +23,8 @@ final class AppSettings {
         static let contextInstanceLinks = "contextInstanceLinks"
         static let mcpServers = "mcpServers"
         static let maxToolRounds = "maxToolRounds"
+        static let builtInTools = "builtInTools"
+        static let builtInFolderPath = "builtInFolderPath"
     }
 
     static let defaultMaxToolRounds = 10
@@ -61,6 +63,38 @@ final class AppSettings {
     /// own. Nothing here can hold a token (see MCPServerConfig).
     var mcpServers: [MCPServerConfig] {
         didSet { persistMCPServers() }
+    }
+
+    /// The built-in tools the user switched on (`BuiltInTools.Tool` raw values). Empty by default,
+    /// and with nothing on no conversation is offered one. Names, not an enum: one that a later
+    /// version added stays in the list, unused, through a change made here.
+    var builtInTools: [String] {
+        didSet { defaults.set(builtInTools, forKey: Key.builtInTools) }
+    }
+
+    /// The one folder List Files and Read File may reach. Nil: they do nothing, whatever the list says.
+    var builtInFolderPath: String? {
+        didSet { defaults.set(builtInFolderPath, forKey: Key.builtInFolderPath) }
+    }
+
+    var builtInToolSettings: BuiltInToolSettings {
+        BuiltInToolSettings(enabled: builtInTools, folderPath: builtInFolderPath)
+    }
+
+    /// Something can be turned on for a conversation: the composer's tools button and ⇧⌘T need it.
+    var offersTools: Bool {
+        !mcpServers.isEmpty || !builtInToolSettings.effectiveTools.isEmpty
+    }
+
+    func setBuiltInTool(_ tool: BuiltInTools.Tool, on: Bool) {
+        builtInTools.removeAll { $0 == tool.rawValue }
+        if on { builtInTools.append(tool.rawValue) }
+    }
+
+    /// Takes the file tools off the list too: a folder chosen later must not switch them back on.
+    func clearBuiltInFolder() {
+        builtInFolderPath = nil
+        builtInTools.removeAll { BuiltInTools.Tool(rawValue: $0)?.needsFolder == true }
     }
 
     /// How many tool rounds one reply may run before the model is asked to answer without tools.
@@ -288,6 +322,9 @@ final class AppSettings {
         }
         let storedRounds = defaults.object(forKey: Key.maxToolRounds) as? Int ?? Self.defaultMaxToolRounds
         self.maxToolRounds = min(max(storedRounds, Self.toolRoundsRange.lowerBound), Self.toolRoundsRange.upperBound)
+        self.builtInTools = defaults.stringArray(forKey: Key.builtInTools) ?? []
+        let storedFolder = defaults.string(forKey: Key.builtInFolderPath) ?? ""
+        self.builtInFolderPath = storedFolder.isEmpty ? nil : storedFolder
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }
         self.learnedContextLengths = (defaults.dictionary(forKey: Key.learnedContextLengths) ?? [:])

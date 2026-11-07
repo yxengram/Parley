@@ -4,13 +4,14 @@ import ParleyCore
 
 // MCP on the app side: which servers a conversation may use, the approvals remembered per tool, and
 // saving, deleting and importing servers. Nothing here starts a server: only a send in a conversation
-// that lists one, or a button in Settings, does.
+// that lists one, or a button in Settings, does. The built-in tools join here as one more server
+// (see BuiltInTools), and only when one is switched on.
 
 extension AppState {
     /// What a session needs from the app to run tools (see ConversationToolServices).
     func toolServices() -> ConversationToolServices {
         ConversationToolServices(
-            host: mcp,
+            host: toolHost,
             enabledServers: { [weak self] settings in self?.enabledServers(for: settings) ?? [] },
             refusal: { [weak self] provider, model in self?.toolRefusal(provider: provider, model: model) },
             markRefused: { [weak self] provider, model, refusal in self?.markToolsRefused(provider: provider, model: model, refusal: refusal) },
@@ -18,7 +19,8 @@ extension AppState {
             setAlwaysAllowed: { [weak self] binding in self?.setAlwaysAllowed(binding) },
             approvalNeeded: { NSApp?.requestUserAttention(.informationalRequest) },
             maxRounds: { [weak self] in self?.settings.maxToolRounds ?? AppSettings.defaultMaxToolRounds },
-            contextLimit: { [weak self] provider, model in self?.contextLimit(provider: provider, model: model) }
+            contextLimit: { [weak self] provider, model in self?.contextLimit(provider: provider, model: model) },
+            builtInFolderPath: { [weak self] in self?.settings.builtInFolderPath }
         )
     }
 
@@ -26,27 +28,55 @@ extension AppState {
         settings.mcpServers.first { $0.id == id }
     }
 
-    /// The servers this conversation lists that exist and are switched on. A stale id is ignored.
+    /// The servers this conversation lists that exist and are switched on, then the built-in tools
+    /// when one is on and the conversation has not opted out. A stale id is ignored. Empty is the
+    /// path with no tools at all.
     func enabledServers(for conversation: ConversationSettings) -> [MCPServerConfig] {
         let ids = conversation.mcpServerIDs ?? []
-        guard !ids.isEmpty else { return [] }
-        return settings.mcpServers.filter { $0.isEnabled && ids.contains($0.id) }
+        var servers = ids.isEmpty ? [] : settings.mcpServers.filter { $0.isEnabled && ids.contains($0.id) }
+        if conversation.usesBuiltInTools, let builtIn = BuiltInTools.serverConfig(settings.builtInToolSettings) {
+            servers.append(builtIn)
+        }
+        return servers
     }
 
     /// The tool definitions the next request would carry, for the idle status strip: known once a
-    /// server has run this launch, 0 before.
+    /// server has run this launch, 0 before. Built-in tools are always known, and have no snapshot.
     func toolDefinitionTokens(for conversation: ConversationSettings) -> Int {
-        let listed = enabledServers(for: conversation).compactMap { server -> (config: MCPServerConfig, tools: [MCPTool])? in
+        let servers = enabledServers(for: conversation)
+        let listed = servers.compactMap { server -> (config: MCPServerConfig, tools: [MCPTool])? in
             guard let tools = mcpSnapshots[server.id]?.tools, !tools.isEmpty else { return nil }
             return (server, tools.filter { !server.disabledTools.contains($0.name) })
         }
-        guard !listed.isEmpty else { return 0 }
-        return MCPToolCatalog(bindings: MCPToolNamer.assign(listed)).definitionTokens
+        let named = MCPToolNamer.assign(listed)
+        let builtIn = servers.first { $0.kind == MCPServerConfig.kindBuiltIn }
+            .map { BuiltInTools.bindings(for: $0, avoiding: Set(named.map(\.exposedName))) } ?? []
+        guard !listed.isEmpty || !builtIn.isEmpty else { return 0 }
+        // A chat with only built-in tools leaves them out for such a model, without a word
+        // (ReplyTarget.offersOnlyBuiltIns), so nothing would explain the number.
+        if servers.allSatisfy({ $0.kind == MCPServerConfig.kindBuiltIn }), modelTakesNoTools(conversation) { return 0 }
+        return MCPToolCatalog(bindings: named + builtIn).definitionTokens
+    }
+
+    /// Whether a remembered refusal covers this conversation. A `.definitions` one was about Parley's
+    /// own tools, so a conversation with a real server still offers that server's.
+    func refusalApplies(_ refusal: ToolsRefusal, to conversation: ConversationSettings) -> Bool {
+        refusal.kind == .unsupported || enabledServers(for: conversation).allSatisfy { $0.kind == MCPServerConfig.kindBuiltIn }
+    }
+
+    private func modelTakesNoTools(_ conversation: ConversationSettings) -> Bool {
+        guard !conversation.usesReAct, let provider = settings.resolvedProvider(for: conversation) else { return false }
+        let model = ConversationSession.effectiveModel(settings: conversation, provider: provider)
+        return contextInfo(provider: provider, model: model)?.ignoresTools == true || toolRefusal(provider: provider, model: model) != nil
     }
 
     // MARK: - Approvals
 
     func toolAllowance(_ binding: MCPToolBinding) -> ToolAllowance {
+        // Never stored: what may run without asking is fixed in BuiltInTools.
+        if binding.serverID == BuiltInTools.serverID {
+            return BuiltInTools.asksEveryTime(binding) ? .ask : .always
+        }
         guard let pinned = mcpServer(binding.serverID)?.alwaysAllowedTools[binding.tool.name] else { return .ask }
         return pinned == binding.tool.fingerprint ? .always : .changed
     }

@@ -156,10 +156,19 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     /// How tools reach the model. Nil is native `tools`, `toolModeReAct` is ReAct text. A String, so
     /// a value a later version adds cannot stop this one decoding the file.
     public var toolMode: String?
+    /// True: this conversation does not get the built-in tools switched on in Settings, for a model
+    /// that cannot do tools. Set only when true, so a file gains no key unless the user asked.
+    public var builtInToolsOff: Bool?
 
     public static let toolModeReAct = "react"
 
     public var usesReAct: Bool { toolMode == Self.toolModeReAct }
+
+    /// For a checkbox: turning it back on stores nothing rather than false.
+    public var usesBuiltInTools: Bool {
+        get { builtInToolsOff != true }
+        set { builtInToolsOff = newValue ? nil : true }
+    }
 
     public init(
         providerID: UUID? = nil,

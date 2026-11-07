@@ -142,8 +142,13 @@ public struct ToolsRefusal: Sendable, Equatable {
     public enum Kind: Sendable {
         /// This server or model has no tool support: remembered per provider and model.
         case unsupported
-        /// It could not take these definitions: one server's bad schema, not remembered.
+        /// It could not take these definitions: one server's bad schema, not remembered. Remembered
+        /// only for Parley's own definitions, and then it holds for chats with no real server.
         case definitions
+        /// An error in words nobody listed, of a kind a passing fault also gives (a 5xx, a 413), that
+        /// went away without `tools`. Retried, never remembered: one bad moment must not take the
+        /// built-in tools from a model until the next launch.
+        case unconfirmed
     }
     public var kind: Kind
     /// The server's own text.

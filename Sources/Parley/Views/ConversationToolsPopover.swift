@@ -1,8 +1,9 @@
 import SwiftUI
 import ParleyCore
 
-/// Which MCP servers this conversation uses. Toggling starts nothing: a server starts when a message
-/// is sent in a conversation that lists it.
+/// Which MCP servers this conversation uses, and whether it leaves out the built-in tools switched
+/// on in Settings. Toggling starts nothing: a server starts when a message is sent in a conversation
+/// that lists it.
 struct ConversationToolsPopover: View {
     @Environment(AppState.self) private var appState
     @Bindable var session: ConversationSession
@@ -40,11 +41,29 @@ struct ConversationToolsPopover: View {
         )
     }
 
+    /// What Settings has on, for every conversation. The checkbox is the way out for one that
+    /// cannot use them.
+    private var builtInTools: [BuiltInTools.Tool] {
+        let on = appState.settings.builtInToolSettings.effectiveTools
+        return BuiltInTools.Tool.allCases.filter(on.contains)
+    }
+
+    private var usesBuiltInTools: Binding<Bool> {
+        Binding(
+            get: { session.conversation.settings.usesBuiltInTools },
+            set: { on in
+                session.conversation.settings.usesBuiltInTools = on
+                session.settingsChanged(debounced: false)
+            }
+        )
+    }
+
     var body: some View {
         let servers = appState.settings.mcpServers.filter(\.isEnabled)
+        let builtIns = builtInTools
         VStack(alignment: .leading, spacing: 10) {
             Text("Tools").font(.headline)
-            if servers.isEmpty {
+            if servers.isEmpty, builtIns.isEmpty {
                 Text(appState.settings.mcpServers.isEmpty
                      ? "No MCP server yet. Add one in Settings > MCP."
                      : "Every MCP server is switched off. Turn one on in Settings > MCP.")
@@ -54,6 +73,9 @@ struct ConversationToolsPopover: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !builtIns.isEmpty {
+                        builtInRow(builtIns)
+                    }
                     ForEach(servers) { server in
                         serverRow(server)
                     }
@@ -63,7 +85,7 @@ struct ConversationToolsPopover: View {
             .frame(maxHeight: 260)
             .fixedSize(horizontal: false, vertical: true)
 
-            if !appState.settings.mcpServers.isEmpty {
+            if appState.settings.offersTools {
                 Picker("Tool calling", selection: toolMode) {
                     Text("Native").tag(Self.nativeTag)
                     Text("ReAct (text)").tag(ConversationSettings.toolModeReAct)
@@ -98,7 +120,8 @@ struct ConversationToolsPopover: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if !usesReAct, let provider, !model.isEmpty, let refusal = appState.toolRefusal(provider: provider, model: model) {
+            if !usesReAct, let provider, !model.isEmpty, let refusal = appState.toolRefusal(provider: provider, model: model),
+               appState.refusalApplies(refusal, to: session.conversation.settings) {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("\(provider.name) did not accept tools for \(model), so they are not offered.", systemImage: "info.circle")
                         .font(.caption)
@@ -118,13 +141,27 @@ struct ConversationToolsPopover: View {
                     .controlSize(.small)
             }
 
-            Text("Tool names, descriptions, arguments and results go to the model's provider, and arguments to the MCP server. Toggling starts and stops nothing: a server starts when you send, and runs until you press Stop in Settings > MCP or quit.")
+            Text(servers.isEmpty && !builtIns.isEmpty
+                 ? "Tool names, descriptions, arguments and results go to the model's provider."
+                 : "Tool names, descriptions, arguments and results go to the model's provider, and arguments to the MCP server. Toggling starts and stops nothing: a server starts when you send, and runs until you press Stop in Settings > MCP or quit.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .frame(width: 320)
+    }
+
+    private func builtInRow(_ tools: [BuiltInTools.Tool]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Built-in tools", isOn: usesBuiltInTools)
+                .toggleStyle(.checkbox)
+            Text(verbatim: tools.map(\.title).joined(separator: ", "))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 20)
+        }
     }
 
     private func serverRow(_ server: MCPServerConfig) -> some View {

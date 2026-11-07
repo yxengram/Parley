@@ -6,6 +6,8 @@ import Foundation
 
 public struct MCPServerConfig: Codable, Identifiable, Hashable, Sendable {
     public static let kindStdio = "stdio", kindHTTP = "http"
+    /// Parley's own tools (BuiltInTools). Never stored, never reaches a transport.
+    public static let kindBuiltIn = "builtin"
     public static let defaultCallTimeout: Double = 120
     public static let defaultMaxResultCharacters = 32_000
     /// A week: past this a timeout means nothing, and the conversions to nanoseconds and Int can trap.

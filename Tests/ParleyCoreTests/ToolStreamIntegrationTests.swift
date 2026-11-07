@@ -281,6 +281,15 @@ struct ToolStreamIntegrationTests {
 
     @Test func notARefusal() {
         #expect(ToolsSupport.refusal(status: 400, body: "This model's maximum context length is 8192 tokens, tools are not supported") == nil)
+        #expect(ToolsSupport.mayBeRefusal(status: 400, body: "x does not support Function Calling"))
+        #expect(ToolsSupport.mayBeRefusal(status: 413, body: "too large"))
+        #expect(ToolsSupport.mayBeRefusal(status: 500, body: "oops"))
+        #expect(ToolsSupport.mayBeRefusal(status: 501, body: "oops"))
+        for status in [200, 401, 403, 408, 429, 502, 503, 504] {
+            #expect(!ToolsSupport.mayBeRefusal(status: status, body: "x"), "\(status)")
+        }
+        #expect(!ToolsSupport.mayBeRefusal(status: 400, body: "This model's maximum context length is 8192 tokens"))
+        #expect(!ToolsSupport.mayBeRefusal(status: 400, body: "request exceeds the context window"))
         #expect(ToolsSupport.refusal(status: 400, body: "request exceeds the context window: tools are not supported") == nil)
         #expect(ToolsSupport.refusal(status: 400, body: "mock bad request") == nil)
         #expect(ToolsSupport.refusal(status: 401, body: "does not support tools") == nil)

@@ -70,7 +70,7 @@ private struct ConversationMenuContent: View {
             if let open { appState.toolsPopoverRequest = open.id }
         }
         .keyboardShortcut("t", modifiers: [.command, .shift])
-        .disabled(open == nil || streaming || appState.settings.mcpServers.isEmpty)
+        .disabled(open == nil || streaming || !appState.settings.offersTools)
 
         Button("Fork from Last Message") {
             if let open, let last = open.conversation.messages.indices.last {
@@ -195,7 +195,7 @@ struct HelpCommand: View {
 enum AboutPanel {
     static func show() {
         let credits = NSAttributedString(
-            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints and MCP servers you configure, and sign-in providers you approve. No telemetry; conversations stay in files on this Mac.",
+            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac.",
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11),
                 .foregroundColor: NSColor.secondaryLabelColor,

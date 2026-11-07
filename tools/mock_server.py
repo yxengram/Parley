@@ -82,6 +82,8 @@ listed by /v1/models. Last message from the user: call the tool named by tool=<n
   mock-tools-refuse-llamacpp  500 "tools param requires --jinja flag"
   mock-tools-refuse-vllm      400 "auto" tool choice requires ...
   mock-tools-refuse-schema    400 "Failed to parse tools: JSON schema error at ..."
+  mock-tools-refuse-unknown   400 "<model> does not support Function Calling", wording Parley has no list entry for
+  mock-tools-refuse-flaky     500 "Internal error" while `tools` are sent, as a passing fault looks
   mock-tools-refuse-always    the same 400 with or without `tools`
 Every request with tool data is validated like the strictest server: a 400 unless each tool_calls
 entry has type, id and JSON arguments and is followed by a tool message with string content and a
@@ -1072,6 +1074,9 @@ class Handler(BaseHTTPRequestHandler):
                                              '--enable-auto-tool-choice and --tool-call-parser to be set'}),
             "mock-tools-refuse-schema": (400, {"error": {"message": "Failed to parse tools: JSON schema error at /properties/x: "
                                                                     "schema must be an object"}}),
+            "mock-tools-refuse-flaky": (500, {"error": {"message": "Internal error"}}),
+            "mock-tools-refuse-unknown": (400, {"error": {"message": "%s does not support Function Calling" % model,
+                                                          "type": "invalid_request_error", "param": None, "code": None}}),
         }
         if model == "mock-tools-refuse-always":
             self.send_json(400, {"error": {"message": "%s does not support tools" % model}})

@@ -19,6 +19,8 @@ struct ConversationToolServices {
     var maxRounds: () -> Int
     /// For ContextBudget.toolResultBudget.
     var contextLimit: (Provider, String) -> ContextLimit?
+    /// For the card of a built-in file tool, which names the folder.
+    var builtInFolderPath: () -> String? = { nil }
 }
 
 enum ToolAllowance {
@@ -32,10 +34,10 @@ struct PendingToolApproval: Equatable, Identifiable {
     /// The call id.
     let id: String
     let serverName: String
-    /// "Local command: npx", or the URL's host.
+    /// "Local command: npx", the URL's host, or for a built-in tool what it reaches.
     let serverDetail: String
     let toolName: String
-    /// Shown in a disclosure, labelled as written by the server.
+    /// Shown in a disclosure, labelled with who wrote it (`definitionLabel`).
     let description: String?
     /// The parameters as the model was told about them, in the same disclosure.
     let parameters: String
@@ -45,6 +47,13 @@ struct PendingToolApproval: Equatable, Identifiable {
     /// ReAct: the call was read from the model's text, which can repeat tool output. Weaker evidence
     /// than a structured call, so this card never offers Always Allow.
     var readFromText = false
+    /// A built-in tool that reads files or a website: what it reads can steer the model, so every
+    /// call stops at this card.
+    var asksEveryTime = false
+    var isBuiltIn = false
+
+    var offersAlwaysAllow: Bool { !readFromText && !asksEveryTime }
+    var definitionLabel: String { isBuiltIn ? "Definition from Parley" : "Definition from the server" }
 }
 
 enum ToolApprovalDecision {
@@ -345,9 +354,11 @@ final class ConversationSession: Identifiable {
         // What was refused earlier is checked once the kind is known (streamRound). Tools wait too:
         // without the kind, a Strata runtime model would silently lose them.
         let servers = tools?.enabledServers(conversation.settings) ?? []
+        // Built-in tools do not wait: a conversation with only those is a plain chat until a model
+        // uses one, and it asks the server nothing a plain chat would not.
         let waitsForServer = info == nil
             && (conversation.settings.disablesThinking == true || conversation.settings.reasoningBudgetTokens != nil
-                || !servers.isEmpty)
+                || !ReplyTarget.realServers(in: servers).isEmpty)
 
         conversation.messages.append(placeholder)
         conversation.updatedAt = Date()
@@ -374,6 +385,18 @@ final class ConversationSession: Identifiable {
         var servers: [MCPServerConfig]
         /// `toolMode`, read once at the start of the reply.
         let usesReAct: Bool
+
+        static func realServers(in servers: [MCPServerConfig]) -> [MCPServerConfig] {
+            servers.filter { $0.kind != MCPServerConfig.kindBuiltIn }
+        }
+
+        /// The servers the user added: the ones that take time to start and can fail.
+        var realServers: [MCPServerConfig] { Self.realServers(in: servers) }
+
+        /// Parley's own tools and nothing the user added. The user never asked for a tool in this
+        /// conversation in particular, so a model without tools must leave it a plain chat: tools
+        /// are left out, and no note says so.
+        var offersOnlyBuiltIns: Bool { !servers.isEmpty && realServers.isEmpty }
     }
 
     static func effectiveModel(settings: ConversationSettings, provider: Provider?) -> String {
@@ -421,7 +444,7 @@ final class ConversationSession: Identifiable {
         var options = options
         var info = serverInfo?(target.provider, target.model)
         if target.waitsForServer, let awaitServerInfo {
-            let forBudget = (options.reasoningBudgetTokens != nil && !options.disablesThinking) || !target.servers.isEmpty
+            let forBudget = (options.reasoningBudgetTokens != nil && !options.disablesThinking) || !target.realServers.isEmpty
             info = await awaitServerInfo(target.provider, target.model, forBudget)
             // Stop (or Lock) during the wait has already finalized the message.
             guard isCurrent(messageID) else { return }
@@ -441,11 +464,13 @@ final class ConversationSession: Identifiable {
         if !target.servers.isEmpty, let tools {
             // ReAct sends no `tools`, so neither gate applies: those servers are what it is for.
             if !target.usesReAct, info?.ignoresTools == true {
-                addNote(ToolNote.toolsNotOffered, to: messageID)
-            } else if !target.usesReAct, let refusal = tools.refusal(target.provider, target.model) {
-                addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
+                if !target.offersOnlyBuiltIns { addNote(ToolNote.toolsNotOffered, to: messageID) }
+            } else if !target.usesReAct, let refusal = tools.refusal(target.provider, target.model),
+                      refusal.kind == .unsupported || target.offersOnlyBuiltIns {
+                if !target.offersOnlyBuiltIns { addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID) }
             } else {
-                replyPhase = .connecting(target.servers.map(\.name))
+                let starting = target.realServers.map(\.name)
+                if !starting.isEmpty { replyPhase = .connecting(starting) }
                 let listed = await tools.host.catalog(for: target.servers)
                 guard isCurrent(messageID) else { return }
                 if Task.isCancelled {
@@ -464,6 +489,7 @@ final class ConversationSession: Identifiable {
                         definitionTokens = ContextBudget.estimateTokens(ReActPrompt.block(tools: react.tools, nonce: react.nonce))
                     } else {
                         options.tools = listed.chatTools
+                        options.toolsAreOptional = target.offersOnlyBuiltIns
                     }
                     if let idx = index(of: messageID) {
                         conversation.messages[idx].toolDefinitionTokens = definitionTokens
@@ -568,10 +594,19 @@ final class ConversationSession: Identifiable {
                 if let refusal = delta.toolsRejected {
                     // The server refused `tools` and accepted the request without them. One bad
                     // schema from one server must not turn tools off for the model: only a plain
-                    // lack of support is remembered.
+                    // lack of support is remembered, unless Parley's own definitions were the only
+                    // ones sent. The gate above spares a real server's chat from that memory, and
+                    // `.unconfirmed` may have been a passing fault, so it is never kept.
                     options.omitsTools = true
-                    if refusal.kind == .unsupported { tools?.markRefused(target.provider, target.model, refusal) }
-                    addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
+                    if refusal.kind == .unsupported || (target.offersOnlyBuiltIns && refusal.kind == .definitions) {
+                        tools?.markRefused(target.provider, target.model, refusal)
+                    }
+                    if target.offersOnlyBuiltIns {
+                        // As if they had never been offered: the definitions are not in this request.
+                        if let idx = index(of: messageID) { conversation.messages[idx].toolDefinitionTokens = nil }
+                    } else {
+                        addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
+                    }
                     continue
                 }
                 if delta.thinkingOffRejected {
@@ -748,18 +783,21 @@ final class ConversationSession: Identifiable {
                 continue
             }
             let allowance = tools.allowance(binding)
+            let folderOnCard = tools.builtInFolderPath()
             if allowance != .always || fromText {
                 replyPhase = .awaitingApproval
                 let approval = PendingToolApproval(
                     id: callID,
                     serverName: binding.serverName,
-                    serverDetail: Self.serverDetail(server),
+                    serverDetail: Self.serverDetail(server, binding: binding, arguments: arguments, tools: tools),
                     toolName: binding.tool.name,
                     description: binding.tool.description,
                     parameters: binding.tool.inputSchema.prettyJSONText,
                     arguments: arguments.isEmpty ? "{}" : JSONValue.object(arguments).prettyJSONText,
                     definitionChanged: allowance == .changed,
-                    readFromText: fromText
+                    readFromText: fromText,
+                    asksEveryTime: BuiltInTools.asksEveryTime(binding),
+                    isBuiltIn: binding.serverID == BuiltInTools.serverID
                 )
                 let decision = await requestApproval(approval, messageID: messageID)
                 guard isCurrent(messageID) else { return }
@@ -770,13 +808,15 @@ final class ConversationSession: Identifiable {
                 case .cancelled:
                     return
                 case .alwaysAllow:
-                    // The card has no such button for a call read from text.
-                    if !fromText { tools.setAlwaysAllowed(binding) }
+                    // The card has no such button for these.
+                    if approval.offersAlwaysAllow { tools.setAlwaysAllowed(binding) }
                 case .allowOnce:
                     break
                 }
-                // Switched off while the card was up: its Allow can no longer mean anything.
-                guard currentServer(for: binding, tools: tools) != nil else {
+                // Switched off while the card was up, or the card's folder is no longer the shared
+                // one: its Allow can no longer mean anything.
+                let folderMoved = BuiltInTools.readsFolder(binding) && tools.builtInFolderPath() != folderOnCard
+                guard !folderMoved, currentServer(for: binding, tools: tools) != nil else {
                     setResult(ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff), for: callID, in: messageID)
                     continue
                 }
@@ -791,12 +831,17 @@ final class ConversationSession: Identifiable {
                 limit: tools.contextLimit(target.provider, target.model),
                 used: contextUsage().tokens
             )
-            let result = await tools.host.call(binding, arguments: arguments,
+            var result = await tools.host.call(binding, arguments: arguments,
                                                timeout: server.effectiveCallTimeout,
                                                maxCharacters: budget)
             // Stop has already written a result.
             guard isCurrent(messageID) else { return }
             activeCallID = nil
+            // The runner reads Settings for itself, after the check above: if the folder moved in
+            // between, what came back is not from the folder that was approved, and it stops here.
+            if BuiltInTools.readsFolder(binding), tools.builtInFolderPath() != folderOnCard {
+                result = ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff)
+            }
             setResult(result, for: callID, in: messageID)
         }
     }
@@ -809,8 +854,12 @@ final class ConversationSession: Identifiable {
         }
     }
 
-    private static func serverDetail(_ server: MCPServerConfig) -> String {
-        server.kind == MCPServerConfig.kindHTTP ? server.urlHost : "Local command: \(server.command)"
+    private static func serverDetail(_ server: MCPServerConfig, binding: MCPToolBinding, arguments: [String: JSONValue],
+                                     tools: ConversationToolServices) -> String {
+        if server.kind == MCPServerConfig.kindBuiltIn {
+            return BuiltInTools.approvalDetail(toolName: binding.tool.name, arguments: arguments, folderPath: tools.builtInFolderPath())
+        }
+        return server.kind == MCPServerConfig.kindHTTP ? server.urlHost : "Local command: \(server.command)"
     }
 
     private func call(_ callID: String, in messageID: UUID) -> ToolCallRecord? {

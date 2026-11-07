@@ -648,6 +648,9 @@ enum SnapshotHarness {
         session.conversation.settings.model = "mock-tools"
         await wait(0.8)
         await captureToolsPopover(appearance, session)
+        await withBuiltInTools {
+            await captureToolsPopover(appearance, session, state: "composer-tools-popover-built-in")
+        }
 
         session.send(text: #"Echo the release notes. tool=filesystem__echo args={"text":"Parley 1.4 adds MCP tools.","repeat":1,"path":"~/Projects/parley/CHANGELOG.md"}"#,
                      attachments: [], settings: appState.settings)
@@ -679,6 +682,19 @@ enum SnapshotHarness {
         await waitFor(seconds: 6) { !session.isStreaming }
 
         await captureReAct(appearance, serverID: serverID)
+    }
+
+    /// Only around the captures that show them: every other state is a chat without built-in tools,
+    /// as a fresh install is. The folder is never read here.
+    private static func withBuiltInTools(_ capture: () async -> Void) async {
+        let settings = AppState.shared.settings
+        settings.builtInFolderPath = outputDirectoryPath
+        settings.builtInTools = BuiltInTools.Tool.allCases.map(\.rawValue)
+        await wait(0.4)
+        await capture()
+        settings.builtInTools = []
+        settings.builtInFolderPath = nil
+        await wait(0.2)
     }
 
     /// ReAct text mode: the popover with its offer, then with the mode on, the card without Always
@@ -988,13 +1004,16 @@ enum SnapshotHarness {
             return
         }
         hideWindows()
-        let tabNames = ["providers", "mcp", "general"]
+        let tabNames = ["providers", "mcp", "built-in-tools", "general"]
         if let tabs = window.contentViewController as? NSTabViewController {
             for (i, name) in tabNames.enumerated() where i < tabs.tabViewItems.count {
                 tabs.selectedTabViewItemIndex = i
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
                 if name == "mcp" { await captureMCPSettings(appearance, window) }
+                if name == "built-in-tools" {
+                    await withBuiltInTools { capture(appearance, "settings-built-in-tools-on", window: window) }
+                }
             }
         } else if let toolbar = window.toolbar, !toolbar.items.isEmpty {
             log("settings: no NSTabViewController (\(String(describing: window.contentViewController))); using the toolbar")
@@ -1005,6 +1024,9 @@ enum SnapshotHarness {
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
                 if name == "mcp" { await captureMCPSettings(appearance, window) }
+                if name == "built-in-tools" {
+                    await withBuiltInTools { capture(appearance, "settings-built-in-tools-on", window: window) }
+                }
             }
         } else {
             log("settings: no tab controller and no toolbar; capturing the current tab only")

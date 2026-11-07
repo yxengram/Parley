@@ -125,6 +125,9 @@ final class AppState {
 
     /// Every MCP server connection. Constructing it starts nothing and reads no secret.
     let mcp: MCPToolHost
+    /// What a conversation talks to: `mcp`, with the built-in tools in front of it. Settings keeps
+    /// using `mcp`, where a built-in tool has no place.
+    let toolHost: MCPToolHost
     /// Arguments, URLs, environment values and headers of the servers (the Keychain, except in
     /// tests and the snapshot harness). Read when a server starts or its editor opens.
     let mcpSecrets: MCPSecretStore
@@ -139,6 +142,8 @@ final class AppState {
         let secrets = mcpSecrets ?? KeychainMCPSecretStore()
         self.mcpSecrets = secrets
         self.mcp = mcp ?? MCPConnectionManager(secrets: secrets)
+        let appSettings = self.settings
+        self.toolHost = BuiltInToolRouter(wrapping: self.mcp, settings: { await appSettings.builtInToolSettings })
         drainMCPUpdates()
     }
 

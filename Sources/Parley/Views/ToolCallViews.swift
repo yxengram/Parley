@@ -337,6 +337,11 @@ struct ToolApprovalCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            } else if approval.asksEveryTime {
+                Label("A file or a web page can tell the model what to do next, so this tool asks every time.", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 4) {
                     Button {
@@ -346,7 +351,7 @@ struct ToolApprovalCard: View {
                             Image(systemName: "chevron.right")
                                 .rotationEffect(.degrees(showDescription ? 90 : 0))
                                 .font(.caption2.weight(.semibold))
-                            Text("Definition from the server")
+                            Text(verbatim: approval.definitionLabel)
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -377,7 +382,7 @@ struct ToolApprovalCard: View {
                 Button("Allow Once") { answer(approval.id, .allowOnce) }
                     .buttonStyle(.borderedProminent)
                     .disabled(!armed)
-                if !approval.readFromText {
+                if approval.offersAlwaysAllow {
                     Button("Always Allow This Tool") { answer(approval.id, .alwaysAllow) }
                         .buttonStyle(.bordered)
                         .disabled(!armed)

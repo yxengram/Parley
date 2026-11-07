@@ -147,7 +147,7 @@ public enum AttachmentLoader {
     }
 
     /// Full decode: valid UTF-8 with no NUL bytes. A leading BOM is dropped.
-    private static func decodeText(_ data: Data) -> String? {
+    static func decodeText(_ data: Data) -> String? {
         if data.contains(0) { return nil }
         guard var text = String(data: data, encoding: .utf8) else { return nil }
         if text.hasPrefix("\u{FEFF}") { text.removeFirst() }

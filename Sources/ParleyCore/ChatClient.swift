@@ -30,6 +30,9 @@ public struct ChatRequestOptions: Sendable {
     /// Leave `tools` out, and flatten earlier tool rounds into text: the server refused them, or
     /// the round cap was reached.
     public var omitsTools = false
+    /// Only Parley's own tools are offered, so this chat worked without them a moment ago: an error
+    /// answer in words `ToolsSupport.refusal` does not know is worth the one retry without them.
+    public var toolsAreOptional = false
     /// ReAct text mode: the tools go out as text in the system message, and `tools` stays nil.
     /// `omitsTools` drops this too.
     public var react: ReActRequest? = nil
@@ -228,6 +231,7 @@ public final class ChatClient: @unchecked Sendable {
                             try await self.runStream(request: request, rejectsStreamOptions: includeUsage,
                                                      thinkingOffFields: thinkingOff, serverKind: options.serverKind,
                                                      sentTools: Self.sendsTools(options),
+                                                     toolsAreOptional: options.toolsAreOptional,
                                                      announcesThinkingOffRefusal: thinkingOffRefusal != nil,
                                                      announcesToolsRefusal: toolsRefusal?.refusal,
                                                      continuation: continuation)
@@ -278,6 +282,7 @@ public final class ChatClient: @unchecked Sendable {
         thinkingOffFields: [String],
         serverKind: InferenceServerKind?,
         sentTools: Bool,
+        toolsAreOptional: Bool,
         announcesThinkingOffRefusal: Bool,
         announcesToolsRefusal: ToolsRefusal?,
         continuation: AsyncThrowingStream<ChatDelta, Error>.Continuation
@@ -303,6 +308,14 @@ public final class ChatClient: @unchecked Sendable {
             }
             if ThinkingOffSupport.isRejection(status: status, body: body, sentFields: thinkingOffFields, serverKind: serverKind) {
                 throw ThinkingOffRejected(error: ParleyError.http(status: status, body: body))
+            }
+            // After the check above, so a refusal of the thinking fields still gets its own retry.
+            // `.definitions`: words nobody listed say nothing about the model's tool support, and a
+            // conversation with a real server on the same model must go on offering its tools.
+            if sentTools, toolsAreOptional, ToolsSupport.mayBeRefusal(status: status, body: body) {
+                let kind: ToolsRefusal.Kind = status >= 500 || status == 413 ? .unconfirmed : .definitions
+                throw ToolsRejected(refusal: ToolsRefusal(kind: kind, message: ToolsSupport.message(body: body)),
+                                    error: ParleyError.http(status: status, body: body))
             }
             throw ParleyError.http(status: status, body: body)
         }
@@ -805,6 +818,15 @@ enum ToolsSupport {
         if unsupported.contains(where: lower.contains) { return .unsupported }
         if let object = JSONValue(jsonText: body), object["error"]?["param"]?.stringValue == "tools" { return .unsupported }
         return nil
+    }
+
+    /// An error answer that could be a refusal of `tools` in words `refusal` does not know. Not auth,
+    /// rate limits, a gateway or a context overflow, which a retry without tools does not touch.
+    static func mayBeRefusal(status: Int, body: String) -> Bool {
+        guard (400..<500).contains(status) || status == 500 || status == 501, ![401, 403, 408, 429].contains(status) else { return false }
+        let lower = body.lowercased()
+        return ContextBudget.contextLength(fromError: body) == nil
+            && !lower.contains("context length") && !lower.contains("context window")
     }
 
     /// The server's own words: `error.message` when the body is that JSON, else the body.

@@ -85,7 +85,7 @@ struct ComposerView: View {
                 .help("Attach images or text files")
                 .accessibilityLabel("Attach Files")
 
-                if !appState.settings.mcpServers.isEmpty {
+                if appState.settings.offersTools {
                     toolsButton
                 }
 
@@ -157,7 +157,8 @@ struct ComposerView: View {
         }
     }
 
-    /// Only with a server configured. Accent-tinted, with a count, while servers are on.
+    /// Only with a server configured or a built-in tool on. Accent-tinted, with a count, while
+    /// servers are on; the built-in tools count as one.
     private var toolsButton: some View {
         let count = appState.enabledServers(for: session.conversation.settings).count
         return Button {
@@ -178,9 +179,9 @@ struct ComposerView: View {
         }
         .buttonStyle(.plain)
         .disabled(session.isStreaming)
-        .help("Tools: which MCP servers this conversation uses (⇧⌘T)")
+        .help("Tools: what this conversation can use (⇧⌘T)")
         .accessibilityLabel("Tools")
-        .accessibilityValue(count == 1 ? "1 server on" : "\(count) servers on")
+        .accessibilityValue(count == 1 ? "1 source on" : "\(count) sources on")
         .popover(isPresented: $showToolsPopover, arrowEdge: .top) {
             ConversationToolsPopover(session: session)
         }
@@ -196,7 +197,9 @@ struct ComposerView: View {
         let history = session.pendingEditIndex.map { Array(session.conversation.messages.prefix($0)) } ?? session.conversation.messages
         return Self.serverWarning(info: info, providerName: provider.name, model: model, history: history,
                                   draft: session.draftAttachments, draftText: session.draftText,
-                                  hasToolServers: !appState.enabledServers(for: session.conversation.settings).isEmpty,
+                                  // A conversation with only built-in tools stays a plain chat here too.
+                                  hasToolServers: appState.enabledServers(for: session.conversation.settings)
+                                      .contains { $0.kind != MCPServerConfig.kindBuiltIn },
                                   usesReAct: session.conversation.settings.usesReAct)
     }
 

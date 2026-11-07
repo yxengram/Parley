@@ -221,7 +221,10 @@ enum MCPOAuthPolicy {
         switch (b[0], b[1]) {
         case (0, _), (224...255, _): return nil
         case (127, _): return .loopback
+        // 198.18.0.0/15 stays public: it is the default fake-IP range of Clash, Surge and the like, so
+        // on such a Mac ordinary public names resolve there, and calling it local would refuse them.
         case (10, _), (192, 168), (169, 254), (172, 16...31), (100, 64...127): return .local
+        case (192, 0) where b[2] == 0: return .local
         default: return .remote
         }
     }
@@ -231,9 +234,16 @@ enum MCPOAuthPolicy {
         let leadingZeros = b.prefix(15).allSatisfy { $0 == 0 }
         if leadingZeros, b[15] == 0 { return nil }
         if leadingZeros, b[15] == 1 { return .loopback }
+        // An IPv4 address in an IPv6 form is that IPv4 address, or wrapping it would get past the rules
+        // above: mapped, IPv4-compatible, NAT64 and 6to4.
         if b.prefix(10).allSatisfy({ $0 == 0 }), b[10] == 0xFF, b[11] == 0xFF { return locality(ofIPv4: Array(b[12...])) }
+        if b.prefix(12).allSatisfy({ $0 == 0 }) { return locality(ofIPv4: Array(b[12...])) }
+        if b.prefix(4) == [0x00, 0x64, 0xFF, 0x9B], b[4..<12].allSatisfy({ $0 == 0 }) { return locality(ofIPv4: Array(b[12...])) }
+        if b[0] == 0x20, b[1] == 0x02 { return locality(ofIPv4: Array(b[2...5])) }
         if b[0] == 0xFF { return nil }
         if b[0] & 0xFE == 0xFC || (b[0] == 0xFE && b[1] & 0xC0 == 0x80) { return .local }
+        // Documentation and discard prefixes: nothing public is ever there.
+        if b.prefix(4) == [0x20, 0x01, 0x0D, 0xB8] || (b[0] == 0x01 && b[1..<8].allSatisfy({ $0 == 0 })) { return .local }
         return .remote
     }
 

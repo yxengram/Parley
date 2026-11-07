@@ -11,6 +11,9 @@ struct SettingsView: View {
             MCPSettingsView()
                 .frame(width: 760, height: 540)
                 .tabItem { Label("MCP", systemImage: "wrench.and.screwdriver") }
+            BuiltInToolsSettingsView()
+                .frame(width: 560, height: 600)
+                .tabItem { Label("Built-in Tools", systemImage: "hammer") }
             GeneralSettingsView()
                 .frame(width: 560, height: 500)
                 .tabItem { Label("General", systemImage: "gearshape") }
@@ -337,7 +340,7 @@ private struct GeneralSettingsView: View {
             }
 
             Section("Privacy") {
-                Label("Parley only contacts the API endpoints and MCP servers you configure, and sign-in providers you approve. No telemetry.", systemImage: "hand.raised.fill")
+                Label("Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page, each website you approve for one call. No telemetry.", systemImage: "hand.raised.fill")
                 Text("API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
