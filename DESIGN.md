@@ -372,7 +372,7 @@ Settings tab "MCP" (`MCPSettingsView`, a draft with Save and Revert: a live bind
 
 Tests: `MCPHardeningTests` hold what the first review found; many of those used to end the process, so a regression shows up as a crashed run. `ToolLoopTests` drive the session with `FakeToolHost`; `MCPIntegrationTests` run the real manager with `tools/mock_mcp_server.py` and `tools/mock_server.py` (whose `mock-tools*` models refuse any dangling tool call). `tools/snapshot.sh` covers the Settings tab, import review, popover, approval card and rows.
 
-Known limits: whether LM Studio returns normalized names is unconfirmed. The snapshot harness's launch check (PARLEY_SNAPSHOT_LAUNCH_COMMAND) starts a bare command from an app with launchd's PATH. Nothing has been tested against real MCP servers, a modern-only server, or a real Keychain item. A running stdio server keeps tool arguments in its own memory after Lock. macOS 14's `addchdir_np` path has not been run.
+Known limits: LM Studio returned `<server>__<tool>` names unchanged and accepted the replayed tool messages in a live check (Qwen 3.8 27B, two turns, 2026-11-07, against the mock MCP server); other models and parallel calls there are unchecked. The snapshot harness's launch check (PARLEY_SNAPSHOT_LAUNCH_COMMAND) starts a bare command from an app with launchd's PATH. Nothing has been tested against real MCP servers, a modern-only server, or a real Keychain item. A running stdio server keeps tool arguments in its own memory after Lock. macOS 14's `addchdir_np` path has not been run.
 
 ## Generation speed and context length
 
