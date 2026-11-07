@@ -149,6 +149,7 @@ final class MCPHTTPHarness: @unchecked Sendable {
     let process = Process()
     let port: Int
     let store = InMemoryMCPSecretStore()
+    let oauthStore = InMemoryMCPOAuthStore()
     let manager: MCPConnectionManager
     var config: MCPServerConfig
     var url: String { "http://127.0.0.1:\(port)/mcp" }
@@ -171,7 +172,7 @@ final class MCPHTTPHarness: @unchecked Sendable {
         process.terminationHandler = { _ in semaphore.signal() }
         try process.run()
 
-        manager = MCPConnectionManager(secrets: store, pathResolver: mcpTestResolver(), clientVersion: "test", stopGrace: 0.3)
+        manager = MCPConnectionManager(secrets: store, oauthStore: oauthStore, pathResolver: mcpTestResolver(), clientVersion: "test", stopGrace: 0.3)
         config = MCPServerConfig(name: "Remote", kind: MCPServerConfig.kindHTTP, urlHost: "127.0.0.1",
                                  headerNames: headers.keys.sorted(), startupTimeout: 10)
         let secrets = MCPServerSecrets(url: "http://127.0.0.1:\(port)/mcp", headers: headers)

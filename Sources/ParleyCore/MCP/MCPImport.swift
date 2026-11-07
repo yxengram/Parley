@@ -159,7 +159,7 @@ public enum MCPConfigImport {
         }
 
         for key in ["envFile", "auth", "oauth"] where server[key] != nil {
-            warnings.append("\(key) is ignored: Parley reads no other files and does not do OAuth.")
+            warnings.append("\(key) is ignored: Parley reads no other files. To sign in, press Sign In in Settings > MCP.")
         }
         return MCPImportEntry(config: config, secrets: secrets, warnings: warnings, danger: danger, error: problem)
     }

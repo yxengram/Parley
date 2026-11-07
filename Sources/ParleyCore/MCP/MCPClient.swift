@@ -110,7 +110,7 @@ final class MCPClient: @unchecked Sendable {
                 try await discover(timeout: startupTimeout)
                 return
             } catch {
-                if error is CancellationError { throw error }
+                if error is CancellationError || Self.isAuthorization(error) { throw error }
             }
         }
         do {
@@ -121,8 +121,17 @@ final class MCPClient: @unchecked Sendable {
                 try await discover(timeout: startupTimeout)
             } catch let later {
                 if case MCPError.unsupportedVersion = later { throw later }
+                // A server that refuses initialize before it checks a token: its 401 is the answer.
+                if Self.isAuthorization(later) { throw later }
                 throw error
             }
+        }
+    }
+
+    private static func isAuthorization(_ error: Error) -> Bool {
+        switch error {
+        case MCPError.needsAuthorization, MCPError.insufficientScope, MCPError.credentialsRefused: return true
+        default: return false
         }
     }
 

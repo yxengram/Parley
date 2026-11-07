@@ -27,6 +27,9 @@ public actor MCPConnectionManager: MCPToolHost {
         /// The user pressed Stop, saved a change or switched the server off. A reply in progress
         /// must not bring it back; only a new `catalog` or `connect` does.
         var stoppedByUser = false
+        /// This server may sign in: an HTTP server with no static Authorization header.
+        var usesSignIn = false
+        var signInNeed: MCPSignInNeed = .none
         let log: MCPLogBuffer
 
         init(config: MCPServerConfig, log: MCPLogBuffer) {
@@ -44,16 +47,22 @@ public actor MCPConnectionManager: MCPToolHost {
     private var connections: [UUID: Connection] = [:]
     /// Removed servers: a late use has no config it may start.
     private var forgotten: Set<UUID> = []
+    private let oauthStore: MCPOAuthStore
+    private var brokers: [UUID: MCPOAuthBroker] = [:]
+    private var signIns: [UUID: Task<Void, Error>] = [:]
+    private nonisolated let quitting = MCPOAuthFlag()
 
     private static let crashWindow: TimeInterval = 60
     private static let crashLimit = 3
     /// How long each step of stopping a server waits for it (2 s by default; quit passes its own).
     private nonisolated let stopGrace: TimeInterval
 
-    public init(secrets: MCPSecretStore, pathResolver: ShellPATHResolver = ShellPATHResolver(),
+    public init(secrets: MCPSecretStore, oauthStore: MCPOAuthStore = KeychainMCPOAuthStore(),
+                pathResolver: ShellPATHResolver = ShellPATHResolver(),
                 clientVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0",
                 stopGrace: TimeInterval = 2) {
         self.secrets = secrets
+        self.oauthStore = oauthStore
         self.pathResolver = pathResolver
         self.clientVersion = clientVersion
         self.stopGrace = stopGrace
@@ -87,9 +96,11 @@ public actor MCPConnectionManager: MCPToolHost {
     }
 
     private func tools(of server: MCPServerConfig) async -> Result<[MCPTool], Error> {
+        var used: MCPClient?
         do {
             connections[server.id]?.stoppedByUser = false
             let client = try await client(for: server)
+            used = client
             guard let connection = connections[server.id] else { throw MCPError.notConfigured }
             if needsListing(connection, client) {
                 let generation = connection.generation
@@ -102,6 +113,7 @@ public actor MCPConnectionManager: MCPToolHost {
             connection.justListed = false
             return .success(connection.tools?.tools ?? [])
         } catch {
+            await authorizationFailed(serverID: server.id, client: used, error: error)
             return .failure(error)
         }
     }
@@ -150,6 +162,10 @@ public actor MCPConnectionManager: MCPToolHost {
             return finished(ToolCallResult(status: .cancelled, text: ToolResultText.interrupted))
         } catch let error as MCPError {
             switch error {
+            case .needsAuthorization(status: 401), .insufficientScope, .oauth:
+                // Refused, or never sent, so nothing ran.
+                await authorizationFailed(serverID: binding.serverID, client: client, error: error)
+                return finished(ToolCallResult(status: .notCalled, text: ToolResultText.notCalled(Self.summary(error))))
             case .timedOut:
                 return finished(ToolCallResult(status: .timedOut, text: ToolResultText.timedOut(seconds: timeout)))
             case .exited:
@@ -167,7 +183,7 @@ public actor MCPConnectionManager: MCPToolHost {
     }
 
     public func connect(_ server: MCPServerConfig) async -> MCPServerSnapshot {
-        guard server.isEnabled else { return snapshot(of: server.id) }
+        guard server.isEnabled, !forgotten.contains(server.id) else { return snapshot(of: server.id) }
         let connection = connection(for: server)
         connection.stoppedByUser = false
         await stopRunning(connection)
@@ -187,14 +203,149 @@ public actor MCPConnectionManager: MCPToolHost {
 
     public func forget(serverID: UUID) async {
         forgotten.insert(serverID)
-        guard let connection = connections.removeValue(forKey: serverID) else { return }
-        connection.stoppedByUser = true
-        await stopRunning(connection)
-        connection.log.clear()
+        signIns[serverID]?.cancel()
+        let connection = connections.removeValue(forKey: serverID)
+        connection?.stoppedByUser = true
+        let transport = connection.flatMap(detach)
+        if let connection { publish(connection) }
+        // Before anything is awaited on the network: a refresh or a sign-in in the browser must not
+        // bring the token back. Best effort, as there is no one left to tell.
+        try? await broker(for: serverID).clear(includingClients: true)
+        brokers[serverID] = nil
+        await transport?.close(grace: stopGrace)
+        connection?.log.clear()
     }
 
     public func logs(serverID: UUID) async -> [String] {
         connections[serverID]?.log.snapshot() ?? []
+    }
+
+    // MARK: Sign-in
+
+    private func broker(for serverID: UUID) -> MCPOAuthBroker {
+        if let broker = brokers[serverID] { return broker }
+        let broker = MCPOAuthBroker(serverID: serverID, store: oauthStore, quitting: quitting)
+        brokers[serverID] = broker
+        Task { await broker.setObserver { [weak self] need in
+            guard let self else { return }
+            Task { await self.signInNeedChanged(serverID: serverID, need: need) }
+        } }
+        return broker
+    }
+
+    private func signInNeedChanged(serverID: UUID, need: MCPSignInNeed?) {
+        guard let connection = connections[serverID], let need else { return }
+        connection.signInNeed = need
+        publish(connection)
+    }
+
+    public func signIn(_ server: MCPServerConfig, approve: @escaping MCPOAuthApprove, open: @escaping MCPOAuthOpen,
+                       willSignIn: @escaping MCPOAuthWillSignIn) async throws {
+        guard server.kind == MCPServerConfig.kindHTTP, !forgotten.contains(server.id) else { throw MCPError.notConfigured }
+        guard server.isEnabled else { throw MCPError.disabled }
+        let store = self.secrets
+        let id = server.id
+        let secrets: MCPServerSecrets
+        do {
+            secrets = try await Task.detached { try store.secrets(for: id) }.value
+        } catch let error as MCPError {
+            throw error
+        } catch {
+            throw MCPError.secrets("Could not read this server's secrets from the Keychain: \(error.localizedDescription)")
+        }
+        let url = try MCPHTTPTransport.validated(url: secrets.url, secrets: secrets)
+        let flow = MCPOAuthSignIn(
+            serverID: id, server: url, secrets: secrets, broker: broker(for: id), store: oauthStore, approve: approve, open: open,
+            willSignIn: willSignIn, probe: { [clientVersion] in try await Self.probe(url: url, secrets: secrets, clientVersion: clientVersion) })
+        signIns[id]?.cancel()
+        let task = Task { try await flow.run() }
+        signIns[id] = task
+        do {
+            try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+        } catch {
+            if signIns[id] == task { signIns[id] = nil }
+            throw Self.signInError(error)
+        }
+        if signIns[id] == task { signIns[id] = nil }
+    }
+
+    private static func signInError(_ error: Error) -> Error {
+        switch error {
+        case let failure as MCPOAuthFailure: return MCPError.oauth(failure)
+        case is CancellationError: return MCPError.oauth(.cancelled)
+        case is MCPError: return error
+        default: return MCPError.oauth(.unreachable)
+        }
+    }
+
+    /// What the server asks for, from one tokenless `initialize` with the server's own static headers.
+    private static func probe(url: URL, secrets: MCPServerSecrets, clientVersion: String) async throws -> MCPOAuthChallenge? {
+        let transport = MCPHTTPTransport(url: url, headers: secrets.headers, registry: nil)
+        let params: JSONValue = .object([
+            "protocolVersion": .string(MCPProtocol.legacyVersion), "capabilities": .object([:]),
+            "clientInfo": .object(["name": .string("Parley"), "version": .string(clientVersion)]),
+        ])
+        do {
+            let challenge = try await transport.probe(MCPOutbound(id: 1, method: "initialize", params: params))
+            await transport.close(grace: 1)
+            return challenge
+        } catch is CancellationError {
+            await transport.close(grace: 1)
+            throw CancellationError()
+        } catch {
+            await transport.close(grace: 1)
+            return nil
+        }
+    }
+
+    public func signOut(serverID: UUID) async throws {
+        signIns[serverID]?.cancel()
+        // No await before this, so a Connect queued behind Sign Out comes after it, whole.
+        let connection = connections[serverID]
+        connection?.stoppedByUser = true
+        let transport = connection.flatMap(detach)
+        if let connection { publish(connection) }
+        // The transport keeps the token it last used, for the session's DELETE.
+        var failure: Error?
+        do {
+            try await broker(for: serverID).clear(includingClients: false)
+        } catch {
+            failure = error
+        }
+        await transport?.close(grace: stopGrace)
+        if let failure { throw failure }
+    }
+
+    public func forgetSignIn(serverID: UUID) async {
+        signIns[serverID]?.cancel()
+        try? await broker(for: serverID).clear(includingClients: false)
+    }
+
+    public func signInInfo(serverID: UUID) async -> MCPSignInInfo? {
+        await broker(for: serverID).info
+    }
+
+    /// A request on a server that may sign in was refused. A dead token leaves nothing to keep open:
+    /// the connection goes, so the state says what to do. This is not a crash. A scope too narrow
+    /// leaves it open, because the other tools still work. `client` is the one that was refused: a
+    /// late failure on a replaced connection says nothing about the new one.
+    private func authorizationFailed(serverID: UUID, client: MCPClient?, error: Error) async {
+        guard let connection = connections[serverID], connection.usesSignIn, connection.client === client else { return }
+        switch error {
+        case MCPError.insufficientScope:
+            connection.signInNeed = .moreAccess
+            publish(connection)
+        case MCPError.needsAuthorization(status: 401):
+            let transport = detach(connection)
+            connection.signInNeed = .signIn
+            connection.state = .failed(Self.describe(error))
+            connection.stateSummary = Self.summary(error)
+            connection.startError = error
+            publish(connection)
+            await transport?.close(grace: stopGrace)
+        default:
+            break
+        }
     }
 
     public func clearLogs(serverIDs: [UUID]) async {
@@ -214,6 +365,7 @@ public actor MCPConnectionManager: MCPToolHost {
     }
 
     public nonisolated func shutdownSync(grace: TimeInterval) {
+        quitting.set()
         registry.shutdown(grace: grace)
         // Final: AppState's drain task ends with this.
         updatesContinuation.finish()
@@ -252,6 +404,7 @@ public actor MCPConnectionManager: MCPToolHost {
         connection.tools = nil
         connection.freshUntil = nil
         connection.justListed = false
+        connection.signInNeed = .none
         connection.state = .stopped
         connection.stateSummary = nil
         let transport = connection.transport
@@ -291,6 +444,7 @@ public actor MCPConnectionManager: MCPToolHost {
         let generation = connection.generation
         connection.startError = nil
         connection.closeError = nil
+        connection.signInNeed = .none
         if case .restarting = connection.state {} else {
             connection.state = .starting
         }
@@ -302,7 +456,7 @@ public actor MCPConnectionManager: MCPToolHost {
         let config = connection.config
         var transport: MCPTransport?
         do {
-            let opened = try await makeTransport(config, log: connection.log)
+            let opened = try await makeTransport(config, connection: connection)
             transport = opened
             guard connection.generation == generation else { throw CancellationError() }
             connection.transport = opened
@@ -340,6 +494,10 @@ public actor MCPConnectionManager: MCPToolHost {
             connection.startError = shown
             connection.state = .failed(Self.describe(shown))
             connection.stateSummary = Self.summary(shown)
+            if connection.usesSignIn {
+                if case MCPError.needsAuthorization(status: 401) = shown { connection.signInNeed = .signIn }
+                if case MCPError.insufficientScope = shown { connection.signInNeed = .moreAccess }
+            }
             connection.transport = nil
             connection.startTask = nil
             transport?.onClosed = nil
@@ -348,7 +506,8 @@ public actor MCPConnectionManager: MCPToolHost {
         }
     }
 
-    private func makeTransport(_ config: MCPServerConfig, log: MCPLogBuffer) async throws -> MCPTransport {
+    private func makeTransport(_ config: MCPServerConfig, connection: Connection) async throws -> MCPTransport {
+        let log = connection.log
         let secrets: MCPServerSecrets
         do {
             // Off the actor: the Keychain may ask the user, and other servers must not wait for that.
@@ -370,7 +529,17 @@ public actor MCPConnectionManager: MCPToolHost {
             return MCPStdioTransport(launch: launch, log: log, registry: registry)
         case MCPServerConfig.kindHTTP:
             let url = try MCPHTTPTransport.validated(url: secrets.url, secrets: secrets)
-            return MCPHTTPTransport(url: url, headers: secrets.headers, registry: registry)
+            connection.usesSignIn = !secrets.usesStaticAuthorization && MCPOAuthPolicy.serverMaySignIn(url)
+            guard connection.usesSignIn else { return MCPHTTPTransport(url: url, headers: secrets.headers, registry: registry) }
+            let broker = broker(for: config.id)
+            do {
+                try await broker.attach(serverURL: url)
+            } catch let error as MCPError {
+                throw error
+            } catch {
+                throw MCPError.secrets("Could not read this server's sign-in from the Keychain: \(error.localizedDescription)")
+            }
+            return MCPHTTPTransport(url: url, headers: secrets.headers, registry: registry, authorizer: broker)
         default:
             throw MCPError.unknownKind(config.kind)
         }
@@ -416,7 +585,7 @@ public actor MCPConnectionManager: MCPToolHost {
         MCPServerSnapshot(serverID: connection.config.id, state: connection.state,
                           protocolVersion: connection.client?.protocolVersion, serverInfo: connection.client?.serverInfo,
                           tools: connection.tools?.tools ?? [], hiddenTools: connection.tools?.hidden ?? [],
-                          isRunning: connection.client != nil)
+                          isRunning: connection.client != nil, signInNeed: connection.signInNeed)
     }
 
     private static func describe(_ error: Error) -> String {

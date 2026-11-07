@@ -385,7 +385,8 @@ private func isSafe(_ name: String) -> Bool {
     }
 
     @Test func authorizationTextSaysSo() {
-        #expect(MCPError.needsAuthorization(status: 401).errorDescription == "The server refused the request (HTTP 401). Parley does not do OAuth; add a static Authorization header if the server accepts one.")
+        #expect(MCPError.needsAuthorization(status: 401).errorDescription == "This server needs you to sign in. Press Sign In in Settings > MCP, or add a static Authorization header if the server accepts one.")
+        #expect(MCPError.needsAuthorization(status: 403).errorDescription == "The server refused the request (HTTP 403). Check your access to this server and any headers set for it.")
     }
 }
 

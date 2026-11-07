@@ -3,7 +3,8 @@ import Foundation
 /// Streamable HTTP: every message is a POST to one URL, answered with one JSON object or with an
 /// event stream that ends in the response. Same session rules as ChatClient: ephemeral, no cookies,
 /// no credential store, and redirects are refused, because a 307 would replay a tool's arguments
-/// and the user's tokens to whatever host it names. No OAuth discovery, no .well-known, ever.
+/// and the user's tokens to whatever host it names. No discovery happens here: a 401 stops and says
+/// so, and only Sign In (MCPOAuthSignIn) looks anything up.
 final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
     let isHTTP = true
     private let url: URL
@@ -11,6 +12,8 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
     private let session: URLSession
     private let maxMessageBytes: Int
     private let registry: MCPProcessRegistry?
+    /// Nil with a static Authorization header, which then goes out as it always did.
+    private let authorizer: MCPHTTPAuthorizer?
 
     private let lock = NSLock()
     private var inboundHandler: (@Sendable (MCPInbound) -> Void)?
@@ -19,10 +22,14 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
     private var sessionID: String?
     private var protocolVersion: String?
     private var isClosed = false
+    /// The last token used. Quit is synchronous, so its DELETE can only send what is already here.
+    private var bearer: String?
 
     /// `url` and `headers` have been through `validated(url:secrets:)`.
-    init(url: URL, headers: [String: String], registry: MCPProcessRegistry?, maxMessageBytes: Int = MCPProtocol.maxMessageBytes) {
+    init(url: URL, headers: [String: String], registry: MCPProcessRegistry?, maxMessageBytes: Int = MCPProtocol.maxMessageBytes,
+         authorizer: MCPHTTPAuthorizer? = nil) {
         self.url = url
+        self.authorizer = authorizer
         self.userHeaders = headers
         self.registry = registry
         self.maxMessageBytes = maxMessageBytes
@@ -79,6 +86,7 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
         request.timeoutInterval = 3600
         // Protocol headers last, so a pasted header cannot replace them.
         for (name, value) in userHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        if let bearer = currentBearer() { request.setValue("Bearer " + bearer, forHTTPHeaderField: "Authorization") }
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if let sessionID = currentSession() { request.setValue(sessionID, forHTTPHeaderField: "MCP-Session-Id") }
         return request
@@ -92,35 +100,88 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
         return request
     }
 
+    private func currentBearer() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return bearer
+    }
+
+    private func use(bearer token: String?) {
+        lock.lock(); defer { lock.unlock() }
+        bearer = token
+    }
+
+    /// One request of a send or Connect, the only kind that may renew a token. A 401 is retried once
+    /// with a new one. That is not the "never re-issue tools/call" case, which is about a broken
+    /// stream, where the call may have run: a 401 says the server did not run it.
     func send(_ message: MCPOutbound) async throws -> MCPResponse {
-        try ensureOpen()
-        let request = post(MCPWire.encode(message), headers: message.httpHeaders)
-        let sentSession = request.value(forHTTPHeaderField: "MCP-Session-Id") != nil
-        let (bytes, response) = try await perform(request)
-        let http = response as? HTTPURLResponse
-        let status = http?.statusCode ?? 0
-
-        guard (200..<300).contains(status) else {
-            let data = try await collect(bytes, limit: ChatClient.maxErrorBodyBytes, failsOverLimit: false)
-            if let rejected = rejection(status: status, data: data, sentSession: sentSession) {
-                return MCPResponse(result: nil, error: rejected)
+        var mayRetry = true
+        var replacement: String?
+        while true {
+            try ensureOpen()
+            let token: String?
+            if let replacement {
+                token = replacement
+            } else {
+                token = try await authorizer?.token(mayRefresh: true)
             }
-            throw failure(status: status, response: http, data: data, sentSession: sentSession)
-        }
-        store(session: http?.value(forHTTPHeaderField: "MCP-Session-Id"))
+            // Renewing can outlast Stop, and a closed transport sends nothing.
+            try ensureOpen()
+            if authorizer != nil { use(bearer: token) }
+            let request = post(MCPWire.encode(message), headers: message.httpHeaders)
+            let sentSession = request.value(forHTTPHeaderField: "MCP-Session-Id") != nil
+            // What this request really carried: concurrent requests share `bearer`.
+            let sent = authorizer == nil ? nil : request.value(forHTTPHeaderField: "Authorization").map { String($0.dropFirst("Bearer ".count)) }
+            let (bytes, response) = try await perform(request)
+            let http = response as? HTTPURLResponse
+            let status = http?.statusCode ?? 0
+            let scrubber = MCPTokenScrubber(token: sent)
 
-        let contentType = (http?.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
-        if contentType.contains("text/event-stream") {
-            return try await readEvents(bytes, id: message.id)
+            guard (200..<300).contains(status) else {
+                let data = try await collect(bytes, limit: ChatClient.maxErrorBodyBytes, failsOverLimit: false)
+                // Cleaned before anything shortens it: a token cut in two matches nothing.
+                let cleaned = scrubber.cleanRaw(data)
+                if status == 401, mayRetry, let sent, let authorizer {
+                    mayRetry = false
+                    if let fresh = try await authorizer.replacement(forRejected: sent) {
+                        replacement = fresh
+                        continue
+                    }
+                }
+                if let rejected = rejection(status: status, data: cleaned, sentSession: sentSession) {
+                    return MCPResponse(result: nil, error: scrubber.clean(rejected))
+                }
+                throw await failure(status: status, response: http, data: cleaned, sentSession: sentSession, scrubber: scrubber)
+            }
+            store(session: http?.value(forHTTPHeaderField: "MCP-Session-Id"))
+
+            let contentType = (http?.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+            if contentType.contains("text/event-stream") {
+                return scrubber.clean(try await readEvents(bytes, id: message.id))
+            }
+            let data = try await collect(bytes, limit: maxMessageBytes, failsOverLimit: true)
+            guard let messages = MCPWire.decode(data) else {
+                throw MCPError.invalidResponse("the body is not JSON-RPC")
+            }
+            guard let answer = answer(to: message.id, in: messages) else {
+                throw MCPError.invalidResponse("no response to this request")
+            }
+            return scrubber.clean(answer)
         }
-        let data = try await collect(bytes, limit: maxMessageBytes, failsOverLimit: true)
-        guard let messages = MCPWire.decode(data) else {
-            throw MCPError.invalidResponse("the body is not JSON-RPC")
+    }
+
+    /// Sign In only, on a transport of its own with no token: what the server asks for. Nil when it
+    /// answers anything but a Bearer 401, which leaves the well-known addresses to try.
+    func probe(_ message: MCPOutbound) async throws -> MCPOAuthChallenge? {
+        let (bytes, response) = try await perform(post(MCPWire.encode(message), headers: message.httpHeaders))
+        let http = response as? HTTPURLResponse
+        if (http?.statusCode ?? 0) == 401 {
+            bytes.task.cancel()
+            return MCPOAuthChallenge.parse(http?.value(forHTTPHeaderField: "WWW-Authenticate"))
         }
-        guard let answer = answer(to: message.id, in: messages) else {
-            throw MCPError.invalidResponse("no response to this request")
-        }
-        return answer
+        // A server that opened a session for this has it ended by `close`.
+        store(session: http?.value(forHTTPHeaderField: "MCP-Session-Id"))
+        bytes.task.cancel()
+        return nil
     }
 
     /// URLSession's cancellation error means the Task was cancelled, and a connection lost after
@@ -143,13 +204,24 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
         return nil
     }
 
-    private func failure(status: Int, response: HTTPURLResponse?, data: Data, sentSession: Bool) -> MCPError {
-        if status == 401 || status == 403 { return .needsAuthorization(status: status) }
+    private func failure(status: Int, response: HTTPURLResponse?, data: Data, sentSession: Bool, scrubber: MCPTokenScrubber) async -> MCPError {
+        if status == 401 || status == 403 { return await authorizationFailure(status: status, response: response) }
         if (300..<400).contains(status) {
-            return .refusedRedirect(ResponseText.errorBody(status: status, response: response, data: data))
+            return .refusedRedirect(scrubber.cleanRaw(ResponseText.errorBody(status: status, response: response, data: data)))
         }
         if status == 404 && sentSession { return .sessionExpired }
-        return .http(status: status, body: ResponseText.errorBody(status: status, response: response, data: data))
+        return .http(status: status, body: scrubber.cleanRaw(ResponseText.errorBody(status: status, response: response, data: data)))
+    }
+
+    /// The challenge is remembered for the next Sign In, and goes no further: not into the error,
+    /// whose text can be saved.
+    private func authorizationFailure(status: Int, response: HTTPURLResponse?) async -> MCPError {
+        let challenge = MCPOAuthChallenge.parse(response?.value(forHTTPHeaderField: "WWW-Authenticate"))
+        guard let authorizer else { return .credentialsRefused(status: status) }
+        if let challenge { await authorizer.received(challenge, status: status) }
+        if status == 403, challenge?.isInsufficientScope == true { return .insufficientScope }
+        // Any other Bearer 403 is about the token, so it needs the same thing a 401 does.
+        return .needsAuthorization(status: challenge == nil ? status : 401)
     }
 
     /// The response to `id`; everything else goes to `onInbound`.
@@ -235,11 +307,18 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
 
     /// A POST that expects no answer, normally 202. The status is the answer: a server that never
     /// ends the body must not hold up what comes next.
+    ///
+    /// Sends the token as it stands. Renewing is for a send or Connect; this also carries the
+    /// `notifications/cancelled` of a Stop and the replies to a server's own pings.
     private func post(accepted body: Data, headers: [String: String]) async throws {
+        try ensureOpen()
+        if let authorizer { use(bearer: try await authorizer.token(mayRefresh: false)) }
         try ensureOpen()
         let (bytes, response) = try await perform(post(body, headers: headers))
         bytes.task.cancel()
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? 0
+        if status == 401 || status == 403 { throw await authorizationFailure(status: status, response: http) }
         guard (200..<300).contains(status) else { throw MCPError.http(status: status, body: "") }
     }
 

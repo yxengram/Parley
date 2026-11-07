@@ -127,15 +127,25 @@ public struct MCPServerSecrets: Codable, Hashable, Sendable {
     public var url: String = ""
     public var env: [String: String] = [:]
     public var headers: [String: String] = [:]
+    /// Sign-in with a client registered by hand. Empty: Parley registers one if the provider allows.
+    /// An https URL works as a Client ID Metadata Document, on a provider that says it accepts them.
+    public var oauthClientID: String = ""
+    public var oauthClientSecret: String = ""
+    /// For a provider that needs the exact redirect URI registered. Nil: a free port.
+    public var oauthCallbackPort: Int?
 
-    public init(args: [String] = [], url: String = "", env: [String: String] = [:], headers: [String: String] = [:]) {
+    public init(args: [String] = [], url: String = "", env: [String: String] = [:], headers: [String: String] = [:],
+                oauthClientID: String = "", oauthClientSecret: String = "", oauthCallbackPort: Int? = nil) {
         self.args = args
         self.url = url
         self.env = env
         self.headers = headers
+        self.oauthClientID = oauthClientID
+        self.oauthClientSecret = oauthClientSecret
+        self.oauthCallbackPort = oauthCallbackPort
     }
 
-    private enum CodingKeys: String, CodingKey { case args, url, env, headers }
+    private enum CodingKeys: String, CodingKey { case args, url, env, headers, oauthClientID, oauthClientSecret, oauthCallbackPort }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -143,6 +153,14 @@ public struct MCPServerSecrets: Codable, Hashable, Sendable {
         url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
         env = try c.decodeIfPresent([String: String].self, forKey: .env) ?? [:]
         headers = try c.decodeIfPresent([String: String].self, forKey: .headers) ?? [:]
+        oauthClientID = try c.decodeIfPresent(String.self, forKey: .oauthClientID) ?? ""
+        oauthClientSecret = try c.decodeIfPresent(String.self, forKey: .oauthClientSecret) ?? ""
+        oauthCallbackPort = try c.decodeIfPresent(Int.self, forKey: .oauthCallbackPort)
+    }
+
+    /// A static Authorization header means this server does not use sign-in: no button, no token.
+    public var usesStaticAuthorization: Bool {
+        headers.keys.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "authorization" }
     }
 
     /// The first header that could not be sent as written: a line break would let a pasted value

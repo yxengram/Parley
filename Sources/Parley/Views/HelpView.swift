@@ -43,7 +43,7 @@ struct HelpView: View {
                     "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call.",
                     "Tool results stay in the conversation, encrypted when the conversation is. They are sent again with every message, like images. Regenerate does not undo what a tool did, and the model may run it again.",
                     "A local server is a program that runs on your Mac with your permissions, so add only servers you trust. Tool names, descriptions and parameters go to the model's provider with every request, tool or no tool call; arguments and results go to the server and to the model's provider. npx and uvx contact their package registries themselves.",
-                    "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers for sign-in. Resources, prompts, sampling, elicitation, OAuth and the old HTTP+SSE transport are not supported.",
+                    "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported.",
                 ])
 
                 section("Encryption", "lock", [
@@ -59,7 +59,7 @@ struct HelpView: View {
                 ])
 
                 section("Privacy", "hand.raised", [
-                    "Parley only contacts the API endpoints and MCP servers you configure. No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.",
+                    "Parley only contacts the API endpoints and MCP servers you configure, and sign-in providers you approve. No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.",
                     "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.",
                 ])
             }

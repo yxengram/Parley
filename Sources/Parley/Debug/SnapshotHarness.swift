@@ -150,10 +150,10 @@ enum SnapshotHarness {
     static func mcpServices() -> (host: MCPToolHost, secrets: MCPSecretStore) {
         let secrets = mcpSecrets
         guard launchCheckCommand != nil else {
-            return (MCPConnectionManager(secrets: secrets, pathResolver: ShellPATHResolver(shell: "/usr/bin/true")), secrets)
+            return (MCPConnectionManager(secrets: secrets, oauthStore: InMemoryMCPOAuthStore(), pathResolver: ShellPATHResolver(shell: "/usr/bin/true")), secrets)
         }
         // Everything but the secret store as in the shipped app: that is what the check is about.
-        return (MCPConnectionManager(secrets: secrets, pathResolver: ShellPATHResolver(shell: setting("PARLEY_SNAPSHOT_LAUNCH_SHELL"))), secrets)
+        return (MCPConnectionManager(secrets: secrets, oauthStore: InMemoryMCPOAuthStore(), pathResolver: ShellPATHResolver(shell: setting("PARLEY_SNAPSHOT_LAUNCH_SHELL"))), secrets)
     }
 
     private static let mcpSecrets = InMemoryMCPSecretStore()

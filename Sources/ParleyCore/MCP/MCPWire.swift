@@ -51,6 +51,13 @@ public enum MCPError: LocalizedError, Equatable {
     case rpc(code: Int, message: String, data: JSONValue?)
     case http(status: Int, body: String)
     case needsAuthorization(status: Int)
+    /// A refusal on a server that cannot sign in: it has a static Authorization header, or it is plain
+    /// http off this Mac.
+    case credentialsRefused(status: Int)
+    /// A Bearer 403 with `insufficient_scope`: the sign-in is fine, it does not reach far enough.
+    case insufficientScope
+    /// Sign-in itself failed. Fixed text only.
+    case oauth(MCPOAuthFailure)
     case refusedRedirect(String)
     case messageTooLarge
     case invalidResponse(String)
@@ -87,7 +94,15 @@ public enum MCPError: LocalizedError, Equatable {
             return code == 0 ? "The server reported an error: \(message)" : "The server reported an error (\(code)): \(message)"
         case .http(let status, let body): return "HTTP \(status): \(body)"
         case .needsAuthorization(let status):
-            return "The server refused the request (HTTP \(status)). Parley does not do OAuth; add a static Authorization header if the server accepts one."
+            if status == 401 {
+                return "This server needs you to sign in. Press Sign In in Settings > MCP, or add a static Authorization header if the server accepts one."
+            }
+            return "The server refused the request (HTTP \(status)). Check your access to this server and any headers set for it."
+        case .credentialsRefused(let status):
+            return "The server refused the request (HTTP \(status)). Check this server's Authorization header. Sign-in needs https."
+        case .insufficientScope:
+            return "This server needs more permission for that. Press Sign In in Settings > MCP to grant it."
+        case .oauth(let failure): return failure.text
         case .refusedRedirect(let line): return line
         case .messageTooLarge: return "The server sent a message over 16 MB."
         case .invalidResponse(let why): return "The server sent an invalid response: \(why)"

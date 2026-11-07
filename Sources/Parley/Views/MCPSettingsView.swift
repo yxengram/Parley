@@ -146,6 +146,9 @@ struct MCPServerDraft: Equatable {
     var callTimeout = ""
     var startupTimeout = ""
     var maxResultCharacters = ""
+    var oauthClientID = ""
+    var oauthClientSecret = ""
+    var oauthCallbackPort = ""
 
     init() {}
 
@@ -164,6 +167,9 @@ struct MCPServerDraft: Equatable {
         callTimeout = config.callTimeout.map { String(Int($0)) } ?? ""
         startupTimeout = config.startupTimeout.map { String(Int($0)) } ?? ""
         maxResultCharacters = config.maxResultCharacters.map(String.init) ?? ""
+        oauthClientID = secrets.oauthClientID
+        oauthClientSecret = secrets.oauthClientSecret
+        oauthCallbackPort = secrets.oauthCallbackPort.map(String.init) ?? ""
     }
 
     private static func values(_ pairs: [Pair]) -> [String: String] {
@@ -203,6 +209,9 @@ struct MCPServerDraft: Equatable {
             let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
             secrets.url = trimmed
             secrets.headers = Self.values(headers)
+            secrets.oauthClientID = oauthClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+            secrets.oauthClientSecret = oauthClientSecret
+            secrets.oauthCallbackPort = Self.positive(oauthCallbackPort)
             config.urlHost = URLComponents(string: trimmed)?.host ?? ""
             config.headerNames = secrets.headers.keys.sorted()
             config.command = ""
@@ -230,6 +239,10 @@ struct MCPServerDraft: Equatable {
             guard let scheme = comps?.scheme?.lowercased(), scheme == "http" || scheme == "https",
                   let host = comps?.host, !host.isEmpty else {
                 return "Enter a full URL such as https://example.com/mcp."
+            }
+            let port = oauthCallbackPort.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !port.isEmpty, !(Int(port).map { (1024...65535).contains($0) } ?? false) {
+                return "The callback port is a number from 1024 to 65535. Leave it blank to use a free one."
             }
         } else if command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "Enter the program to run."
@@ -298,6 +311,11 @@ struct MCPServerEditor: View {
             statusSection
             connectionSection
             secretsSection
+            if isHTTP, loaded {
+                MCPSignInSection(serverID: serverID, draft: $draft, needsAttention: snapshot?.signInNeed ?? .none) {
+                    draft.problem == nil && (!isDirty || save())
+                }
+            }
             useSection
             toolsSection
         }

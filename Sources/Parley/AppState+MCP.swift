@@ -104,6 +104,12 @@ extension AppState {
         if previous != nil, changed || !config.isEnabled {
             stopServer(config.id)
         }
+        // A sign-in is for one address.
+        if let previousSecrets, previousSecrets.url != secrets.url {
+            let mcp = self.mcp
+            let id = config.id
+            Task { await mcp.forgetSignIn(serverID: id) }
+        }
         return config
     }
 
@@ -137,5 +143,29 @@ extension AppState {
     func stopServer(_ id: UUID) {
         let mcp = self.mcp
         Task { await mcp.stop(serverID: id) }
+    }
+
+    // MARK: - Sign-in
+
+    /// Sign In in Settings: the one way any discovery happens. Parley cannot tell which account was
+    /// chosen in the browser, so approvals given under the last sign-in end before the new token
+    /// can be used, not after: a reply in its tool loop would run them under the new account.
+    func signIn(_ id: UUID, approve: @escaping MCPOAuthApprove) async throws {
+        guard let server = mcpServer(id) else { throw MCPError.notConfigured }
+        try await mcp.signIn(server, approve: approve, open: { url in
+            await MainActor.run { NSWorkspace.shared.open(url) }
+        }, willSignIn: { [weak self] in
+            await self?.resetApprovals(serverID: id)
+        })
+        // As the server is now: the browser can take minutes.
+        if let current = mcpServer(id), current.isEnabled { _ = await mcp.connect(current) }
+    }
+
+    func signOut(_ id: UUID) async throws {
+        try await mcp.signOut(serverID: id)
+    }
+
+    func signInInfo(_ id: UUID) async -> MCPSignInInfo? {
+        await mcp.signInInfo(serverID: id)
     }
 }

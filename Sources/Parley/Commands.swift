@@ -195,7 +195,7 @@ struct HelpCommand: View {
 enum AboutPanel {
     static func show() {
         let credits = NSAttributedString(
-            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints and MCP servers you configure. No telemetry; conversations stay in files on this Mac.",
+            string: "A private chat client for OpenAI-compatible APIs.\nParley only contacts the API endpoints and MCP servers you configure, and sign-in providers you approve. No telemetry; conversations stay in files on this Mac.",
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11),
                 .foregroundColor: NSColor.secondaryLabelColor,

@@ -6,7 +6,7 @@
 ```bash
 ./build.sh            # 生成 build/Parley.app（ad-hoc 签名）
 open build/Parley.app
-swift test            # 623 个测试：核心层 467 个，App 层 156 个；集成测试会自动启动 tools/mock_server.py 和 tools/mock_mcp_server.py
+swift test            # 746 个测试：核心层 581 个，App 层 165 个；集成测试会自动启动 tools/mock_server.py 和 tools/mock_mcp_server.py
 ```
 只装了 Command Line Tools 就能构建，不需要 Xcode。
 
@@ -36,9 +36,20 @@ Parley 是 MCP 客户端：它连接你配置的 MCP 服务器，把服务器的
 **支持什么**
 - 传输：stdio（本机命令）和 Streamable HTTP（远程 URL）。
 - 能力：只有 tools。
-- HTTP 认证：只有固定的请求头（例如 `Authorization: Bearer …`）。
+- HTTP 认证：固定的请求头（例如 `Authorization: Bearer …`），或在浏览器里登录（OAuth，遵循 MCP 2026-07-28 授权规范，使用 PKCE）。
 
-**不支持什么**：resources、prompts、sampling、elicitation、OAuth，以及已废弃的 HTTP+SSE 传输（导入这种配置时会明确说不支持）。服务器要求 OAuth 时，会显示 401/403 的说明；只有服务器接受固定的 Authorization 头时才能用。工具结果里的图片、音频和二进制内容不会发给模型，结果下方会注明。
+**不支持什么**：resources、prompts、sampling、elicitation，以及已废弃的 HTTP+SSE 传输（导入这种配置时会明确说不支持）。工具结果里的图片、音频和二进制内容不会发给模型，结果下方会注明。
+
+**登录（OAuth）**
+- 服务器要求登录时，连接会停在 401，只显示“需要登录”，不会查询任何东西。只有你在**设置 → MCP**里按下 **Sign In**，Parley 才开始查找登录信息（`.well-known`）。
+- 除 MCP 服务器以外的主机，Parley 都会先在确认框里列出主机名和它会收到什么，你同意后才会联系。如果登录服务商不是 MCP 服务器本身，确认框会提醒：这个服务器将持有该服务商签发的令牌，这个令牌可能在服务器之外也能用。
+- 服务商可能要求注册客户端。没有填写 Client ID 时，Parley 会自动注册，服务商会收到名称 Parley 和一个本机地址，并留下一条记录。GitHub 这类需要手工注册的服务商，请填写 Client ID 和 Client Secret，并把编辑页显示的重定向地址登记到服务商那里；需要固定端口时可以填写 Callback Port。
+- 服务器地址（含路径）会发给服务商，也会留在浏览器历史里，历史可能会同步。这是规范要求的，确认框每次都会说明。URL 里带用户名或密码时不能登录；非本机的纯 http 服务器也不能登录，因为令牌会明文传输。
+- 令牌只保存在登录钥匙串里（不同步），不会写入 UserDefaults、会话文件或日志。只在你发送消息或点 Connect 时才会刷新，不会定时刷新。如果服务商支持，Parley 会申请长期访问（`offline_access`）。
+- Sign Out 只删除本机的令牌，不联系服务商；关闭连接时仍会向 MCP 服务器发送结束会话的 DELETE。修改 URL 或删除服务器时，令牌也会删除。
+- Parley 看不到你在浏览器里选了哪个账号，所以每次登录都会清除这个服务器的“总是允许”。
+- 服务器需要更多权限时不会自动打开任何东西，再按一次 Sign In，确认框会标出新增的权限。
+- 设置了固定的 `Authorization` 头时，这个服务器不使用登录，固定请求头的行为不变。其他固定请求头只发给 MCP 服务器，不发给登录服务商。
 
 **配置**
 1. 打开**设置 → MCP**，点 `+` 填写，或点 **Import…** 粘贴其他 MCP 客户端的配置（`{"mcpServers":{…}}`、VS Code 的 `{"servers":{…}}`，或只有里面的部分）。Parley 不会读取其他应用的配置文件，只看你粘贴的文字。导入前逐项显示完整的命令或 URL、工作目录、危险写法（`sudo`、`curl … | sh`、指向 `~/.ssh` 等）、会改变实际运行代码的环境变量及其值（`PATH`、`DYLD_*`、`NODE_OPTIONS` 等）和隐藏了值的其他变量名；有危险提示的服务器默认不勾选，提示也会留在编辑页里。`${VAR}` 不展开，按原样保存。命令里写了整条命令行（程序名后带空格和参数）的条目不能导入，因为命令名保存在偏好设置里，不在钥匙串里；配置里写了 `"disabled": true` 的服务器导入后保持关闭。
@@ -98,7 +109,7 @@ Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做�
 - 密码只在解锁时用来派生密钥，之后只有密钥保存在内存里。“锁定”会把密钥从内存中清除。
 
 ## 隐私
-- 网络请求只发往你配置的 API 地址和 MCP 服务器，并且会拒绝 HTTP 重定向。URLSession 是 ephemeral 模式：没有缓存，也没有 cookie。
+- 网络请求只发往你配置的 API 地址、MCP 服务器，以及你在 Sign In 确认框里同意的登录主机，并且会拒绝 HTTP 重定向。URLSession 是 ephemeral 模式：没有缓存，也没有 cookie。
 - MCP 服务器是你自己配置的目的地。工具的参数和结果会发给这些服务器，**也会发给模型的服务商**。只要对话启用了服务器，每个请求都会把工具名（包括 `<服务器名>__<工具名>` 里的服务器名）、描述和参数定义发给模型的服务商，即使这次没有调用任何工具。stdio 服务器是以你的权限在这台 Mac 上运行的程序，只添加你信任的。Parley 没有服务器目录，不查询任何注册表，不自动发现服务器，也不读取其他应用的 MCP 配置；但你配置的程序自己可能联网，例如 `npx -y` 和 `uvx` 会访问各自的软件包仓库。服务器发来的工具描述只作为该工具的 `description` 交给模型，界面上标明来自服务器，不会当作 Parley 自己的话，也不按 Markdown 渲染。
 - 读取上下文长度只会向同一个服务器（相同的协议、主机和端口）发送只读 GET 请求，超时 5 秒，失败时静默忽略。LM Studio、Strata 引擎（`/health`）、llama.cpp、Ollama 的原生接口只对本机、局域网或 Tailscale 地址（或模型列表显示是 LM Studio/llama.cpp/Strata 时）尝试；Strata 共享端口除了模型列表什么都不问，`/slots` 永远不读。不会查询任何第三方的模型数据库。
 - 聊天请求会附带 `stream_options: {include_usage: true}` 以获得 token 统计；如果服务器以 400/422 拒绝这个字段，会去掉它重试一次，并在本次运行中记住。

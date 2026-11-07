@@ -95,6 +95,34 @@ public enum MCPServerState: Sendable, Equatable {
     case failed(String)
 }
 
+/// What a server's sign-in needs from the user.
+public enum MCPSignInNeed: Sendable, Equatable {
+    case none
+    /// A 401, or a sign-in that ended.
+    case signIn
+    /// `insufficient_scope`: the next Sign In asks for more.
+    case moreAccess
+    /// A renewed token could not be saved to the Keychain, so it lasts until Parley quits.
+    case notSaved
+}
+
+/// A stored sign-in, for the editor. Nothing here is secret.
+public struct MCPSignInInfo: Sendable, Equatable {
+    /// The provider's host.
+    public var provider: String
+    public var scopes: [String]
+
+    public init(provider: String, scopes: [String]) {
+        self.provider = provider
+        self.scopes = scopes
+    }
+
+    /// Host and port of a provider URL, as the sheet shows it.
+    public static func authority(ofURL text: String) -> String {
+        URL(string: text).flatMap(MCPOAuthPolicy.authority) ?? text
+    }
+}
+
 public struct MCPServerSnapshot: Sendable, Equatable {
     public var serverID: UUID
     public var state: MCPServerState
@@ -105,9 +133,11 @@ public struct MCPServerSnapshot: Sendable, Equatable {
     /// Tools the server listed that Parley cannot use: (name, reason).
     public var hiddenTools: [MCPHiddenTool]
     public var isRunning: Bool
+    public var signInNeed: MCPSignInNeed
 
     public init(serverID: UUID, state: MCPServerState = .stopped, protocolVersion: String? = nil, serverInfo: String? = nil,
-                tools: [MCPTool] = [], hiddenTools: [MCPHiddenTool] = [], isRunning: Bool = false) {
+                tools: [MCPTool] = [], hiddenTools: [MCPHiddenTool] = [], isRunning: Bool = false,
+                signInNeed: MCPSignInNeed = .none) {
         self.serverID = serverID
         self.state = state
         self.protocolVersion = protocolVersion
@@ -115,6 +145,7 @@ public struct MCPServerSnapshot: Sendable, Equatable {
         self.tools = tools
         self.hiddenTools = hiddenTools
         self.isRunning = isRunning
+        self.signInNeed = signInNeed
     }
 }
 
@@ -139,4 +170,32 @@ public protocol MCPToolHost: AnyObject, Sendable {
     /// Quit and tests. Synchronous, thread-safe, bounded by about 3 × grace + 1 s, and instant
     /// when nothing runs.
     func shutdownSync(grace: TimeInterval)
+
+    /// User pressed Sign In: the only way any discovery happens. Throws MCPError. The next request
+    /// carries the new token. Connecting is the caller's, with the config as it is by then: the
+    /// browser can take minutes, and the server may have been switched off meanwhile.
+    func signIn(_ server: MCPServerConfig, approve: @escaping MCPOAuthApprove, open: @escaping MCPOAuthOpen,
+                willSignIn: @escaping MCPOAuthWillSignIn) async throws
+    /// Closes the connection, then removes the token. Contacts no sign-in provider. Throws when the
+    /// Keychain refused, so "signed out" is never shown over a token that is still there.
+    func signOut(serverID: UUID) async throws
+    /// The server's URL changed: a sign-in is for one address. Leaves the connection alone, so it
+    /// does not disturb a Connect pressed right after the save.
+    func forgetSignIn(serverID: UUID) async
+    /// The stored sign-in, if any. Reads the Keychain: only when the editor opens.
+    func signInInfo(serverID: UUID) async -> MCPSignInInfo?
+}
+
+/// Hosts that have no sign-in: test doubles.
+public extension MCPToolHost {
+    func signIn(_ server: MCPServerConfig, approve: @escaping MCPOAuthApprove, open: @escaping MCPOAuthOpen,
+                willSignIn: @escaping MCPOAuthWillSignIn) async throws {
+        throw MCPError.notConfigured
+    }
+
+    func signOut(serverID: UUID) async throws {}
+
+    func forgetSignIn(serverID: UUID) async {}
+
+    func signInInfo(serverID: UUID) async -> MCPSignInInfo? { nil }
 }

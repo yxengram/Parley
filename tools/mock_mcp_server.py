@@ -13,7 +13,8 @@ Eras (a 2026-07-28 "modern" server is stateless and has no initialize; a "legacy
 
 The HTTP mock binds 127.0.0.1 only. POST / takes messages; GET / is 405; DELETE ends a session.
 Mock routes: GET /mock/log (every message received, with its headers, as JSON), POST
-/mock/expire-sessions, POST /mock/refuse-initialize (the next initialize is a 503).
+/mock/expire-sessions, POST /mock/refuse-initialize (the next initialize is a 503). With the oauth
+behavior it also serves the metadata documents, /authorize, /token and /register.
 
 Every message received is logged as one JSON line to --log-file. Nothing is ever sent anywhere.
 
@@ -50,6 +51,27 @@ Behaviors (--behaviors, comma separated):
            ends), redirect (307), 401, no-delete
            (DELETE is 405), huge-message (a 17 MiB answer), drop-mid-call, header-mismatch (the
            first tools/call is a 400 -32020)
+ oauth     oauth (the server at /mcp needs a Bearer token, and this process is also its
+           authorization server). Everything below needs oauth too:
+           oauth-no-header (a challenge without resource_metadata), oauth-root-metadata (the
+           path-inserted document is a 404; the root one names the origin), oauth-wrong-issuer,
+           oauth-no-s256, oauth-wrong-iss (the callback's iss is another issuer), oauth-no-iss
+           (metadata promises iss, the callback leaves it out), oauth-wrong-resource,
+           oauth-no-registration, oauth-no-refresh (no refresh_token issued), oauth-keep-refresh
+           (refresh answers without a new refresh_token), oauth-invalid-grant (every refresh is
+           refused), oauth-invalid-client (the same with invalid_client), oauth-refresh-500,
+           oauth-slow-refresh (refresh takes a second), oauth-short-lived (expires_in 30, so the
+           next use refreshes), oauth-no-expiry (no expires_in), oauth-echo (a tool result and an
+           error body quote the Authorization header), oauth-step-up (add needs scope files:write;
+           a 403 insufficient_scope otherwise), oauth-confidential (registration returns a secret,
+           /token wants it by Basic), oauth-other-metadata (resource_metadata is on
+           MOCK_OTHER_PORT), oauth-other-issuer (authorization_servers names MOCK_OTHER_PORT),
+           oauth-other-token (the token endpoint is on localhost:MOCK_OTHER_PORT),
+           oauth-plain-endpoint (the token endpoint is http://example.invalid), oauth-denied
+           (the callback carries error=access_denied), oauth-bearer-403 (add is a 403 with a
+           Bearer invalid_token challenge), oauth-no-scope (nothing names a scope),
+           oauth-long-error (the error body has the Authorization header across 2000 characters)
+           POST /mock/expire-tokens ends every access token.
 
 A grandchild (spawn_child) sleeps 30 s and then exits: a test that fails cannot leak it for long,
 and it does not watch its parent, so only the process group can stop it sooner.
@@ -57,6 +79,7 @@ and it does not watch its parent, so only the process group can stop it sooner.
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import signal
@@ -66,6 +89,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODERN = "2026-07-28"
@@ -495,7 +519,243 @@ def decode_header(value):
     return value
 
 
-class Handler(BaseHTTPRequestHandler):
+# OAuth: written from the MCP 2026-07-28 authorization pages. Everything is fake and in memory.
+class OAuthState:
+    next_id = 0
+    codes = {}          # code -> what the authorization request said
+    access = {}         # access token -> {"resource", "scopes"}
+    refresh = {}        # refresh token -> {"client_id", "resource", "scopes"}
+    spent = set()       # refresh tokens already used
+    clients = {}        # client_id -> {"redirect_uris", "secret"}
+
+
+def oauth_id(prefix):
+    OAuthState.next_id += 1
+    # RFC 6750 tokens may hold / and +.
+    return "%s-%d-%s/a+b" % (prefix, OAuthState.next_id, base64.urlsafe_b64encode(os.urandom(12)).decode().rstrip("="))
+
+
+def issue_tokens(resource, scopes, client_id):
+    access = oauth_id("fake-access")
+    answer = {"access_token": access, "token_type": "Bearer", "scope": " ".join(scopes)}
+    if "oauth-short-lived" in BEHAVIORS:
+        answer["expires_in"] = 30
+    elif "oauth-no-expiry" not in BEHAVIORS:
+        answer["expires_in"] = 3600
+    OAuthState.access[access] = {"resource": resource, "scopes": scopes}
+    return answer
+
+
+def add_refresh(answer, resource, scopes, client_id):
+    if "oauth-no-refresh" in BEHAVIORS:
+        return
+    token = oauth_id("fake-refresh")
+    OAuthState.refresh[token] = {"client_id": client_id, "resource": resource, "scopes": scopes}
+    answer["refresh_token"] = token
+
+
+class OAuthRoutes:
+    """Mixed into Handler. Each method answers one route."""
+
+    def origin(self):
+        return "http://127.0.0.1:%d" % self.server.server_address[1]
+
+    def other_origin(self):
+        return "http://127.0.0.1:%d" % int(os.environ.get("MOCK_OTHER_PORT") or 1)
+
+    def issuer(self):
+        return self.other_origin() if "oauth-other-issuer" in BEHAVIORS else self.origin()
+
+    def challenge(self, extra=""):
+        parts = ["Bearer"]
+        fields = []
+        if "oauth-no-header" not in BEHAVIORS:
+            base = self.other_origin() if "oauth-other-metadata" in BEHAVIORS else self.origin()
+            fields.append('resource_metadata="%s/.well-known/oauth-protected-resource/mcp"' % base)
+        if "oauth-no-scope" not in BEHAVIORS:
+            fields.append('scope="files:read"')
+        if extra:
+            fields.append(extra)
+        return parts[0] + " " + ", ".join(fields)
+
+    def bearer_refused(self, message):
+        """Sends the answer when the request may not go on. A modern-only server refuses a legacy
+        initialize before it looks at any token."""
+        params = (message or {}).get("params") or {}
+        if ARGS.era == "modern" and not is_modern_request(params):
+            return False
+        header = self.headers.get("Authorization") or ""
+        token = header[7:] if header.startswith("Bearer ") else None
+        with LOCK:
+            grant = OAuthState.access.get(token)
+        if grant is None or grant["resource"] not in (self.origin(), self.origin() + "/mcp"):
+            self.send_json(401, {"error": "unauthorized"}, {"WWW-Authenticate": self.challenge()})
+            return True
+        if "oauth-bearer-403" in BEHAVIORS and (message or {}).get("method") == "tools/call" and params.get("name") == "add":
+            self.send_json(403, {"error": "forbidden"}, {"WWW-Authenticate": 'Bearer error="invalid_token"'})
+            return True
+        if "oauth-step-up" in BEHAVIORS and (message or {}).get("method") == "tools/call" \
+                and params.get("name") == "add" and "files:write" not in grant["scopes"]:
+            self.send_json(403, {"error": "forbidden"}, {"WWW-Authenticate": self.challenge(
+                'error="insufficient_scope", error_description="more please"').replace("files:read", "files:write")})
+            return True
+        return False
+
+    def protected_resource(self, root):
+        if root and "oauth-root-metadata" not in BEHAVIORS and "oauth-no-header" not in BEHAVIORS:
+            self.send_empty(404)
+            return
+        if not root and "oauth-root-metadata" in BEHAVIORS:
+            self.send_empty(404)
+            return
+        resource = self.origin() if root else self.origin() + "/mcp"
+        if "oauth-wrong-resource" in BEHAVIORS:
+            resource = "http://127.0.0.1:1/elsewhere"
+        document = {"resource": resource, "authorization_servers": [self.issuer()]}
+        if "oauth-no-scope" not in BEHAVIORS:
+            document["scopes_supported"] = ["files:read"]
+        self.send_json(200, document)
+
+    def server_metadata(self):
+        origin = self.origin()
+        token = origin + "/token"
+        if "oauth-other-token" in BEHAVIORS:
+            token = "http://localhost:%d/token" % int(os.environ.get("MOCK_OTHER_PORT") or 1)
+        if "oauth-plain-endpoint" in BEHAVIORS:
+            token = "http://example.invalid/token"
+        document = {
+            "issuer": "https://honest.example" if "oauth-wrong-issuer" in BEHAVIORS else origin,
+            "authorization_endpoint": origin + "/authorize",
+            "token_endpoint": token,
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "token_endpoint_auth_methods_supported": ["none", "client_secret_basic"],
+            "scopes_supported": ["files:read", "files:write", "offline_access"],
+            "authorization_response_iss_parameter_supported": True,
+        }
+        if "oauth-no-s256" not in BEHAVIORS:
+            document["code_challenge_methods_supported"] = ["S256"]
+        if "oauth-no-registration" not in BEHAVIORS:
+            document["registration_endpoint"] = origin + "/register"
+        self.send_json(200, document)
+
+    def authorize(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        one = lambda name: (query.get(name) or [None])[0]
+        needed = ("response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "resource")
+        if any(one(name) is None for name in needed) or one("code_challenge_method") != "S256" or one("response_type") != "code":
+            self.send_json(400, {"error": "invalid_request"})
+            return
+        client = OAuthState.clients.get(one("client_id"))
+        if client is not None and one("redirect_uri") not in client["redirect_uris"]:
+            self.send_json(400, {"error": "invalid_request", "error_description": "redirect_uri mismatch"})
+            return
+        code = oauth_id("fake-code")
+        with LOCK:
+            OAuthState.codes[code] = {name: one(name) for name in needed + ("scope",)}
+        if "oauth-denied" in BEHAVIORS:
+            fields = {"error": "access_denied", "error_description": "the fake-secret-description", "state": one("state"), "iss": self.origin()}
+        else:
+            fields = {"code": code, "state": one("state"), "iss": self.origin()}
+        if "oauth-wrong-iss" in BEHAVIORS:
+            fields["iss"] = "https://attacker.example"
+        if "oauth-no-iss" in BEHAVIORS:
+            del fields["iss"]
+        self.send_response(302)
+        self.send_header("Location", one("redirect_uri") + "?" + urllib.parse.urlencode(fields))
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def register(self, raw):
+        try:
+            body = json.loads(raw.decode("utf-8"))
+        except ValueError:
+            body = {}
+        self.log_request_event("POST", body)
+        client_id = oauth_id("fake-client")
+        answer = {"client_id": client_id, "redirect_uris": body.get("redirect_uris"), "token_endpoint_auth_method": "none"}
+        secret = None
+        if "oauth-confidential" in BEHAVIORS:
+            secret = oauth_id("fake-client-secret")
+            answer["client_secret"] = secret
+            answer["token_endpoint_auth_method"] = "client_secret_basic"
+        with LOCK:
+            OAuthState.clients[client_id] = {"redirect_uris": body.get("redirect_uris") or [], "secret": secret}
+        self.send_json(201, answer)
+
+    def client_refused(self, client_id):
+        client = OAuthState.clients.get(client_id)
+        secret = client and client["secret"]
+        if not secret:
+            return False
+        header = self.headers.get("Authorization") or ""
+        try:
+            sent = base64.b64decode(header[6:]).decode("utf-8") if header.startswith("Basic ") else ""
+        except ValueError:
+            sent = ""
+        # RFC 6749 2.3.1: both parts are form-encoded.
+        name, _, value = sent.partition(":")
+        if urllib.parse.unquote_plus(name) == client_id and urllib.parse.unquote_plus(value) == secret:
+            return False
+        self.send_json(401, {"error": "invalid_client"})
+        return True
+
+    def token(self, raw):
+        form = {k: v[0] for k, v in urllib.parse.parse_qs(raw.decode("utf-8"), keep_blank_values=True).items()}
+        self.log_request_event("POST", form)
+        grant = form.get("grant_type")
+        if self.client_refused(form.get("client_id")):
+            return
+        if grant == "authorization_code":
+            with LOCK:
+                record = OAuthState.codes.pop(form.get("code"), None)
+            if record is None:
+                self.send_json(400, {"error": "invalid_grant"})
+                return
+            digest = hashlib.sha256((form.get("code_verifier") or "").encode()).digest()
+            challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+            if challenge != record["code_challenge"] or form.get("redirect_uri") != record["redirect_uri"] \
+                    or form.get("resource") != record["resource"] or form.get("client_id") != record["client_id"]:
+                self.send_json(400, {"error": "invalid_grant"})
+                return
+            scopes = (record.get("scope") or "").split()
+            with LOCK:
+                answer = issue_tokens(record["resource"], scopes, record["client_id"])
+                add_refresh(answer, record["resource"], scopes, record["client_id"])
+            self.send_json(200, answer)
+            return
+        if grant == "refresh_token":
+            if "oauth-slow-refresh" in BEHAVIORS:
+                time.sleep(1)
+            if "oauth-refresh-500" in BEHAVIORS:
+                self.send_json(500, {})
+                return
+            if "oauth-invalid-client" in BEHAVIORS:
+                self.send_json(401, {"error": "invalid_client"})
+                return
+            old = form.get("refresh_token")
+            with LOCK:
+                record = OAuthState.refresh.get(old)
+                reused = old in OAuthState.spent
+                if record is not None and "oauth-keep-refresh" not in BEHAVIORS:
+                    del OAuthState.refresh[old]
+                    OAuthState.spent.add(old)
+            if "oauth-invalid-grant" in BEHAVIORS or reused or record is None:
+                self.send_json(400, {"error": "invalid_grant"})
+                return
+            if form.get("resource") != record["resource"] or form.get("client_id") != record["client_id"]:
+                self.send_json(400, {"error": "invalid_target"})
+                return
+            with LOCK:
+                answer = issue_tokens(record["resource"], record["scopes"], record["client_id"])
+                if "oauth-keep-refresh" not in BEHAVIORS:
+                    add_refresh(answer, record["resource"], record["scopes"], record["client_id"])
+            self.send_json(200, answer)
+            return
+        self.send_json(400, {"error": "unsupported_grant_type"})
+
+
+class Handler(OAuthRoutes, BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format, *args):  # noqa: A002
@@ -530,10 +790,28 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, events)
             return
         self.log_request_event("GET", None)
+        if "oauth" in BEHAVIORS:
+            path = urllib.parse.urlsplit(self.path).path
+            if path == "/.well-known/oauth-protected-resource/mcp":
+                self.protected_resource(root=False)
+                return
+            if path == "/.well-known/oauth-protected-resource":
+                self.protected_resource(root=True)
+                return
+            if path == "/.well-known/oauth-authorization-server":
+                self.server_metadata()
+                return
+            if path == "/authorize":
+                self.authorize()
+                return
+            self.send_empty(404)
+            return
         self.send_empty(405)
 
     def do_DELETE(self):
         self.log_request_event("DELETE", None)
+        if "oauth" in BEHAVIORS and self.bearer_refused(None):
+            return
         if "no-delete" in BEHAVIORS:
             self.send_empty(405)
             return
@@ -555,6 +833,17 @@ class Handler(BaseHTTPRequestHandler):
             REFUSE_INITIALIZE = True
             self.send_empty(204)
             return
+        if self.path == "/mock/expire-tokens":
+            with LOCK:
+                OAuthState.access.clear()
+            self.send_empty(204)
+            return
+        if "oauth" in BEHAVIORS and self.path == "/register":
+            self.register(raw)
+            return
+        if "oauth" in BEHAVIORS and self.path == "/token":
+            self.token(raw)
+            return
         try:
             message = json.loads(raw.decode("utf-8") or "{}")
         except ValueError:
@@ -562,6 +851,23 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.log_request_event("POST", message)
 
+        if "oauth" in BEHAVIORS and self.bearer_refused(message):
+            return
+        if "oauth-echo" in BEHAVIORS and message.get("method") == "tools/call":
+            seen = "you sent " + (self.headers.get("Authorization") or "")
+            if (message.get("params") or {}).get("name") == "add":
+                if "oauth-long-error" in BEHAVIORS:
+                    seen = "x" * 1985 + seen
+                # As PHP's json_encode writes it.
+                body = json.dumps({"error": seen}).replace("/", "\\/").encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_json(200, {"jsonrpc": "2.0", "id": message.get("id"), "result": text_result(seen)})
+            return
         if "401" in BEHAVIORS:
             self.send_json(401, {"error": "unauthorized"}, {"WWW-Authenticate": 'Bearer resource_metadata="http://127.0.0.1:1/.well-known/x"'})
             return
