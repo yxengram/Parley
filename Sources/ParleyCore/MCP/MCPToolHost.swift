@@ -87,6 +87,11 @@ public struct MCPToolCatalog: Sendable {
         let matches = bindings.filter { folded($0.exposedName) == wanted }
         return matches.count == 1 ? matches[0] : nil
     }
+
+    /// Exact match only: a name read from model text must not land on a tool by being close to it.
+    public func exactBinding(forFunctionName name: String) -> MCPToolBinding? {
+        bindings.first { $0.exposedName == name }
+    }
 }
 
 public enum MCPServerState: Sendable, Equatable {

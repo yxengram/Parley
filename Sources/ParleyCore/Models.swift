@@ -94,6 +94,10 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     public var toolNotes: [ToolNote]?
     /// Estimated tokens of the tool definitions sent with this reply's requests.
     public var toolDefinitionTokens: Int?
+    /// ReAct: the Thought before a Final Answer. Not `reasoning`, because the model wrote it as text
+    /// and the rules for thinking do not apply (a "None" reply would look ignored, and the duration
+    /// would be wrong). Shown collapsed above the answer, never sent back, not in `visibleText`.
+    public var reactThought: String?
 
     public init(
         id: UUID = UUID(),
@@ -149,6 +153,13 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     /// MCP servers this conversation uses. Nil and [] both mean none. A list of ids only, so a
     /// conversation file can never name a command or URL.
     public var mcpServerIDs: [UUID]?
+    /// How tools reach the model. Nil is native `tools`, `toolModeReAct` is ReAct text. A String, so
+    /// a value a later version adds cannot stop this one decoding the file.
+    public var toolMode: String?
+
+    public static let toolModeReAct = "react"
+
+    public var usesReAct: Bool { toolMode == Self.toolModeReAct }
 
     public init(
         providerID: UUID? = nil,

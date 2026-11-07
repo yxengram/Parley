@@ -106,7 +106,7 @@ private func replyWithRound(final: String = "Done.") -> Message {
     @Test func newFieldsLeaveNoTraceInAConversationWithoutTools() throws {
         let conversation = Conversation(settings: ConversationSettings(model: "m"), messages: goldenHistory())
         let text = String(decoding: try ConversationFile.encode(conversation, encryption: nil), as: UTF8.self)
-        for key in ["toolRounds", "toolNotes", "toolDefinitionTokens", "mcpServerIDs"] {
+        for key in ["toolRounds", "toolNotes", "toolDefinitionTokens", "mcpServerIDs", "toolMode", "reactThought"] {
             #expect(!text.contains(key))
         }
     }

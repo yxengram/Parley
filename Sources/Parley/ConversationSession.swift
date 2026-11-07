@@ -42,6 +42,9 @@ struct PendingToolApproval: Equatable, Identifiable {
     /// Pretty JSON of what will be sent.
     let arguments: String
     let definitionChanged: Bool
+    /// ReAct: the call was read from the model's text, which can repeat tool output. Weaker evidence
+    /// than a structured call, so this card never offers Always Allow.
+    var readFromText = false
 }
 
 enum ToolApprovalDecision {
@@ -356,7 +359,8 @@ final class ConversationSession: Identifiable {
         saveNow()
 
         let messageID = placeholder.id
-        let target = ReplyTarget(provider: provider, model: model, waitsForServer: waitsForServer, servers: servers)
+        let target = ReplyTarget(provider: provider, model: model, waitsForServer: waitsForServer, servers: servers,
+                                 usesReAct: conversation.settings.usesReAct)
         streamTask = Task { [weak self] in
             await self?.runReply(client: client, history: history, options: options, messageID: messageID, target: target)
         }
@@ -368,6 +372,8 @@ final class ConversationSession: Identifiable {
         let waitsForServer: Bool
         /// Empty: no tools are offered and the request is today's.
         var servers: [MCPServerConfig]
+        /// `toolMode`, read once at the start of the reply.
+        let usesReAct: Bool
     }
 
     static func effectiveModel(settings: ConversationSettings, provider: Provider?) -> String {
@@ -378,6 +384,10 @@ final class ConversationSession: Identifiable {
 
     @ObservationIgnored private var liveAccumulator = StreamAccumulator()
     @ObservationIgnored private var liveMeter = GenerationMeter()
+    /// Set while the request in flight offers tools as ReAct text: the accumulator keeps the raw text
+    /// for the parser, and the message shows what this says. Nil for every other request, so a
+    /// request at the round cap, whose text is not parsed, shows as it came.
+    @ObservationIgnored private var liveReAct: ReActScanner?
     /// The in-flight request carries the "no thinking" fields (cleared when the server refused them).
     @ObservationIgnored private var liveSendsThinkingOff = false
     /// The server kind that request was shaped for (stored with an "ignored" note).
@@ -429,9 +439,10 @@ final class ConversationSession: Identifiable {
 
         var catalog: MCPToolCatalog?
         if !target.servers.isEmpty, let tools {
-            if info?.ignoresTools == true {
+            // ReAct sends no `tools`, so neither gate applies: those servers are what it is for.
+            if !target.usesReAct, info?.ignoresTools == true {
                 addNote(ToolNote.toolsNotOffered, to: messageID)
-            } else if let refusal = tools.refusal(target.provider, target.model) {
+            } else if !target.usesReAct, let refusal = tools.refusal(target.provider, target.model) {
                 addNote(ToolNote.toolsNotAccepted, refusal.message, to: messageID)
             } else {
                 replyPhase = .connecting(target.servers.map(\.name))
@@ -446,9 +457,16 @@ final class ConversationSession: Identifiable {
                 }
                 catalog = listed
                 if !listed.chatTools.isEmpty {
-                    options.tools = listed.chatTools
+                    var definitionTokens = listed.definitionTokens
+                    if target.usesReAct {
+                        let react = ReActRequest(tools: listed.chatTools, nonce: ReActPrompt.nonce(conversationID: conversation.id))
+                        options.react = react
+                        definitionTokens = ContextBudget.estimateTokens(ReActPrompt.block(tools: react.tools, nonce: react.nonce))
+                    } else {
+                        options.tools = listed.chatTools
+                    }
                     if let idx = index(of: messageID) {
-                        conversation.messages[idx].toolDefinitionTokens = listed.definitionTokens
+                        conversation.messages[idx].toolDefinitionTokens = definitionTokens
                     }
                 }
             }
@@ -480,18 +498,24 @@ final class ConversationSession: Identifiable {
 
             // The accumulated calls drive the loop, not finish_reason, except that a reply cut off
             // by "length" never runs them: its last call may be incomplete.
-            let calls = liveAccumulator.toolCalls.finalCalls(existingIDs: callIDs(in: messageID))
+            var calls = liveAccumulator.toolCalls.finalCalls(existingIDs: callIDs(in: messageID))
+            // In ReAct the call comes from the text. Native calls this request did not ask for never run.
+            let readsText = ChatClient.sendsReact(options)
+            if readsText {
+                if !calls.isEmpty { addNote(ToolNote.nativeCallsIgnored, ToolNote.nativeCallsIgnoredText, to: messageID) }
+                calls = splitReActRound(messageID)
+            }
             guard !calls.isEmpty else {
                 finishReply(messageID)
                 return
             }
-            guard ChatClient.sendsTools(options), liveAccumulator.finishReason != "length", let catalog, let tools else {
+            guard ChatClient.sendsTools(options) || readsText, liveAccumulator.finishReason != "length", let catalog, let tools else {
                 addNote(ToolNote.callsNotRun, to: messageID)
                 finishReply(messageID)
                 return
             }
-            commitRound(messageID, calls: calls, catalog: catalog)
-            await runCalls(calls.map(\.id), messageID: messageID, catalog: catalog, tools: tools, target: target)
+            commitRound(messageID, calls: calls, catalog: catalog, fromText: readsText)
+            await runCalls(calls.map(\.id), messageID: messageID, catalog: catalog, tools: tools, target: target, fromText: readsText)
             guard isCurrent(messageID) else { return }
             if Task.isCancelled {
                 finalizeStreamingMessage(stoppedEarly: true)
@@ -516,6 +540,7 @@ final class ConversationSession: Identifiable {
         roundStartedAt = Date()
         replyPhase = .generating
         activeCallID = nil
+        liveReAct = nil
     }
 
     /// One request and its stream. `options` keeps what the server refused, for the later rounds.
@@ -533,6 +558,7 @@ final class ConversationSession: Identifiable {
         }
         liveSendsThinkingOff = !ChatClient.sentThinkingOffFields(options).isEmpty
         liveThinkingOffServerKind = options.serverKind
+        liveReAct = ChatClient.sendsReact(options) ? ReActScanner() : nil
         var lastFlush = Date.distantPast
         var lastStats = Date.distantPast
         var failure: Error?
@@ -563,6 +589,16 @@ final class ConversationSession: Identifiable {
                 let now = Date()
                 liveAccumulator.apply(delta, now: now)
                 liveMeter.record(delta, now: now)
+                if liveReAct != nil {
+                    liveReAct?.feed(liveAccumulator.content, generation: liveAccumulator.contentGeneration)
+                    // No `stop` is sent: a thinking model can write "Observation:" in its reasoning,
+                    // which a server stop string would cut. Leaving ends the stream instead (its
+                    // onTermination cancels the request), so the rest never arrives, and neither do
+                    // usage and finish_reason. It leaves at the first text after the input, not at
+                    // the input's end, so that a `</think>` right after the input can still turn
+                    // it into reasoning. A model that stops by itself ends the stream anyway.
+                    if liveReAct?.actionIsFollowed == true { break }
+                }
                 if now.timeIntervalSince(lastStats) >= Self.liveStatsInterval {
                     lastStats = now
                     publishLiveGeneration()
@@ -602,6 +638,9 @@ final class ConversationSession: Identifiable {
         conversation.messages[idx].toolNotes = (conversation.messages[idx].toolNotes ?? []) + [note]
     }
 
+    /// ReAct shows less than came: labels and an Action that did not run are not an answer.
+    static let nothingToShow = "The reply has nothing to show: the model wrote only format labels or a tool call that did not run."
+
     /// Ends a reply whose last request finished. Empty text is a failure only with no tool rounds:
     /// after them the model may simply have nothing to add.
     private func finishReply(_ messageID: UUID) {
@@ -609,12 +648,15 @@ final class ConversationSession: Identifiable {
             let msg = conversation.messages[idx]
             let isEmpty = msg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && (msg.reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let textCame = liveReAct != nil && !liveAccumulator.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if isEmpty, (msg.toolRounds ?? []).isEmpty {
                 // A 200 stream that ended with nothing: show it as a failure with Retry.
-                conversation.messages[idx].error = "The server ended the reply without sending any content."
+                conversation.messages[idx].error = textCame ? Self.nothingToShow : "The server ended the reply without sending any content."
                 conversation.messages[idx].isComplete = false
             } else {
-                if isEmpty { addNote(ToolNote.emptyAfterTools, to: messageID) }
+                // An Action cut off after a tool result is not "wrote nothing"; its own note says so.
+                let saidSo = textCame && msg.toolNotes?.contains(ToolNote(kind: ToolNote.callsNotRun)) == true
+                if isEmpty, !saidSo { addNote(ToolNote.emptyAfterTools, to: messageID) }
                 conversation.messages[idx].isComplete = true
             }
         }
@@ -623,15 +665,41 @@ final class ConversationSession: Identifiable {
 
     // MARK: - Tool rounds
 
+    /// Reads the round's raw text: an Action leaves its Thought as the content, and an answer leaves
+    /// the answer, with its Thought beside it. Returns the call, if there is one.
+    private func splitReActRound(_ messageID: UUID) -> [ToolCallRecord] {
+        guard let idx = index(of: messageID) else { return [] }
+        switch ReActParser.parse(liveAccumulator.content) {
+        case .answer(let thought, let text):
+            conversation.messages[idx].content = text
+            conversation.messages[idx].reactThought = thought
+            return []
+        case .action(let thought, let name, let arguments):
+            conversation.messages[idx].content = thought
+            conversation.messages[idx].reactThought = nil
+            // As in native mode, where `finalCalls` drops it. A round holding it would be an invalid
+            // `tool_calls` entry in every later native request, and no model can be told about it.
+            guard !name.isEmpty else { return [] }
+            let id = ReActParser.newCallID(existingIDs: callIDs(in: messageID))
+            return [ToolCallRecord(id: id, name: name, arguments: arguments)]
+        }
+    }
+
+    /// A name read from text must match exactly: `binding(forFunctionName:)` also takes a near match,
+    /// which is for servers that normalize structured names.
+    private func binding(for name: String, in catalog: MCPToolCatalog, fromText: Bool) -> MCPToolBinding? {
+        fromText ? catalog.exactBinding(forFunctionName: name) : catalog.binding(forFunctionName: name)
+    }
+
     /// Moves the current round from the top-level fields into `toolRounds` and resets everything
     /// live in the same step: otherwise a Stop during approval would write this round's text back as
     /// the final round's, and the strip would count it twice while a tool runs.
-    private func commitRound(_ messageID: UUID, calls: [ToolCallRecord], catalog: MCPToolCatalog) {
+    private func commitRound(_ messageID: UUID, calls: [ToolCallRecord], catalog: MCPToolCatalog, fromText: Bool) {
         guard let idx = index(of: messageID) else { return }
         var msg = conversation.messages[idx]
         let records = calls.map { call -> ToolCallRecord in
             var call = call
-            if let binding = catalog.binding(forFunctionName: call.name) {
+            if let binding = binding(for: call.name, in: catalog, fromText: fromText) {
                 call.serverID = binding.serverID
                 call.serverName = binding.serverName
                 call.toolName = binding.tool.name
@@ -648,6 +716,7 @@ final class ConversationSession: Identifiable {
         conversation.messages[idx] = msg
         liveAccumulator = StreamAccumulator()
         liveMeter = GenerationMeter()
+        liveReAct = nil
         liveGeneration = nil
         streamIsReasoning = false
         streamReasoningStartedAt = nil
@@ -657,8 +726,10 @@ final class ConversationSession: Identifiable {
     }
 
     /// Runs one round's calls one after another, which keeps approvals and side effects predictable.
+    /// `fromText`: ReAct. Every call shows the card, whatever was stored for the tool: text can be an
+    /// echo of tool output, so Always Allow, which is about structured calls, does not reach it.
     private func runCalls(_ callIDs: [String], messageID: UUID, catalog: MCPToolCatalog,
-                          tools: ConversationToolServices, target: ReplyTarget) async {
+                          tools: ConversationToolServices, target: ReplyTarget, fromText: Bool) async {
         for callID in callIDs {
             guard isCurrent(messageID), !Task.isCancelled, let call = call(callID, in: messageID) else { return }
             // What never runs asks for no approval, and the model hears why.
@@ -668,7 +739,7 @@ final class ConversationSession: Identifiable {
                           for: callID, in: messageID)
                 continue
             }
-            guard let binding = catalog.binding(forFunctionName: call.name) else {
+            guard let binding = binding(for: call.name, in: catalog, fromText: fromText) else {
                 setResult(ToolCallResult(status: .notCalled, text: ToolResultText.unknownTool(call.name)), for: callID, in: messageID)
                 continue
             }
@@ -677,7 +748,7 @@ final class ConversationSession: Identifiable {
                 continue
             }
             let allowance = tools.allowance(binding)
-            if allowance != .always {
+            if allowance != .always || fromText {
                 replyPhase = .awaitingApproval
                 let approval = PendingToolApproval(
                     id: callID,
@@ -687,7 +758,8 @@ final class ConversationSession: Identifiable {
                     description: binding.tool.description,
                     parameters: binding.tool.inputSchema.prettyJSONText,
                     arguments: arguments.isEmpty ? "{}" : JSONValue.object(arguments).prettyJSONText,
-                    definitionChanged: allowance == .changed
+                    definitionChanged: allowance == .changed,
+                    readFromText: fromText
                 )
                 let decision = await requestApproval(approval, messageID: messageID)
                 guard isCurrent(messageID) else { return }
@@ -698,7 +770,8 @@ final class ConversationSession: Identifiable {
                 case .cancelled:
                     return
                 case .alwaysAllow:
-                    tools.setAlwaysAllowed(binding)
+                    // The card has no such button for a call read from text.
+                    if !fromText { tools.setAlwaysAllowed(binding) }
                 case .allowOnce:
                     break
                 }
@@ -868,7 +941,15 @@ final class ConversationSession: Identifiable {
         guard let idx = index(of: messageID) else { return }
         let acc = liveAccumulator
         var msg = conversation.messages[idx]
-        msg.content = acc.content
+        if liveReAct != nil {
+            // Stop and Lock come through here too: raw Action lines never reach the message.
+            liveReAct?.feed(acc.content, generation: acc.contentGeneration)
+            let live = liveReAct?.live(acc.content)
+            msg.content = live?.text ?? ""
+            msg.reactThought = live?.thought
+        } else {
+            msg.content = acc.content
+        }
         msg.reasoning = acc.reasoning.isEmpty ? nil : acc.reasoning
         msg.reasoningDuration = acc.reasoningDuration
         msg.usage = acc.usage

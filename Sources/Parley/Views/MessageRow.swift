@@ -196,6 +196,11 @@ struct MessageRow: View, Equatable {
                 )
             }
 
+            if let thought = message.reactThought, !thought.isEmpty {
+                // The model wrote this as text, so it stays collapsed, also while streaming.
+                ThinkingDisclosure(reasoning: thought, duration: nil, isThinking: false, isStreaming: false)
+            }
+
             if !message.attachments.isEmpty {
                 AttachmentStrip(attachments: message.attachments, alignment: .leading)
             }
@@ -467,6 +472,9 @@ struct MessageRow: View, Equatable {
         Button("Copy Message") { copy() }
         if let reasoning = message.reasoning, !reasoning.isEmpty {
             Button("Copy Thinking") { Pasteboard.copy(reasoning) }
+        }
+        if let thought = message.reactThought, !thought.isEmpty {
+            Button("Copy Thought") { Pasteboard.copy(thought) }
         }
         if let rounds = message.toolRounds, !rounds.isEmpty {
             Button("Copy Tool Calls") { Pasteboard.copy(ToolDisplay.copyText(rounds)) }

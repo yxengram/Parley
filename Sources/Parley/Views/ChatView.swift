@@ -301,7 +301,7 @@ private struct MessageListView: View {
               let m = session.conversation.messages.last(where: { $0.id == id }) else { return -1 }
         let rounds = m.toolRounds ?? []
         let calls = rounds.reduce(0) { $0 &+ $1.calls.count &+ $1.calls.filter { $0.result != nil }.count }
-        return m.content.utf8.count &+ (m.reasoning?.utf8.count ?? 0) &+ rounds.count &+ calls
+        return m.content.utf8.count &+ (m.reasoning?.utf8.count ?? 0) &+ (m.reactThought?.utf8.count ?? 0) &+ rounds.count &+ calls
     }
 
     private var actions: MessageRow.Actions {

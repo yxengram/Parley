@@ -196,11 +196,13 @@ struct ComposerView: View {
         let history = session.pendingEditIndex.map { Array(session.conversation.messages.prefix($0)) } ?? session.conversation.messages
         return Self.serverWarning(info: info, providerName: provider.name, model: model, history: history,
                                   draft: session.draftAttachments, draftText: session.draftText,
-                                  hasToolServers: !appState.enabledServers(for: session.conversation.settings).isEmpty)
+                                  hasToolServers: !appState.enabledServers(for: session.conversation.settings).isEmpty,
+                                  usesReAct: session.conversation.settings.usesReAct)
     }
 
     static func serverWarning(info: ModelContextInfo, providerName: String, model: String, history: [Message],
-                              draft: [Attachment], draftText: String, hasToolServers: Bool = false) -> String? {
+                              draft: [Attachment], draftText: String, hasToolServers: Bool = false,
+                              usesReAct: Bool = false) -> String? {
         let isImage = { (a: Attachment) in a.kind == .image && a.data != nil }
         let draftHasImages = draft.contains(where: isImage)
         let historyHasImages = history.contains { $0.role == .user && $0.attachments.contains(where: isImage) }
@@ -224,7 +226,7 @@ struct ComposerView: View {
                 return "With its images this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends the images again. Remove some, or fork from a message before the first image."
             }
         }
-        if hasToolServers, info.ignoresTools {
+        if hasToolServers, info.ignoresTools, !usesReAct {
             return "Tools will not be offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata."
         }
         return nil

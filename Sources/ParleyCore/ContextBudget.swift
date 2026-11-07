@@ -226,7 +226,11 @@ public enum ContextBudget {
     /// never more than the reply's completion tokens.
     static func reasoningTokens(in message: Message) -> Int {
         guard let usage = message.usage else { return 0 }
-        return reasoningTokens(usage: usage, reasoning: message.reasoning)
+        let reasoning = reasoningTokens(usage: usage, reasoning: message.reasoning)
+        // A ReAct Thought was generated and is not sent back either.
+        guard let thought = message.reactThought, !thought.isEmpty else { return reasoning }
+        let total = reasoning + estimateTokens(thought)
+        return usage.completionTokens.map { min(total, $0) } ?? total
     }
 
     private static func reasoningTokens(usage: TokenUsage, reasoning: String?) -> Int {

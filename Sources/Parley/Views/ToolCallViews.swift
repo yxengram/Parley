@@ -332,6 +332,12 @@ struct ToolApprovalCard: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if approval.readFromText {
+                Label("Read from the model's text, which can repeat tool output, so this call can only be allowed once.", systemImage: "text.quote")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             VStack(alignment: .leading, spacing: 4) {
                     Button {
                         showDescription.toggle()
@@ -371,9 +377,11 @@ struct ToolApprovalCard: View {
                 Button("Allow Once") { answer(approval.id, .allowOnce) }
                     .buttonStyle(.borderedProminent)
                     .disabled(!armed)
-                Button("Always Allow This Tool") { answer(approval.id, .alwaysAllow) }
-                    .buttonStyle(.bordered)
-                    .disabled(!armed)
+                if !approval.readFromText {
+                    Button("Always Allow This Tool") { answer(approval.id, .alwaysAllow) }
+                        .buttonStyle(.bordered)
+                        .disabled(!armed)
+                }
             }
             .controlSize(.small)
         }

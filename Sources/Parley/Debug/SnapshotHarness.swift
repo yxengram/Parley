@@ -677,6 +677,42 @@ enum SnapshotHarness {
         await scrollChat(toTop: false)
         capture(appearance, "strip-running-tool")
         await waitFor(seconds: 6) { !session.isStreaming }
+
+        await captureReAct(appearance, serverID: serverID)
+    }
+
+    /// ReAct text mode: the popover with its offer, then with the mode on, the card without Always
+    /// Allow, and the reply with its Thought collapsed.
+    private static func captureReAct(_ appearance: String, serverID: UUID) async {
+        let appState = AppState.shared
+        do {
+            try await appState.createConversation(title: "Text tools", directory: defaultDirectory, password: nil, mcpServerIDs: [serverID])
+        } catch {
+            log("createConversation failed: \(error)")
+            return
+        }
+        guard let session = appState.session(for: appState.selection) else { return }
+        session.conversation.settings.model = "mock-react"
+        await wait(0.8)
+        appState.markToolsRefused(provider: provider, model: "mock-react",
+                                  refusal: ToolsRefusal(kind: .unsupported, message: "mock-react does not support tools"))
+        await captureToolsPopover(appearance, session, state: "composer-tools-popover-offer")
+        appState.clearToolRefusal(provider: provider, model: "mock-react")
+        session.conversation.settings.toolMode = ConversationSettings.toolModeReAct
+        await wait(0.3)
+        await captureToolsPopover(appearance, session, state: "composer-tools-popover-react")
+
+        session.send(text: #"Echo the release notes. tool=filesystem__echo args={"text":"Parley 1.4 adds MCP tools.","repeat":1,"path":"~/Projects/parley/CHANGELOG.md"}"#,
+                     attachments: [], settings: appState.settings)
+        await waitFor(seconds: 8) { session.pendingApproval != nil }
+        await wait(ToolApprovalCard.armDelay + 0.3)
+        await scrollChat(toTop: false)
+        capture(appearance, "approval-card-react")
+        session.answerApproval(.allowOnce)
+        await waitFor(seconds: 8) { !session.isStreaming }
+        await wait(0.6)
+        await scrollChat(toTop: false)
+        capture(appearance, "react-reply")
     }
 
     /// The confirmation for the link in the seeded chat, taken from its rendered text. Nothing can
@@ -708,7 +744,8 @@ enum SnapshotHarness {
     }
 
     /// The composer's tools popover, composited above the button (bottom left of the chat).
-    private static func captureToolsPopover(_ appearance: String, _ session: ConversationSession) async {
+    private static func captureToolsPopover(_ appearance: String, _ session: ConversationSession,
+                                            state: String = "composer-tools-popover") async {
         AppState.shared.toolsPopoverRequest = session.id
         await wait(1.0)
         guard let popover = NSApp.windows.first(where: { isPopover($0) && $0.isVisible }),
@@ -716,7 +753,7 @@ enum SnapshotHarness {
             skip("\(appearance) tools popover (no popover window appeared)")
             return
         }
-        capture(appearance, "composer-tools-popover", overlays: [(popoverView, NSPoint(x: 300, y: 112))])
+        capture(appearance, state, overlays: [(popoverView, NSPoint(x: 300, y: 112))])
         closePopovers()
         await wait(0.6)
     }

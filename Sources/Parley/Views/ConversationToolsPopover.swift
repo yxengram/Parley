@@ -9,6 +9,22 @@ struct ConversationToolsPopover: View {
 
     private var provider: Provider? { appState.settings.resolvedProvider(for: session.conversation.settings) }
     private var model: String { ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider) }
+    private var usesReAct: Bool { session.conversation.settings.usesReAct }
+
+    private static let nativeTag = "native"
+
+    private var toolMode: Binding<String> {
+        Binding(
+            get: { usesReAct ? ConversationSettings.toolModeReAct : Self.nativeTag },
+            set: { setReAct($0 == ConversationSettings.toolModeReAct) }
+        )
+    }
+
+    /// Takes effect at the next reply. Nil keeps the file free of the key.
+    private func setReAct(_ on: Bool) {
+        session.conversation.settings.toolMode = on ? ConversationSettings.toolModeReAct : nil
+        session.settingsChanged(debounced: false)
+    }
 
     private func isOn(_ id: UUID) -> Binding<Bool> {
         Binding(
@@ -47,6 +63,21 @@ struct ConversationToolsPopover: View {
             .frame(maxHeight: 260)
             .fixedSize(horizontal: false, vertical: true)
 
+            if !appState.settings.mcpServers.isEmpty {
+                Picker("Tool calling", selection: toolMode) {
+                    Text("Native").tag(Self.nativeTag)
+                    Text("ReAct (text)").tag(ConversationSettings.toolModeReAct)
+                }
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                if usesReAct {
+                    Text("For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             let tokens = appState.toolDefinitionTokens(for: session.conversation.settings)
             if tokens > 0 {
                 Text("Tool definitions: about \(TokenFormat.grouped(tokens)) tokens per request.")
@@ -67,18 +98,24 @@ struct ConversationToolsPopover: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if let provider, !model.isEmpty, let refusal = appState.toolRefusal(provider: provider, model: model) {
+            if !usesReAct, let provider, !model.isEmpty, let refusal = appState.toolRefusal(provider: provider, model: model) {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("\(provider.name) did not accept tools for \(model), so they are not offered.", systemImage: "info.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(refusal.message)
-                    Button("Try Again") {
-                        appState.clearToolRefusal(provider: provider, model: model)
+                    HStack(spacing: 8) {
+                        Button("Try Again") {
+                            appState.clearToolRefusal(provider: provider, model: model)
+                        }
+                        Button("Use ReAct") { setReAct(true) }
                     }
                     .controlSize(.small)
                 }
+            } else if Self.offersReActForIgnoredTools(info: serverInfo, usesReAct: usesReAct) {
+                Button("Use ReAct") { setReAct(true) }
+                    .controlSize(.small)
             }
 
             Text("Tool names, descriptions, arguments and results go to the model's provider, and arguments to the MCP server. Toggling starts and stops nothing: a server starts when you send, and runs until you press Stop in Settings > MCP or quit.")
@@ -133,13 +170,26 @@ struct ConversationToolsPopover: View {
         return "That is about \(share)% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request."
     }
 
+    private var serverInfo: ModelContextInfo? {
+        guard let provider, !model.isEmpty else { return nil }
+        return appState.contextInfo(provider: provider, model: model)
+    }
+
     private var notes: [String] {
-        guard let provider, !model.isEmpty, let info = appState.contextInfo(provider: provider, model: model) else { return [] }
+        serverInfo.map { Self.notes(info: $0, usesReAct: usesReAct) } ?? []
+    }
+
+    /// The server ignores `tools`, so text is the one way to reach it. Nothing switches on its own.
+    static func offersReActForIgnoredTools(info: ModelContextInfo?, usesReAct: Bool) -> Bool {
+        info?.ignoresTools == true && !usesReAct
+    }
+
+    static func notes(info: ModelContextInfo, usesReAct: Bool) -> [String] {
         var notes: [String] = []
-        if info.ignoresTools {
+        if info.ignoresTools, !usesReAct {
             notes.append("Strata runs this model in its runtime mode, which ignores tools. Use a native model in Strata.")
         }
-        if info.serverKind == .ollama {
+        if info.serverKind == .ollama, !usesReAct {
             notes.append("Ollama keeps only basic schema keywords.")
         }
         return notes

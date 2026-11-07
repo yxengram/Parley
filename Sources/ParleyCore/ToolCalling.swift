@@ -99,7 +99,9 @@ public struct ToolNote: Codable, Hashable, Sendable {
 
     public static let toolsNotAccepted = "toolsNotAccepted", toolsNotOffered = "toolsNotOffered",
         serverUnavailable = "serverUnavailable", roundLimit = "roundLimit",
-        callsNotRun = "callsNotRun", emptyAfterTools = "emptyAfterTools"
+        callsNotRun = "callsNotRun", emptyAfterTools = "emptyAfterTools", nativeCallsIgnored = "nativeCallsIgnored"
+    /// Its `detail`. It sits on replies that ended well, and on replies whose text call ran.
+    public static let nativeCallsIgnoredText = "The model sent native tool calls. ReAct runs only calls written as text, so those were not run."
 
     public init(kind: String, detail: String? = nil) {
         self.kind = kind
@@ -190,6 +192,10 @@ public enum ToolResultText {
     /// Closes a request that has to go out without `tools` while the reply is still open. Ending on
     /// an assistant turn would have llama.cpp and Ollama continue that turn instead of answering.
     public static let answerNow = "Answer now from the tool results above. No more tools are available."
+
+    /// ReAct replay of a reply that ended in a round, with a next user turn after it. Sent, not
+    /// stored: the Observation is a user turn, and strict templates refuse two in a row.
+    public static let noAnswer = "(This reply ended without an answer.)"
 
     public static func unknownTool(_ name: String) -> String {
         "The tool was not called: no tool named \(name) is available."

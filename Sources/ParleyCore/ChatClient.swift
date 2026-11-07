@@ -30,6 +30,9 @@ public struct ChatRequestOptions: Sendable {
     /// Leave `tools` out, and flatten earlier tool rounds into text: the server refused them, or
     /// the round cap was reached.
     public var omitsTools = false
+    /// ReAct text mode: the tools go out as text in the system message, and `tools` stays nil.
+    /// `omitsTools` drops this too.
+    public var react: ReActRequest? = nil
 
     public init(model: String, systemPrompt: String = "", temperature: Double? = nil, maxTokens: Int? = nil, reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
@@ -405,7 +408,8 @@ public final class ChatClient: @unchecked Sendable {
         applyAuthorization(to: &request)
         let data = try Self.encodeBody(body, options: options)
         if let limit = options.maxRequestBytes, data.count > limit {
-            let carriesToolData = Self.sendsTools(options) || messages.contains { !($0.toolRounds ?? []).isEmpty }
+            let carriesToolData = Self.sendsTools(options) || Self.sendsReact(options)
+                || messages.contains { !($0.toolRounds ?? []).isEmpty }
             throw ParleyError.api(Self.requestTooLargeMessage(bytes: data.count, limit: limit, carriesToolData: carriesToolData))
         }
         request.httpBody = data
@@ -414,15 +418,22 @@ public final class ChatClient: @unchecked Sendable {
 
     /// The request's bytes. With tools the keys are sorted: dictionary order is not stable, and
     /// llama.cpp and Strata render tools at the start of the prompt, so an order flip would miss
-    /// the prefix cache on every round. Without tools the options are the empty ones of old.
+    /// the prefix cache on every round. ReAct text sits at the same place. Without tools the options
+    /// are the empty ones of old.
     static func encodeBody(_ body: [String: Any], options: ChatRequestOptions) throws -> Data {
-        try JSONSerialization.data(withJSONObject: body, options: sendsTools(options) ? [.sortedKeys] : [])
+        try JSONSerialization.data(withJSONObject: body, options: sendsTools(options) || sendsReact(options) ? [.sortedKeys] : [])
     }
 
     /// Whether this request carries `tools`. Decides the shape of the whole body: tool messages go
     /// out only with tools (see `buildRequestBody`).
     public static func sendsTools(_ options: ChatRequestOptions) -> Bool {
         !options.omitsTools && !(options.tools ?? []).isEmpty
+    }
+
+    /// Whether this request offers tools as ReAct text. It carries no `tools`, and tool rounds go
+    /// out as text (see `buildRequestBody`).
+    public static func sendsReact(_ options: ChatRequestOptions) -> Bool {
+        !options.omitsTools && !(options.react?.tools ?? []).isEmpty
     }
 
     /// Strata's shared port answers an oversized body with a bare HTTP 500 "Request failed" (or
@@ -476,15 +487,22 @@ public final class ChatClient: @unchecked Sendable {
     /// `stream_options: {include_usage: true}` (what streamChat sends unless the server refused it).
     ///
     /// Earlier tool rounds go out as `tool_calls` and `role: tool` messages only when this request
-    /// carries `tools`. Otherwise they are flattened into assistant text (Message.flattenedForRequest):
+    /// carries `tools`, and as Action and Observation text when it offers tools as ReAct text (the
+    /// system message then ends with `ReActPrompt.block`). Otherwise they are flattened into
+    /// assistant text (Message.flattenedForRequest):
     /// a retry without tools could fail the same way on a tool-shaped history, and Strata's runtime
     /// path keeps only `{role, content}`. A reply that is still open then ends in a user turn asking
     /// for the answer. `tool_choice` is never sent: Ollama has none, the rest default to auto.
     public static func buildRequestBody(messages: [Message], options: ChatRequestOptions, includeUsage: Bool = false) -> [String: Any] {
         var apiMessages: [[String: Any]] = []
 
-        if !options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            apiMessages.append(["role": "system", "content": options.systemPrompt])
+        var systemText = options.systemPrompt
+        if sendsReact(options), let react = options.react {
+            let block = ReActPrompt.block(tools: react.tools, nonce: react.nonce)
+            systemText = Message.isBlank(systemText) ? block : systemText + "\n\n" + block
+        }
+        if !systemText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            apiMessages.append(["role": "system", "content": systemText])
         }
 
         for message in messages {
@@ -499,6 +517,13 @@ public final class ChatClient: @unchecked Sendable {
                 if rounds.isEmpty {
                     guard !Message.isBlank(message.content) else { continue }
                     apiMessages.append(["role": "assistant", "content": message.content])
+                } else if sendsReact(options) {
+                    for round in rounds { apiMessages += ReActReplay.messages(round: round) }
+                    if !Message.isBlank(message.content) {
+                        apiMessages.append(["role": "assistant", "content": message.content])
+                    } else if message.id != messages.last?.id {
+                        apiMessages.append(["role": "assistant", "content": ToolResultText.noAnswer])
+                    }
                 } else if sendsTools(options) {
                     for round in rounds {
                         var replay: [String: Any] = ["role": "assistant", "tool_calls": round.calls.map { call -> [String: Any] in
@@ -550,7 +575,7 @@ public final class ChatClient: @unchecked Sendable {
         }
 
         // A reply still open, going out without `tools` (the round limit, or tools were refused).
-        if !sendsTools(options), let last = messages.last, last.role == .assistant, !(last.toolRounds ?? []).isEmpty,
+        if !sendsTools(options), !sendsReact(options), let last = messages.last, last.role == .assistant, !(last.toolRounds ?? []).isEmpty,
            Message.isBlank(last.content) {
             apiMessages.append(["role": "user", "content": ToolResultText.answerNow])
         }

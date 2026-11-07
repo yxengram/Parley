@@ -336,6 +336,9 @@ public struct StreamAccumulator: Sendable {
     public private(set) var reasoningEndedAt: Date?
     /// The `tool_calls` fragments so far.
     public private(set) var toolCalls = ToolCallAccumulator()
+    /// Moves when `content` stops being an extension of what it was: an orphan closing tag showed
+    /// that it was reasoning. Anything scanning `content` as it grows starts again.
+    public private(set) var contentGeneration = 0
 
     /// Inside an inline <think> block.
     private var inThinkTag = false
@@ -452,6 +455,7 @@ public struct StreamAccumulator: Sendable {
     private mutating func reclassifyContentAsReasoning(adding extra: String, now: Date) {
         let moved = content + extra
         content = ""
+        contentGeneration += 1
         if reasoningStartedAt == nil {
             reasoningStartedAt = firstContentAt ?? now
         }

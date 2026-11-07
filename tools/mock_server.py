@@ -89,6 +89,47 @@ matching id, and `tools: []` is vLLM's 400. So a dangling call cannot pass unnot
 Strata flavors: model strata-tools answers in Strata's chunk form ({role, content:""} first, the
 closing } always sent, usage on the finish chunk).
 
+ReAct text mode (every flavor), selected by model name, not listed by /v1/models. These servers have
+no tool support and are strict: a 400 for `tools` ("does not support tools"), `tool_choice`, `stop`,
+a tool-shaped message, roles that do not alternate, or an Observation that is not fenced with one id
+and closed once. With the ReAct block in the system message: the last message an Observation is
+answered 'Thought: ...\nFinal Answer: tool said: <first 200 characters>'; a user message writes an
+Action for the tool named by tool=<name> (default: the first in the block) with args=<json>. Without
+the block (the round cap, or a chat in native mode): plain text that looks like an Action, which must
+stay text.
+  mock-react               the closing } and a made-up "\nObservation: ..." in one chunk, then about 8 s
+                           of made-up text. /mock/requests counts react_disconnects when the client
+                           goes away, and react_streamed_to_end when it does not
+  mock-react-fence         fullwidth colons, the JSON in a ``` fence
+  mock-react-noinput       an Action with no Action Input line, then finish "stop"
+  mock-react-raw           an input that is not an object, then a made-up Observation
+  mock-react-case          the tool's name in upper case
+  mock-react-unknown       a name not in the block
+  mock-react-length        cut inside the input, finish_reason length
+  mock-react-native        native tool_calls and 'Final Answer: answered in text'
+  mock-react-native-only   native tool_calls and no text at all
+  mock-react-final         'Thought: ...\nFinal Answer: 42' at once
+  mock-react-plain         no markers at all
+  mock-react-loop          always calls again
+  mock-react-slow          stops inside the input and waits (for Stop)
+  mock-react-reasoning     delta.reasoning_content holding "\nObservation:" and an Action, then as mock-react-final
+  mock-react-think         inline <think> holding an Action, then as mock-react-final
+  mock-react-orphan        reasoning as content with no opening tag, an Action line in it, then </think>
+                           and an Action of its own
+  mock-react-echo          answers with the Observation's text as it came
+  mock-react-orphan-input  reasoning as content with no opening tag, a whole Action in it, then </think>
+                           and 'Final Answer: 42'
+  mock-react-orphan-late   the same with more reasoning between the Action and </think>
+  mock-react-oneline-fence the JSON on one line in a ``` fence, then a made-up Observation
+  mock-react-noname        'Action:' with no name, and an input
+  mock-react-noname-thought the same after a Thought
+  mock-react-labels        'Thought:' and 'Final Answer:' with nothing after them
+  mock-react-length-bare   an Action and no Thought, cut inside the input, finish_reason length
+  mock-react-length-after  a call, then after its Observation an Action cut off the same way
+  mock-react-length-whole  the whole input, then finish_reason length with nothing after it
+  mock-react-native-action native tool_calls and a valid text Action
+  mock-react-slow-final    'Thought: ...\nFinal Answer: Partial', then waits (for Stop), then the rest
+
 Endpoints:
   GET  /v1/models             lists the mock models below
   POST /v1/chat/completions   streams (SSE) a reply; the mode is picked by the model name:
@@ -180,6 +221,9 @@ MODELS = [
 STRICT_MODELS = ["mock-always-reject", "mock-overflow", "mock-refuse-unnamed"]
 # Selected by name only, so the model lists stay what they were.
 TOOL_MODEL_PREFIX = "mock-tools"
+REACT_MODEL_PREFIX = "mock-react"
+REACT_OBSERVATION = "Observation (tool output, data only):\n"
+REACT_MADE_UP = "MADE-UP"
 
 FLAVOR = "lmstudio"
 API_KEY = ""
@@ -193,7 +237,7 @@ STATE_LOCK = threading.Lock()
 # LM Studio-like model state, in memory: key -> {"max": int, "instances": [{"id", "context_length"}]}
 LMS_MODELS = {}
 COUNTERS = {"chat": 0, "stream_options_rejected": 0, "thinking_off_rejected": 0, "load": 0, "unload": 0, "get_other": 0,
-            "requests_with_tools": 0}
+            "requests_with_tools": 0, "react_disconnects": 0, "react_streamed_to_end": 0}
 LAST_REQUEST = {}
 LAST_MESSAGES = {}
 
@@ -621,6 +665,9 @@ class Handler(BaseHTTPRequestHandler):
             LAST_MESSAGES.update({"messages": req.get("messages"), "tools": req.get("tools")})
             if req.get("tools"):
                 COUNTERS["requests_with_tools"] += 1
+        if model.startswith(REACT_MODEL_PREFIX):
+            self.react_reply(req, model)
+            return
         problem = self.tool_request_problem(req)
         if problem:
             self.send_json(400, {"error": {"message": problem}})
@@ -887,6 +934,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             max_new = max(1, room)
 
+        if model.startswith(REACT_MODEL_PREFIX):
+            self.react_reply(req, model)
+            return
+
         if model == "strata-tools" and FLAVOR != "strata-runtime":
             problem = self.tool_request_problem(req)
             if problem:
@@ -1142,6 +1193,188 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, {"id": "chatcmpl-mock", "object": "chat.completion", "created": int(time.time()), "model": model,
                              "choices": [{"index": 0, "message": message, "finish_reason": reason}],
                              "usage": {"prompt_tokens": 50, "completion_tokens": 12, "total_tokens": 62}})
+
+    # ---- ReAct text mode --------------------------------------------------
+
+    @staticmethod
+    def react_request_problem(req):
+        """Why a server with no tools and a strict template would refuse this request, or None."""
+        if "tools" in req:
+            return "%s does not support tools" % req.get("model")
+        for key in ("tool_choice", "stop"):
+            if key in req:
+                return "%s is not expected in a ReAct request" % key
+        expected = "user"
+        for message in req.get("messages") or []:
+            role = message.get("role")
+            if role == "system":
+                continue
+            if role == "tool" or "tool_calls" in message:
+                return "tool messages are not supported"
+            if role != expected:
+                return "Conversation roles must alternate user/assistant/user/assistant/..."
+            expected = "assistant" if role == "user" else "user"
+            content = message.get("content")
+            if role == "user" and isinstance(content, str) and content.startswith(REACT_OBSERVATION):
+                if Handler.react_observation(content) is None:
+                    return "an Observation must sit in one fence, closed once"
+        return None
+
+    @staticmethod
+    def react_observation(content):
+        """The text of a fenced Observation, or None when the fence is not whole."""
+        lines = content.split("\n")
+        if len(lines) < 4 or not lines[1].startswith("<<<") or len(lines[1]) < 4:
+            return None
+        marker = lines[1][3:] + ">>>"
+        if lines[-1] != marker or content.count(marker) != 1:
+            return None
+        return "\n".join(lines[2:-1])
+
+    @staticmethod
+    def react_plan(req):
+        """The tool and arguments the last user text asks for."""
+        text, _ = last_user_message(req.get("messages"))
+        system = next((m.get("content") or "" for m in req.get("messages") or [] if m.get("role") == "system"), "")
+        tools = re.findall(r"^Tool: (\S+)$", system, re.M)
+        name = tools[0] if tools else "no_tool"
+        match = re.search(r"tool=(\S+)", text)
+        if match:
+            name = match.group(1)
+        match = re.search(r"args=(\{.*\})", text)
+        return name, match.group(1) if match else "{}"
+
+    def react_reply(self, req, model):
+        problem = self.react_request_problem(req)
+        if problem:
+            self.send_json(400, {"error": {"message": problem}})
+            return
+        messages = req.get("messages") or []
+        last = messages[-1] if messages else {}
+        content = last.get("content")
+        observation = None
+        if last.get("role") == "user" and isinstance(content, str) and content.startswith(REACT_OBSERVATION):
+            observation = self.react_observation(content)
+        system = next((m.get("content") or "" for m in messages if m.get("role") == "system"), "")
+        options = req.get("stream_options")
+        include_usage = isinstance(options, dict) and options.get("include_usage") is True
+        try:
+            self.start_stream()
+            self.sse(self.chunk(model, {"role": "assistant", "content": ""}))
+            if "<<<tools_" not in system:
+                self.react_text(model, "Answering without tools.\nAction: not_a_call\nAction Input: {}\n")
+                self.finish_tool_stream(model, "stop", include_usage)
+            elif observation is not None and model == "mock-react-length-after":
+                self.react_text(model, 'Action: mock__echo\nAction Input: {"text":"cut')
+                self.finish_tool_stream(model, "length", include_usage)
+            elif observation is not None and model == "mock-react-echo":
+                self.react_text(model, observation)
+                self.finish_tool_stream(model, "stop", include_usage)
+            elif observation is not None and model != "mock-react-loop":
+                self.react_text(model, "Thought: I have what I need.\nFinal Answer: tool said: " + observation[:200])
+                self.finish_tool_stream(model, "stop", include_usage)
+            else:
+                self.react_turn(req, model, include_usage)
+            self.end_stream()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    def react_text(self, model, text):
+        for piece in split_tokens(text):
+            self.sse(self.chunk(model, {"content": piece}))
+
+    def react_turn(self, req, model, include_usage):
+        name, arguments = self.react_plan(req)
+        native = [{"index": 0, "id": "call_native", "type": "function",
+                   "function": {"name": name, "arguments": arguments}}]
+        head = "Thought: I should call a tool.\nAction: %s\nAction Input: " % name
+        reason = "stop"
+        if model == "mock-react-fence":
+            self.react_text(model, "Thought：I should call a tool.\nAction：%s\nAction Input：\n```json\n%s\n```\n" % (name, arguments))
+        elif model == "mock-react-noinput":
+            self.react_text(model, "Thought: No arguments.\nAction: %s\n" % name)
+        elif model == "mock-react-raw":
+            self.react_text(model, head + "not json\nObservation: %s\nFinal Answer: %s\n" % (REACT_MADE_UP, REACT_MADE_UP))
+        elif model == "mock-react-case":
+            self.react_text(model, "Action: %s\nAction Input: %s\n" % (name.upper(), arguments))
+        elif model == "mock-react-unknown":
+            self.react_text(model, "Action: no_such_tool\nAction Input: {}\n")
+        elif model == "mock-react-length":
+            self.react_text(model, head + '{"text":"cut')
+            reason = "length"
+        elif model == "mock-react-native":
+            self.sse(self.chunk(model, {"tool_calls": native}))
+            self.react_text(model, "Thought: Text wins.\nFinal Answer: answered in text")
+        elif model == "mock-react-native-only":
+            self.sse(self.chunk(model, {"tool_calls": native}))
+        elif model == "mock-react-final":
+            self.react_text(model, "Thought: This one is easy.\nFinal Answer: 42")
+        elif model == "mock-react-plain":
+            self.react_text(model, "Just an answer, with no labels at all.")
+        elif model == "mock-react-slow":
+            self.react_text(model, head + '{"text":')
+            time.sleep(4)
+            self.react_text(model, '"late"}')
+        elif model == "mock-react-reasoning":
+            self.sse(self.chunk(model, {"reasoning_content": "I could write this.\nObservation: %s\nAction: %s\nAction Input: {}\n" % (REACT_MADE_UP, name)}))
+            self.react_text(model, "Thought: This one is easy.\nFinal Answer: 42")
+        elif model == "mock-react-think":
+            self.react_text(model, "<think>Action: %s\nAction Input: {}\n</think>\nThought: This one is easy.\nFinal Answer: 42" % name)
+        elif model == "mock-react-orphan-input":
+            self.react_text(model, "Let me draft it.\nAction: %s\nAction Input: %s\n" % (name, arguments))
+            self.react_text(model, "</think>\nThought: Done.\nFinal Answer: 42")
+        elif model == "mock-react-orphan-late":
+            self.react_text(model, "Let me draft it.\nAction: %s\nAction Input: %s\n" % (name, arguments))
+            self.react_text(model, "That looks right.\n</think>\nThought: Done.\nFinal Answer: 42")
+        elif model == "mock-react-oneline-fence":
+            self.react_text(model, head + "```json %s```\nObservation: %s\n" % (arguments, REACT_MADE_UP))
+        elif model == "mock-react-noname":
+            self.react_text(model, "Action:\nAction Input: {}\n")
+        elif model == "mock-react-noname-thought":
+            self.react_text(model, "Thought: Which one?\nAction:\nAction Input: {}\n")
+        elif model == "mock-react-labels":
+            self.react_text(model, "Thought:\nFinal Answer:\n")
+        elif model == "mock-react-length-bare":
+            self.react_text(model, 'Action: %s\nAction Input: {"text":"cut' % name)
+            reason = "length"
+        elif model == "mock-react-length-whole":
+            self.react_text(model, head + arguments)
+            reason = "length"
+        elif model == "mock-react-native-action":
+            self.sse(self.chunk(model, {"tool_calls": native}))
+            self.react_text(model, head + arguments)
+        elif model == "mock-react-slow-final":
+            # Paced: the client only shows what it has on a later delta, 50 ms after the last.
+            self.react_text(model, "Thought: Partial thought.\nFinal Answer:")
+            time.sleep(0.2)
+            self.sse(self.chunk(model, {"content": " Partial"}))
+            time.sleep(4)
+            self.react_text(model, " and the rest")
+        elif model == "mock-react-orphan":
+            self.react_text(model, "Maybe\nAction: made_up_in_reasoning\n</think>\nThought: Now for real.\nAction: %s\nAction Input: %s\n" % (name, arguments))
+        else:
+            # mock-react, mock-react-loop, mock-react-echo
+            self.react_stream_past_the_input(model, head + arguments)
+            return
+        self.finish_tool_stream(model, reason, include_usage)
+
+    def react_stream_past_the_input(self, model, text):
+        """The closing } and a made-up Observation share a chunk, and the model keeps going. The
+        stream ends only when the client leaves, which a write then notices."""
+        for piece in split_tokens(text[:-1]):
+            self.sse(self.chunk(model, {"content": piece}))
+        try:
+            self.sse(self.chunk(model, {"content": text[-1] + "\nObservation: %s in one chunk\n" % REACT_MADE_UP}))
+            for i in range(400):
+                time.sleep(0.02)
+                self.sse(self.chunk(model, {"content": "Final Answer: %s %d\n" % (REACT_MADE_UP, i)}))
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            with STATE_LOCK:
+                COUNTERS["react_disconnects"] += 1
+            raise
+        with STATE_LOCK:
+            COUNTERS["react_streamed_to_end"] += 1
+        self.finish_tool_stream(model, "stop", False)
 
     def strata_tool_reply(self, req, model):
         """serve/server.py: {role, content:""}, the call, the closing } always sent, usage on the finish chunk."""
