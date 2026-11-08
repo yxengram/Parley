@@ -12,16 +12,19 @@ struct HelpView: View {
                         .frame(width: 56, height: 56)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Parley Help").font(.title2.weight(.semibold))
+                        Text("Parley Help")
+                            .lettered(32)
+                            .foregroundStyle(Hideout.emberText)
+                            .accessibilityAddTraits(.isHeader)
                         Text("A private chat client for OpenAI-compatible APIs.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.inkSoft)
                     }
                 }
 
                 section("Getting started", "server.rack", [
                     "Open Settings (⌘,) > Providers and add a server. The base URL includes the version path, for example http://localhost:1234/v1 for LM Studio or https://api.openai.com/v1.",
                     "API keys are stored in your login Keychain and never synced. Local servers usually need no key.",
-                    "Use Test Connection to load the server's model list. A new chat uses the provider's default model, or the first model the server lists. Change it with the model menu in the toolbar, which also accepts a custom model ID.",
+                    "Use Test Connection to load the server's model list. A new chat uses the provider's default model, or the first model the server lists. Change it with the model menu at the top of the window, which also accepts a custom model ID.",
                 ])
 
                 section("Messages", "bubble.left.and.text.bubble.right", [
@@ -73,8 +76,19 @@ struct HelpView: View {
                     "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.",
                 ])
             }
-            .padding(28)
-            .frame(maxWidth: 640, alignment: .leading)
+            .padding(.horizontal, 34)
+            .padding(.top, 36)
+            .padding(.bottom, 34)
+            // A little handbook taped up in the room, about 75 characters to the line.
+            .frame(maxWidth: 660, alignment: .leading)
+            .paperCard(Hideout.card, seed: 12, radius: 16)
+            .overlay(alignment: .top) {
+                WashiTape(color: Hideout.marigold, width: 104, height: 26, angle: -2)
+                    .offset(y: -11)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 32)
+            .padding(.bottom, 26)
             .frame(maxWidth: .infinity)
         }
         .frame(minWidth: 480, minHeight: 400)
@@ -82,11 +96,21 @@ struct HelpView: View {
 
     private func section(_ title: String, _ symbol: String, _ paragraphs: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol)
-                .font(.headline)
+            Label {
+                Text(title)
+                    .lettered(21)
+                    .foregroundStyle(Hideout.ink)
+            } icon: {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Hideout.emberText)
+            }
+            .accessibilityAddTraits(.isHeader)
             ForEach(paragraphs, id: \.self) { p in
                 Text(p)
-                    .foregroundStyle(.secondary)
+                    .fontDesign(.default)
+                    .lineSpacing(3)
+                    .foregroundStyle(Hideout.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }

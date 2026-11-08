@@ -325,7 +325,7 @@ final class ConversationSession: Identifiable {
             return
         }
         guard !model.isEmpty else {
-            placeholder.error = "No model selected. Pick a model in the toolbar or set a default model for \(provider.name) in Settings."
+            placeholder.error = "No model selected. Pick a model at the top of the window or set a default model for \(provider.name) in Settings."
             conversation.messages.append(placeholder)
             conversation.updatedAt = Date()
             saveNow()

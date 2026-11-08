@@ -108,7 +108,7 @@ struct MCPSignInSection: View {
             if hasStaticAuthorization {
                 Text("This server has a static Authorization header, so it does not use sign-in.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
             } else {
                 if let info = model.info {
                     LabeledContent("Signed in through") { Text(verbatim: ToolDisplay.address(info.provider)) }
@@ -121,26 +121,26 @@ struct MCPSignInSection: View {
                 }
                 if let note = attentionText {
                     Text(verbatim: note)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .safetyNotice(.caution)
                 }
                 HStack {
                     Button(model.isRunning ? "Signing In…" : "Sign In") {
                         if prepare() { model.signIn(appState, serverID: serverID) }
                     }
+                    .buttonStyle(TagButtonStyle())
                     .disabled(model.isRunning)
                     if model.isRunning {
                         Button("Cancel") { model.cancel() }
+                            .buttonStyle(TagButtonStyle())
                     }
                     if model.info != nil, !model.isRunning {
                         Button("Sign Out") { model.signOut(appState, serverID: serverID) }
+                            .buttonStyle(TagButtonStyle())
                     }
                 }
                 if let message = model.message {
                     Text(verbatim: message)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .safetyNotice(.danger)
                 }
                 TextField("Client ID (optional)", text: $draft.oauthClientID)
                 SecureField("Client Secret (optional)", text: $draft.oauthClientSecret)
@@ -156,13 +156,14 @@ struct MCPSignInSection: View {
             if !hasStaticAuthorization {
                 Text("Leave Client ID empty and Parley registers itself with the provider, if the provider allows it. If you register an app by hand, use the redirect URI above, and set a port if the provider needs an exact one. Tokens stay in your login Keychain (not synced). Signing in again clears Always Allow for this server.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
             }
         }
         .task(id: serverID) { await model.load(appState, serverID: serverID) }
         .onDisappear { model.cancel() }
         .sheet(item: Binding(get: { model.review }, set: { if $0 == nil { model.answer(.cancel) } })) { review in
             MCPSignInReviewSheet(review: review) { model.answer($0) }
+                .hideoutSheet()
         }
     }
 
@@ -191,17 +192,23 @@ struct MCPSignInReviewSheet: View {
     private var selected: String? { picked ?? review.hosts.first }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(verbatim: title).font(.headline)
-            content
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                DecisionHeading(title: Text(verbatim: title))
+                content
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .noticeCard(fill: Hideout.attentionWash, edge: Hideout.attention)
+            HStack(spacing: 8) {
                 Spacer()
                 Button("Cancel") { answer(.cancel) }
+                    .buttonStyle(TagButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button("Continue") { answer(.proceed(host: review.kind == .provider ? selected : nil)) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(TagButtonStyle(kind: .primary))
                     .disabled(review.kind == .provider && selected == nil)
             }
         }
@@ -224,12 +231,12 @@ struct MCPSignInReviewSheet: View {
             Text("\(ToolDisplay.address(review.server)) keeps its sign-in information on another host. Parley has not contacted it yet.")
             hostList(review.hosts.map(ToolDisplay.address))
             Text("It receives a request from this Mac for that information, and nothing else.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
         case .moreHosts:
             Text("The provider also uses these hosts. Parley has not contacted them yet.")
             hostList(review.hosts.map(ToolDisplay.address))
             Text("Depending on the host, it receives this server's address, Parley's name and a local address, the sign-in code, or renewal tokens later on.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
         case .provider:
             providerContent
         }
@@ -252,22 +259,27 @@ struct MCPSignInReviewSheet: View {
         }
         if review.providerDiffers, let selected {
             Text("\(ToolDisplay.address(review.server)) will hold a token issued by \(host(selected)), with the permissions below. That token may also work outside this server.")
-                .foregroundStyle(.orange)
+                .safetyNotice(.caution)
         }
         if !review.scopes.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Permissions requested:")
-                ForEach(review.scopes, id: \.self) { scope in
-                    Text(verbatim: ToolDisplay.line(scope) + (review.newScopes.contains(scope) ? " (new)" : ""))
-                        .font(.callout.monospaced())
-                        .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(review.scopes, id: \.self) { scope in
+                        Text(verbatim: ToolDisplay.line(scope) + (review.newScopes.contains(scope) ? " (new)" : ""))
+                            .font(.callout.monospaced())
+                            .fontDesign(.monospaced)
+                            .foregroundStyle(Hideout.boardInk)
+                            .textSelection(.enabled)
+                    }
                 }
+                .modifier(BoardPanel())
             }
         }
         Text("The provider receives this server's address, including its path. That address is part of the sign-in page's address, so it stays in your browser history, which may sync.")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Hideout.inkSoft)
         Text("If Parley has to register, the provider also receives the name Parley and a local address, and keeps a record. If it offers long-lived access, Parley asks for it, and renews the sign-in only when you use this server.")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Hideout.inkSoft)
     }
 
     private func hostList(_ hosts: [String]) -> some View {
@@ -275,9 +287,61 @@ struct MCPSignInReviewSheet: View {
             ForEach(hosts, id: \.self) { name in
                 Text(verbatim: name)
                     .font(.callout.monospaced())
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(Hideout.boardInk)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        .modifier(BoardPanel())
+    }
+}
+
+/// Addresses and permissions on the chalkboard, the same as a tool's arguments.
+private struct BoardPanel: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Hideout.board, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+}
+
+// Private on purpose: other surfaces define their own helpers, and these must not collide.
+private enum SafetyTone { case caution, danger }
+
+private extension View {
+    /// A warning or an error on its own flat strip. Exact wording, no decoration.
+    func safetyNotice(_ tone: SafetyTone) -> some View {
+        let edge = tone == .danger ? Hideout.danger : Hideout.caution
+        return self
+            .font(.callout.weight(.medium))
+            .foregroundStyle(edge)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .noticeCard(fill: tone == .danger ? Hideout.dangerWash : Hideout.cautionWash, edge: edge, radius: 8)
+    }
+}
+
+
+/// The title of something that needs a decision: plain and strong, never lettered.
+private struct DecisionHeading: View {
+    let title: Text
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Hideout.paper)
+                .frame(width: 26, height: 26)
+                .background(Hideout.attention, in: Circle())
+                .accessibilityHidden(true)
+            title
+                .font(Hideout.title(16))
+                .foregroundStyle(Hideout.ink)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

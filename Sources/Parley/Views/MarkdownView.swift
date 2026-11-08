@@ -14,6 +14,9 @@ struct MarkdownView: View {
             }
         }
         .textSelection(.enabled)
+        // Long replies read in the plain system face; links take the on-paper ember.
+        .fontDesign(.default)
+        .tint(Hideout.emberText)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -28,6 +31,7 @@ struct MarkdownView: View {
             Text(MarkdownParser.inline(s))
                 .font(Self.headingFont(level))
                 .fontWeight(.semibold)
+                .fontDesign(.rounded)
                 .padding(.top, level <= 2 ? 6 : 3)
                 .fixedSize(horizontal: false, vertical: true)
         case .list(let items):
@@ -35,7 +39,7 @@ struct MarkdownView: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(item.marker)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.emberText)
                             .monospacedDigit()
                             .frame(minWidth: 14, alignment: .trailing)
                         Text(MarkdownParser.inline(item.text))
@@ -47,17 +51,31 @@ struct MarkdownView: View {
             }
         case .quote(let s):
             Text(MarkdownParser.inline(s))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 12)
                 .overlay(alignment: .leading) {
-                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 3)
+                    Capsule().fill(Hideout.stitch).frame(width: 3)
                 }
         case .code(let lang, let code):
             CodeBlockView(language: lang, code: code)
         case .rule:
-            Divider().padding(.vertical, 4)
+            StitchedRule()
+                .stroke(Hideout.stitch, style: StrokeStyle(lineWidth: 1.25, lineCap: .round, dash: [6, 5]))
+                .frame(height: 1.25)
+                .padding(.vertical, 6)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// A line of quilt stitching across the page, for a markdown rule.
+    private struct StitchedRule: Shape {
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+            return path
         }
     }
 
@@ -80,7 +98,8 @@ struct CodeBlockView: View {
             HStack(spacing: 6) {
                 Text(language.isEmpty ? "code" : language)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(Hideout.boardInkSoft)
                 Spacer()
                 Button {
                     Pasteboard.copy(code)
@@ -89,9 +108,11 @@ struct CodeBlockView: View {
                 } label: {
                     Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         .font(.caption)
+                        .foregroundStyle(Hideout.boardInkSoft)
                         .frame(width: 20, height: 18)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .help(copied ? "Copied" : "Copy code")
                 .accessibilityLabel("Copy Code")
             }
@@ -102,6 +123,9 @@ struct CodeBlockView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
                     .font(.system(size: 12, design: .monospaced))
+                    // An inherited font design would otherwise replace the monospaced face.
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(Hideout.boardInk)
                     .lineSpacing(2)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: true, vertical: true)
@@ -110,8 +134,13 @@ struct CodeBlockView: View {
                     .padding(.bottom, 12)
             }
         }
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.secondary.opacity(0.12)))
+        // A chalkboard in both appearances. The edge barely wanders: its points shift as a
+        // streaming block grows.
+        .background {
+            WobblyRect(seed: 5, radius: 12, amplitude: 0.8)
+                .fill(Hideout.board)
+                .shadow(color: .black.opacity(0.14), radius: 3, y: 1.5)
+        }
     }
 }
 
@@ -290,7 +319,7 @@ enum MarkdownParser {
             // Inline code: smaller monospaced text on a tinted background (visible in CJK text too).
             for run in attributed.runs where run.inlinePresentationIntent?.contains(.code) == true {
                 attributed[run.range].font = .system(size: 12, design: .monospaced)
-                attributed[run.range].backgroundColor = Color.secondary.opacity(0.16)
+                attributed[run.range].backgroundColor = Hideout.paperDeep
             }
             // A link Parley would refuse is plain text; the rest stay links in name only.
             for run in attributed.runs {

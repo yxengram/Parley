@@ -83,6 +83,8 @@ struct MessageRow: View, Equatable {
     private var isUser: Bool { message.role == .user }
     private var isLast: Bool { index == messageCount - 1 }
     private var hasToolRounds: Bool { !(message.toolRounds ?? []).isEmpty }
+    /// Cuts the note's edge the same way on every launch (`hashValue` would not).
+    private var noteSeed: Int { Int(message.id.uuid.0) &* 251 &+ Int(message.id.uuid.1) }
     private var laterCount: Int { max(0, messageCount - index - 1) }
 
     var body: some View {
@@ -140,16 +142,18 @@ struct MessageRow: View, Equatable {
                 }
                 if !message.content.isEmpty {
                     Text(message.content)
+                        .fontDesign(.default)
+                        .foregroundStyle(Hideout.ink)
                         .textSelection(.enabled)
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
-                        .background(Color.accentColor.opacity(0.13), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .paperCard(Hideout.peach, seed: noteSeed, radius: 14)
                         .overlay {
                             if editState == .editing {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                                WobblyRect(seed: noteSeed, radius: 14)
+                                    .strokeBorder(Hideout.ember, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [5, 3]))
                             }
                         }
                         .help(Text(message.createdAt, format: .dateTime.weekday().hour().minute()))
@@ -161,8 +165,7 @@ struct MessageRow: View, Equatable {
                     Button(action: actions.getReply) {
                         Label("Get Reply", systemImage: "arrow.turn.down.right")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(TagButtonStyle())
                     .help("Ask the model to answer this message")
                 }
             }
@@ -212,9 +215,9 @@ struct MessageRow: View, Equatable {
                     WaitingIndicator(startedAt: roundStartedAt ?? message.createdAt, progress: promptProgress, serverKind: serverKind)
                 } else if case .connecting(let servers) = replyPhase {
                     HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
+                        FirefliesIndicator()
                         Text(verbatim: Self.startingText(servers))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.inkSoft)
                     }
                 }
             }
@@ -222,14 +225,14 @@ struct MessageRow: View, Equatable {
             if !isStreamingThis, message.error == nil, let note = Self.finishNote(message, maxTokens: maxTokens) {
                 Label(note, systemImage: "scissors")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if !isStreamingThis, let note = Self.thinkingOffNote(message, repeated: repeatsThinkingOffNote) {
                 Label(note, systemImage: "info.circle")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
                     .help(Self.thinkingOffNote(message) ?? note)
             }
@@ -238,7 +241,7 @@ struct MessageRow: View, Equatable {
                 ForEach(message.toolNotes ?? [], id: \.self) { note in
                     Label(Self.toolNoteText(note), systemImage: "info.circle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(note.detail ?? "")
                 }
@@ -259,15 +262,13 @@ struct MessageRow: View, Equatable {
                 HStack(spacing: 8) {
                     Text("Stopped before the reply finished.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                     Button {
                         requestRegenerate()
                     } label: {
                         Label("Regenerate", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .font(.caption)
+                    .buttonStyle(TagButtonStyle())
                     .disabled(conversationBusy)
                 }
             }
@@ -286,16 +287,13 @@ struct MessageRow: View, Equatable {
 
     private var header: some View {
         HStack(spacing: 5) {
-            Image(systemName: "sparkles")
-                .imageScale(.small)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+            LanternMark(size: 16)
             Text(message.model ?? "Assistant")
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
             Text(message.createdAt, format: .dateTime.hour().minute())
                 .font(.caption)
-                .foregroundStyle(.secondary.opacity(0.8))
+                .foregroundStyle(Hideout.inkFaint)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("Assistant, \(message.model ?? "unknown model"), \(message.createdAt.formatted(date: .omitted, time: .shortened))"))
@@ -309,7 +307,7 @@ struct MessageRow: View, Equatable {
         if showUsage, let line = Self.footerText(usage: usage, stats: stats, toolRounds: isStreamingThis ? 0 : message.toolRounds?.count ?? 0) {
             Text(line)
                 .font(.caption2)
-                .foregroundStyle(.secondary.opacity(0.8))
+                .foregroundStyle(Hideout.inkFaint)
         }
     }
 
@@ -501,7 +499,7 @@ struct MessageRow: View, Equatable {
     }
 
     private var actionBar: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             ActionButton(systemImage: copied ? "checkmark" : "doc.on.doc", help: "Copy") {
                 copy()
             }
@@ -527,9 +525,6 @@ struct MessageRow: View, Equatable {
                 .disabled(conversationBusy)
             }
         }
-        .padding(3)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.2)))
     }
 }
 
@@ -548,21 +543,15 @@ struct WaitingIndicator: View {
             let elapsed = max(0, context.date.timeIntervalSince(startedAt))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    if let progress {
-                        ProgressView(value: progress.fraction)
-                            .progressViewStyle(.circular)
-                            .controlSize(.small)
-                    } else {
-                        ProgressView().controlSize(.small)
-                    }
+                    FirefliesIndicator()
                     Text(Self.statusText(progress: progress, elapsed: elapsed))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .monospacedDigit()
                 }
                 if progress == nil, serverKind == .strata, elapsed >= Self.loadingHintAfter {
                     Text("Strata may be loading the model or reading a long prompt; a first reply after a pause can take a few minutes.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -592,17 +581,18 @@ private struct ErrorCallout: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
+                .foregroundStyle(Hideout.danger)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(presentation.title)
                     .font(.callout.weight(.medium))
+                    .foregroundStyle(Hideout.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
                 if let detail = presentation.detail {
                     Text(detail)
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
@@ -610,18 +600,21 @@ private struct ErrorCallout: View {
                     if let status = presentation.status {
                         Text(status)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.inkSoft)
                     }
                     if let raw = presentation.raw, raw != presentation.title {
                         Button(showDetails ? "Hide Details" : "Details") { showDetails.toggle() }
-                            .buttonStyle(.link)
+                            .buttonStyle(.plain)
                             .font(.caption)
+                            .underline()
+                            .foregroundStyle(Hideout.danger)
                     }
                 }
                 if showDetails, let raw = presentation.raw {
                     Text(raw)
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .fontDesign(.monospaced)
+                        .foregroundStyle(Hideout.inkSoft)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -630,21 +623,19 @@ private struct ErrorCallout: View {
             HStack(spacing: 6) {
                 if presentation.suggestsSettings {
                     SettingsLink { Text("Settings…") }
-                        .controlSize(.small)
+                        .buttonStyle(TagButtonStyle())
                 }
                 if let retry {
                     Button(action: retry) {
                         Label("Retry", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(TagButtonStyle())
                     .disabled(busy)
                 }
             }
         }
-        .padding(10)
-        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.red.opacity(0.18)))
+        .padding(12)
+        .noticeCard(fill: Hideout.dangerWash, edge: Hideout.danger)
         .help(raw)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Error: \(presentation.title)")
@@ -659,10 +650,40 @@ private struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .frame(width: 22, height: 20)
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(PaperRoundButtonStyle())
         .help(help)
         .accessibilityLabel(help)
+    }
+}
+
+/// A small round paper button. Opaque, unlike `RoundIconButtonStyle`, because it sits over text;
+/// when disabled only its icon fades, so the paper stays solid.
+private struct PaperRoundButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Inner(configuration: configuration)
+    }
+
+    private struct Inner: View {
+        let configuration: ButtonStyle.Configuration
+        @ViewState private var hovering = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let active = hovering && isEnabled
+            configuration.label
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(active ? Hideout.ink : Hideout.inkSoft)
+                .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
+                .frame(width: 24, height: 24)
+                .background {
+                    Circle()
+                        .fill(active ? Hideout.paperDeep : Hideout.card)
+                        .shadow(color: .black.opacity(0.10), radius: 1.5, y: 1)
+                }
+                .overlay(Circle().strokeBorder(Hideout.line))
+                .contentShape(Circle())
+                .onHover { hovering = $0 }
+        }
     }
 }

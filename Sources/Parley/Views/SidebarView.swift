@@ -4,64 +4,231 @@ import ParleyCore
 struct SidebarView: View {
     @Environment(AppState.self) private var appState
 
-    @ViewState private var renameTarget: ConversationSession?
-    @ViewState private var passwordTarget: PasswordSheet.Target?
-    @ViewState private var removeEncryptionTarget: ConversationSession?
-    @ViewState private var deleteTarget: LibraryEntry?
-    @ViewState private var showEncryptedNotice = false
-    @ViewState private var query = ""
+    @FocusState private var searchFocused: Bool
+    @FocusState private var listFocused: Bool
 
     var body: some View {
         @Bindable var state = appState
         let groups = groupedEntries
-        List(selection: $state.selection) {
-            ForEach(groups, id: \.title) { group in
-                Section(group.title) {
-                    ForEach(group.entries) { entry in
-                        SidebarRow(entry: entry, dateStyle: group.dateStyle)
-                            .tag(entry.id)
+        VStack(spacing: 0) { wallHeader(query: $state.sidebarQuery); conversationList(groups, selection: $state.selection) }
+            .background(WallBackground())
+            .foregroundStyle(Hideout.wallInk)
+            // initial: ⌘F may have just brought the sidebar back.
+            .onChange(of: appState.sidebarSearchFocusPending, initial: true) { _, pending in
+                guard pending else { return }
+                appState.sidebarSearchFocusPending = false
+                // A sidebar that has just appeared has no field in the window yet.
+                DispatchQueue.main.async { searchFocused = true }
+            }
+    }
+
+    private func wallHeader(query: Binding<String>) -> some View {
+        VStack(spacing: 8) {
+            ZStack(alignment: .top) {
+                WindowDragArea()
+                // The cord hangs just below the traffic lights.
+                Bunting().padding(.top, 34)
+                HStack(spacing: 6) {
+                    Spacer()
+                    Button { appState.showNewChatSheet = true } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
                     }
+                    .buttonStyle(RoundIconButtonStyle(size: 28, onWall: true))
+                    .help("New Chat (⌘N)")
+                    Button(action: appState.toggleSidebar) {
+                        Label("Hide Sidebar", systemImage: "sidebar.left")
+                    }
+                    .buttonStyle(RoundIconButtonStyle(size: 28, onWall: true))
+                    .help("Hide Sidebar (⌃⌘S)")
                 }
+                .padding(.top, 5)
+                .padding(.trailing, 10)
+            }
+            .frame(height: 76)
+
+            Text("Parley")
+                .lettered(30)
+                .foregroundStyle(Hideout.wallInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .accessibilityAddTraits(.isHeader)
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Hideout.inkSoft)
+                    .accessibilityHidden(true)
+                TextField("Search", text: query)
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(Hideout.ink)
+                    .focused($searchFocused)
+                    .onExitCommand { query.wrappedValue = ""; searchFocused = false }
+                if !query.wrappedValue.isEmpty {
+                    Button { query.wrappedValue = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Hideout.inkSoft)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear Search")
+                }
+            }
+            .font(.system(size: 13, design: .rounded))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .paperCard(Hideout.tag, seed: 3, radius: 9)
+            .padding(.horizontal, 12)
+        }
+        .padding(.bottom, 8)
+    }
+
+    private func conversationList(_ groups: [DateGroup], selection: Binding<UUID?>) -> some View {
+        List(selection: selection) {
+            ForEach(groups, id: \.title) { group in
+                Section {
+                    ForEach(group.entries) { entry in
+                        SidebarRow(entry: entry, dateStyle: group.dateStyle, isSelected: appState.selection == entry.id,
+                                   listFocused: listFocused)
+                            .tag(entry.id)
+                            .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+                } header: {
+                    Text(group.title)
+                        .lettered(15)
+                        .foregroundStyle(Hideout.wallInkSoft)
+                }
+                .listSectionSeparator(.hidden)
             }
         }
         .listStyle(.sidebar)
-        .searchable(text: $query, placement: .sidebar, prompt: "Search")
+        .focused($listFocused)
+        .scrollContentBackground(.hidden)
+        .background(ListSelectionHighlightRemover())
         // Right-click menu for the clicked row; double-click or Return renames.
         .contextMenu(forSelectionType: UUID.self) { ids in
             if let id = ids.first, let entry = appState.entry(id: id) {
                 contextMenu(for: entry)
             }
         } primaryAction: { ids in
-            if let id = ids.first, let entry = appState.entry(id: id) {
-                rename(entry)
-            }
+            if let id = ids.first { appState.sidebarRequest = .rename(id) }
         }
         // Delete / ⌘⌫ while the list has focus: the same "Move to Trash" confirmation.
         .onDeleteCommand {
-            if let entry = appState.entry(id: appState.selection) { deleteTarget = entry }
+            if let id = appState.selection { appState.sidebarRequest = .moveToTrash(id) }
         }
         .overlay {
             if appState.entries.isEmpty && !appState.isScanning {
-                ContentUnavailableView {
-                    Label("No conversations", systemImage: "bubble.left")
-                } description: {
+                VStack(spacing: 6) {
+                    Text("The wall is bare")
+                        .lettered(20)
                     Text("Press ⌘N to start a new chat.")
+                        .font(.callout)
+                        .foregroundStyle(Hideout.wallInkSoft)
                 }
-            } else if !query.isEmpty && groups.isEmpty {
-                ContentUnavailableView.search(text: query)
+                .foregroundStyle(Hideout.wallInk)
+            } else if !appState.sidebarQuery.isEmpty && groups.isEmpty {
+                VStack(spacing: 6) {
+                    Text("Not on this wall")
+                        .lettered(20)
+                    Text("No conversation matches “\(appState.sidebarQuery)”.")
+                        .font(.callout)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Hideout.wallInkSoft)
+                }
+                .padding(.horizontal, 16)
+                .foregroundStyle(Hideout.wallInk)
             }
         }
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    appState.showNewChatSheet = true
-                } label: {
-                    Label("New Chat", systemImage: "square.and.pencil")
-                }
-                .help("New Chat (⌘N)")
+    }
+
+    @ViewBuilder
+    private func contextMenu(for entry: LibraryEntry) -> some View {
+        let session = appState.session(for: entry.id)
+        let locked = entry.isEncrypted && session == nil
+        let streaming = session?.isStreaming ?? false
+
+        Button("Rename…") { appState.sidebarRequest = .rename(entry.id) }
+            .disabled(locked)
+        Button("Fork") {
+            if let session, let last = session.conversation.messages.indices.last {
+                appState.fork(session, through: last)
             }
         }
-        .onChange(of: appState.sidebarRequest) { _, request in
+        .disabled(session == nil || streaming || (session?.conversation.messages.isEmpty ?? true))
+
+        if entry.isEncrypted || (session?.isEncrypted ?? false) {
+            Button("Change Password…") { appState.sidebarRequest = .changePassword(entry.id) }
+            .disabled(session == nil || streaming)
+            Button("Remove Encryption…") { appState.sidebarRequest = .removeEncryption(entry.id) }
+            .disabled(session == nil || streaming)
+            Button("Lock") {
+                appState.lock(entry.id)
+            }
+            .disabled(session == nil)
+        } else {
+            Button("Encrypt…") { appState.sidebarRequest = .encrypt(entry.id) }
+            .disabled(streaming)
+        }
+
+        Divider()
+        Button("Reveal in Finder") { appState.revealInFinder(entry) }
+        Button("Remove from List") { appState.removeFromList(entry) }
+        Divider()
+        Button("Move to Trash…", role: .destructive) { appState.sidebarRequest = .moveToTrash(entry.id) }
+    }
+
+    // MARK: Grouping and search
+
+    struct DateGroup {
+        let title: String
+        let dateStyle: SidebarRow.DateStyle
+        var entries: [LibraryEntry]
+    }
+
+    /// Today / Yesterday / Previous 7 Days / Older, newest first. Search matches titles of plain
+    /// and unlocked conversations only (locked ones have no title in memory).
+    private var groupedEntries: [DateGroup] {
+        let q = appState.sidebarQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let entries = appState.sortedEntries.filter { entry in
+            guard !q.isEmpty else { return true }
+            return appState.displayTitle(for: entry)?.localizedStandardContains(q) ?? false
+        }
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now)) ?? now
+        var groups: [DateGroup] = [
+            DateGroup(title: "Today", dateStyle: .time, entries: []),
+            DateGroup(title: "Yesterday", dateStyle: .time, entries: []),
+            DateGroup(title: "Previous 7 Days", dateStyle: .weekday, entries: []),
+            DateGroup(title: "Older", dateStyle: .date, entries: []),
+        ]
+        for entry in entries {
+            let date = appState.sortDate(for: entry)
+            let i: Int
+            if calendar.isDateInToday(date) || date > now { i = 0 }
+            else if calendar.isDateInYesterday(date) { i = 1 }
+            else if date >= weekAgo { i = 2 }
+            else { i = 3 }
+            groups[i].entries.append(entry)
+        }
+        return groups.filter { !$0.entries.isEmpty }
+    }
+}
+
+/// The sheets and dialogs behind the Conversation menu and the sidebar's row menus, whatever asked
+/// for them through `AppState.sidebarRequest`.
+struct ConversationDialogs: ViewModifier {
+    @Environment(AppState.self) private var appState
+
+    @ViewState private var renameTarget: ConversationSession?
+    @ViewState private var passwordTarget: PasswordSheet.Target?
+    @ViewState private var removeEncryptionTarget: ConversationSession?
+    @ViewState private var deleteTarget: LibraryEntry?
+    @ViewState private var showEncryptedNotice = false
+
+    func body(content: Content) -> some View {
+        content
+        // initial: a menu command chosen while the window was closed is waiting at reopen.
+        .onChange(of: appState.sidebarRequest, initial: true) { _, request in
             guard let request else { return }
             appState.sidebarRequest = nil
             handle(request)
@@ -70,6 +237,7 @@ struct SidebarView: View {
             RenameSheet(title: session.conversation.title) { newTitle in
                 session.rename(newTitle)
             }
+            .hideoutSheet()
         }
         .sheet(item: $passwordTarget, onDismiss: {
             // Shown only after the sheet is gone, so the alert is never hidden behind it.
@@ -82,6 +250,7 @@ struct SidebarView: View {
                 if newlyEncrypted { showEncryptedNotice = true }
             })
             .environment(appState)
+            .hideoutSheet()
         }
         .confirmationDialog(
             "Remove encryption?",
@@ -105,52 +274,6 @@ struct SidebarView: View {
         } message: { entry in
             Text(entry.url.lastPathComponent)
         }
-    }
-
-    @ViewBuilder
-    private func contextMenu(for entry: LibraryEntry) -> some View {
-        let session = appState.session(for: entry.id)
-        let locked = entry.isEncrypted && session == nil
-        let streaming = session?.isStreaming ?? false
-
-        Button("Rename…") { rename(entry) }
-            .disabled(locked)
-        Button("Fork") {
-            if let session, let last = session.conversation.messages.indices.last {
-                appState.fork(session, through: last)
-            }
-        }
-        .disabled(session == nil || streaming || (session?.conversation.messages.isEmpty ?? true))
-
-        if entry.isEncrypted || (session?.isEncrypted ?? false) {
-            Button("Change Password…") {
-                if let session { passwordTarget = .init(session: session, mode: .change) }
-            }
-            .disabled(session == nil || streaming)
-            Button("Remove Encryption…") {
-                removeEncryptionTarget = session
-            }
-            .disabled(session == nil || streaming)
-            Button("Lock") {
-                appState.lock(entry.id)
-            }
-            .disabled(session == nil)
-        } else {
-            Button("Encrypt…") {
-                Task {
-                    if let s = await ensureSession(entry) {
-                        passwordTarget = .init(session: s, mode: .encrypt)
-                    }
-                }
-            }
-            .disabled(streaming)
-        }
-
-        Divider()
-        Button("Reveal in Finder") { appState.revealInFinder(entry) }
-        Button("Remove from List") { appState.removeFromList(entry) }
-        Divider()
-        Button("Move to Trash…", role: .destructive) { deleteTarget = entry }
     }
 
     private func rename(_ entry: LibraryEntry) {
@@ -178,43 +301,6 @@ struct SidebarView: View {
         }
     }
 
-    // MARK: Grouping and search
-
-    struct DateGroup {
-        let title: String
-        let dateStyle: SidebarRow.DateStyle
-        var entries: [LibraryEntry]
-    }
-
-    /// Today / Yesterday / Previous 7 Days / Older, newest first. Search matches titles of plain
-    /// and unlocked conversations only (locked ones have no title in memory).
-    private var groupedEntries: [DateGroup] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entries = appState.sortedEntries.filter { entry in
-            guard !q.isEmpty else { return true }
-            return appState.displayTitle(for: entry)?.localizedStandardContains(q) ?? false
-        }
-        let calendar = Calendar.current
-        let now = Date()
-        let weekAgo = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now)) ?? now
-        var groups: [DateGroup] = [
-            DateGroup(title: "Today", dateStyle: .time, entries: []),
-            DateGroup(title: "Yesterday", dateStyle: .time, entries: []),
-            DateGroup(title: "Previous 7 Days", dateStyle: .weekday, entries: []),
-            DateGroup(title: "Older", dateStyle: .date, entries: []),
-        ]
-        for entry in entries {
-            let date = appState.sortDate(for: entry)
-            let i: Int
-            if calendar.isDateInToday(date) || date > now { i = 0 }
-            else if calendar.isDateInYesterday(date) { i = 1 }
-            else if date >= weekAgo { i = 2 }
-            else { i = 3 }
-            groups[i].entries.append(entry)
-        }
-        return groups.filter { !$0.entries.isEmpty }
-    }
-
     private func ensureSession(_ entry: LibraryEntry) async -> ConversationSession? {
         if let s = appState.session(for: entry.id) { return s }
         return await appState.loadPlain(entry)
@@ -227,6 +313,11 @@ struct SidebarRow: View {
     @Environment(AppState.self) private var appState
     let entry: LibraryEntry
     var dateStyle: DateStyle = .date
+    var isSelected = false
+    /// Whether arrow keys and Delete go to the list: without the system's highlight, the tag says so.
+    var listFocused = false
+
+    @ViewState private var hovering = false
 
     var body: some View {
         let session = appState.session(for: entry.id)
@@ -238,11 +329,14 @@ struct SidebarRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let title {
                     Text(title)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium, design: .rounded))
+                        .foregroundStyle(primaryInk)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 } else {
                     Text("Encrypted conversation")
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(secondaryInk)
                         .lineLimit(1)
                 }
                 HStack(spacing: 0) {
@@ -255,31 +349,59 @@ struct SidebarRow: View {
                             .truncationMode(.middle)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, design: .rounded))
+                .foregroundStyle(secondaryInk)
             }
             Spacer(minLength: 4)
             if session?.pendingApproval != nil {
                 // Without this a background chat waits silently.
                 Image(systemName: "hand.raised.fill")
                     .imageScale(.small)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(isSelected ? Hideout.attention : Hideout.wallInk)
                     .help("Waiting for your approval of a tool call")
                     .accessibilityLabel("Waiting for approval")
             } else if session?.isStreaming == true {
-                ProgressView().controlSize(.small)
+                HideoutSpinner(color: isSelected ? Hideout.emberText : Hideout.wallInk)
             }
             if entry.isEncrypted || session?.isEncrypted == true {
                 Image(systemName: session == nil ? "lock.fill" : "lock.open")
                     .imageScale(.small)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? Hideout.brass : Hideout.wallInkSoft)
                     .help(session == nil ? "Encrypted, locked" : "Encrypted, unlocked")
                     .accessibilityLabel(session == nil ? "Locked" : "Unlocked")
             }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background {
+            if isSelected {
+                WobblyRect(seed: entry.id.hashValueStable, radius: 8)
+                    .fill(Hideout.tag)
+                    .shadow(color: .black.opacity(0.18), radius: 2.5, y: 1.5)
+                    .overlay {
+                        if listFocused {
+                            WobblyRect(seed: entry.id.hashValueStable, radius: 8)
+                                .stroke(Hideout.ember, lineWidth: 1.5)
+                        }
+                    }
+            } else if hovering {
+                WobblyRect(seed: entry.id.hashValueStable, radius: 8)
+                    .fill(Hideout.tag.opacity(0.35))
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelected {
+                WashiTape(color: Hideout.marigold, width: 34, height: 11, angle: 6)
+                    .offset(x: 6, y: -3)
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .help(abbreviated(url.path))
     }
+
+    private var primaryInk: Color { isSelected ? Hideout.ink : Hideout.wallInk }
+    private var secondaryInk: Color { isSelected ? Hideout.inkSoft : Hideout.wallInkSoft }
 
     @ViewBuilder
     private func dateText(_ date: Date) -> some View {
@@ -298,16 +420,22 @@ private struct RenameSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Rename Conversation").font(.headline)
+            Text("Rename Conversation").lettered(22)
             TextField("Title", text: $title)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .foregroundStyle(Hideout.ink)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .paperCard(Hideout.card, seed: 5, radius: 9)
                 .frame(width: 320)
                 .onSubmit(save)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(TagButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button("Rename", action: save)
+                    .buttonStyle(TagButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -320,4 +448,9 @@ private struct RenameSheet: View {
         onSave(title)
         dismiss()
     }
+}
+
+private extension UUID {
+    /// A small seed that is the same on every launch (hashValue is not).
+    var hashValueStable: Int { Int(uuid.0) &* 251 &+ Int(uuid.1) }
 }

@@ -258,7 +258,7 @@ Features:
     - an Encrypt toggle with password and confirm fields
   - Context menu: Rename, Encrypt…/Change password…, Remove encryption, Lock, Reveal in Finder, Remove from list, Delete file (with confirmation; moves to the Trash via `FileManager.trashItem`).
 - **Chat view:**
-  - The toolbar has a provider picker, a model picker (from `listModels` plus free text), and a button that opens a per-conversation settings popover (system prompt, temperature, max tokens, reasoning effort).
+  - The header has a provider picker, a model picker (from `listModels` plus free text), and a button that opens a per-conversation settings popover (system prompt, temperature, max tokens, reasoning effort).
   - Each message row shows the role, markdown content, and attachments: image thumbnails, and text-file chips that preview on click.
   - Each row has a hover action bar:
     - **Copy** for both user and assistant messages. It writes to NSPasteboard with `prepareForNewContents(with: .currentHostOnly)`, which keeps Universal Clipboard from syncing it to other devices.
@@ -546,3 +546,13 @@ App:
 - Timeouts: unchanged. Parley's 600 s is an idle timeout between bytes; Cloudflare answers 524 after 100 s without the first byte. Strata sends `: keep-alive` at least every 10 s while queued or reading the prompt, so only a wait before the very first byte (a cold model load) hits 524, which now says so. Parley never reads or acts on `nel`/`report-to` and sends only its own requests to the configured host. Live check (best effort): two 401s carrying `nel`/`report-to` through the tunnel, then 80 s of watching sockets and the process's network log, showed no connection to the report host; CFNetwork and Network.framework contain no NEL/Report-To strings (they do contain HSTS and Alt-Svc). macOS networking does not appear to implement NEL.
 - Mock: `/cf/…` adds Cloudflare's headers to the normal answer; `/cf-520/` … `/cf-530/`, `/cf-1033/`, `/cf-challenge/`, `/cf-block/`, `/cf-1015/`, `/cf-access/`, `/cf-https/` answer as Cloudflare's edge (any flavor); models `mock-drop` (connection reset mid-body) and `mock-cut` (clean end without finish_reason or [DONE]). The snapshot harness adds `strata-cloudflare-errors` (light) and a learned value in the Strata popover.
 - Live: `meta.instanceId` changed between two days for the same model (`iq3_s`), handled as a restart above. The Cloudflare route ran over HTTP/3; a mid-stream drop over QUIC was not reproduced live (any `URLError` after the 200 counts as a dropped reply).
+
+## Visual design: the Hideout
+
+The interface is a childhood secret base: a cardboard-and-quilt fort, warm-dominant, conveying simple privacy and safety. Light appearance is afternoon sun; dark is lights-out by lantern.
+
+- `Sources/Parley/Theme/Hideout.swift` holds every colour as a dynamic token; `HideoutPieces.swift` holds the shared shapes, cards and button styles. Views use tokens only: no literal or system colours, no materials or glass.
+- The main window is a custom shell (`ContentView`: cardboard wall, seam, room) with `.windowStyle(.hiddenTitleBar)` and `RoomHeader`, not `NavigationSplitView` and a system toolbar. The conversation list is still `List(selection:)`, with its native highlight removed by `ListSelectionHighlightRemover` so a row can draw its own paper tag. Dialogs that menu commands open live on the window root (`ConversationDialogs`), so they work while the sidebar is hidden.
+- Safety colours (`danger`, `caution`, `attention`) are never decorative and stay distinct from the warm accents. Approval, link confirmation and errors use flat `noticeCard`s without tape, wobble or lettering.
+- `.lettered(_:)` (Noteworthy) is for fixed English strings only: it has no CJK glyphs. It sets `.fontDesign(nil)` because an inherited `.fontDesign(.rounded)` replaces custom fonts; for the same reason monospaced text must also set `.fontDesign(.monospaced)`.
+- Art is bundled in `Resources/Art` (copied by `build.sh`) and loaded from the app bundle; nothing is fetched. Fonts ship with macOS.

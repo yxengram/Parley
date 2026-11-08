@@ -50,38 +50,42 @@ struct ComposerView: View {
             if let warning = serverWarning {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Hideout.caution)
                         .accessibilityHidden(true)
                     Text(warning)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .noticeCard(fill: Hideout.cautionWash, edge: Hideout.caution, radius: 10)
             }
 
             if let err = session.composerError {
                 HStack(alignment: .firstTextBaseline) {
                     Label(err, systemImage: "exclamationmark.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Hideout.danger)
                     Spacer()
-                    Button { session.composerError = nil } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Dismiss")
+                    Button { session.composerError = nil } label: {
+                        Image(systemName: "xmark")
+                            .foregroundStyle(Hideout.danger)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Dismiss")
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .noticeCard(fill: Hideout.dangerWash, edge: Hideout.danger, radius: 10)
             }
 
-            HStack(alignment: .bottom, spacing: 6) {
+            HStack(alignment: .bottom, spacing: 7) {
                 Button(action: pickFiles) {
                     Image(systemName: "paperclip")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 26, height: 26)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RoundIconButtonStyle(size: 32, hoverFill: Hideout.composerWash))
                 .help("Attach images or text files")
                 .accessibilityLabel("Attach Files")
 
@@ -93,7 +97,9 @@ struct ComposerView: View {
                     if session.draftText.isEmpty {
                         Text(placeholder)
                             .lineLimit(1)
-                            .foregroundStyle(.tertiary)
+                            .font(.body)
+                            .fontDesign(nil)
+                            .foregroundStyle(Hideout.inkSoft)
                             .padding(.leading, 5)
                             .padding(.top, 3)
                             .allowsHitTesting(false)
@@ -110,42 +116,49 @@ struct ComposerView: View {
                     )
                     .frame(height: editorHeight)
                 }
-                .padding(.vertical, 2)
+                // Centres a single line on the round buttons.
+                .padding(.vertical, 5)
                 .help("Enter sends, Shift-Enter adds a new line. ↑ edits your last message.")
 
                 if session.isStreaming {
+                    // Inked in, with a square: nothing like the ember paper plane it replaces.
                     Button(action: session.stop) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(.primary)
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 12, weight: .bold))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ComposerActionButtonStyle(fill: Hideout.ink, icon: Hideout.paper))
                     .help("Stop generating (Esc or ⌘.)")
                     .accessibilityLabel("Stop Generating")
                 } else {
                     Button(action: send) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.5))
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .offset(x: -0.5, y: 0.5)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ComposerActionButtonStyle(fill: canSend ? Hideout.ember : Hideout.paperDeep,
+                                                           icon: canSend ? Hideout.onEmber : Hideout.inkFaint,
+                                                           raised: canSend))
                     .disabled(!canSend)
                     .help("Send (Enter)")
                     .accessibilityLabel("Send Message")
                 }
             }
-            .padding(.leading, 10)
-            .padding(.trailing, 7)
-            .padding(.vertical, 7)
-            .modifier(ComposerBackground())
+            // Clear of the stitching, which runs 5 pt inside the card's edge.
+            .padding(.leading, 13)
+            .padding(.trailing, 12)
+            .padding(.vertical, 12)
+            .stitchedCard(Hideout.composerCard, seed: 4, radius: 20)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 6)
+        // Room for the backdrop's fade, so it stays inside the safe-area inset.
+        .padding(.top, ComposerStripBackdrop.fadeHeight + 6)
         // The context status strip sits right below.
         .padding(.bottom, 6)
         // Lines the composer up with the message text (rows have 20 pt of side padding).
         .frame(maxWidth: Layout.contentMaxWidth - 8)
         .frame(maxWidth: .infinity)
+        // Runs on under the status strip, which draws on top of it; the window clips the rest.
+        .background { ComposerStripBackdrop().padding(.bottom, -44) }
         .onAppear { focusToken += 1 }
         .onChange(of: session.pendingEditMessageID) { _, id in
             if id != nil { focusToken += 1 }
@@ -157,33 +170,39 @@ struct ComposerView: View {
         }
     }
 
-    /// Only with a server configured or a built-in tool on. Accent-tinted, with a count, while
-    /// servers are on; the built-in tools count as one.
+    /// Only with a server configured or a built-in tool on. Accent-tinted, with a count on a small
+    /// ember badge, while servers are on; the built-in tools count as one.
     private var toolsButton: some View {
         let count = appState.enabledServers(for: session.conversation.settings).count
         return Button {
             showToolsPopover.toggle()
         } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "wrench.and.screwdriver")
-                    .font(.system(size: 14))
-                if count > 0 {
-                    Text(verbatim: "\(count)")
-                        .font(.caption.weight(.medium))
-                        .monospacedDigit()
-                }
-            }
-            .foregroundStyle(count > 0 ? Color.accentColor : Color.secondary)
-            .frame(minWidth: 26, minHeight: 26)
-            .contentShape(Rectangle())
+            Image(systemName: "wrench.and.screwdriver")
+                .foregroundStyle(count > 0 ? Hideout.emberText : Hideout.inkSoft)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RoundIconButtonStyle(size: 32, hoverFill: Hideout.composerWash))
         .disabled(session.isStreaming)
         .help("Tools: what this conversation can use (⇧⌘T)")
         .accessibilityLabel("Tools")
         .accessibilityValue(count == 1 ? "1 source on" : "\(count) sources on")
         .popover(isPresented: $showToolsPopover, arrowEdge: .top) {
             ConversationToolsPopover(session: session)
+                .hideoutSheet()
+        }
+        .overlay(alignment: .topTrailing) {
+            if count > 0 {
+                Text(verbatim: "\(count)")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Hideout.onEmber)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 15, minHeight: 15)
+                    .background(Hideout.ember, in: Capsule())
+                    .offset(x: 5, y: -5)
+                    .allowsHitTesting(false)
+                    // The button's accessibility value already says it.
+                    .accessibilityHidden(true)
+            }
         }
     }
 
@@ -298,26 +317,60 @@ struct ComposerView: View {
     }
 }
 
-/// Liquid Glass on macOS 26 and later, a material elsewhere.
-private struct ComposerBackground: ViewModifier {
-    private static var usesGlass: Bool {
-        #if DEBUG
-        // The snapshot harness cannot render glass; its legacy-SDK mode shows the fallback.
-        if SnapshotHarness.disablesGlass { return false }
-        #endif
-        return true
+/// The strip behind the composer and the status line: the room's own paper, so the transcript
+/// fades out behind it instead of showing around the card. After lights-out it keeps the lantern's
+/// glow, which is centred on this edge of the room; the afternoon sun is at the far corner.
+private struct ComposerStripBackdrop: View {
+    static let fadeHeight: CGFloat = 18
+
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        RoomBackground(glow: scheme == .dark)
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [Hideout.paper.opacity(0), Hideout.paper],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: Self.fadeHeight)
+                    Hideout.paper
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The composer's big round button: send, or stop.
+private struct ComposerActionButtonStyle: ButtonStyle {
+    var fill: Color
+    var icon: Color
+    var raised = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        Inner(configuration: configuration, fill: fill, icon: icon, raised: raised)
     }
 
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        if #available(macOS 26.0, *), Self.usesGlass {
-            content
-                .glassEffect(.regular, in: shape)
-        } else {
-            content
-                .background(.regularMaterial, in: shape)
-                .overlay(shape.strokeBorder(Color.secondary.opacity(0.2)))
-                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+    private struct Inner: View {
+        let configuration: ButtonStyle.Configuration
+        let fill: Color
+        let icon: Color
+        let raised: Bool
+        @ViewState private var hovering = false
+
+        var body: some View {
+            let pressed = configuration.isPressed
+            configuration.label
+                .foregroundStyle(icon)
+                .frame(width: 32, height: 32)
+                .background {
+                    Circle()
+                        .fill(fill)
+                        .brightness(pressed ? -0.05 : hovering && raised ? 0.03 : 0)
+                        .shadow(color: Hideout.board.opacity(raised && !pressed ? 0.2 : 0), radius: 1.5, y: 1)
+                }
+                .scaleEffect(pressed ? 0.95 : 1)
+                .contentShape(Circle())
+                .onHover { hovering = $0 }
         }
     }
 }
@@ -330,7 +383,7 @@ private struct EditingBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "pencil")
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Hideout.emberText)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Editing message")
                     .font(.callout.weight(.medium))
@@ -338,15 +391,20 @@ private struct EditingBar: View {
                      ? "Sending replaces it and the \(laterCount) message\(laterCount == 1 ? "" : "s") after it. Esc cancels."
                      : "Sending replaces it. Esc cancels.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
             }
             Spacer()
             Button("Cancel", action: onCancel)
-                .controlSize(.small)
+                .buttonStyle(TagButtonStyle())
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.vertical, 8)
+        // The user's own note, taken down from the conversation for another go.
+        .paperCard(Hideout.peach, seed: 9, radius: 12)
+        .overlay(alignment: .topTrailing) {
+            WashiTape(color: Hideout.marigold, width: 46, height: 13, angle: 3)
+                .offset(x: -14, y: -6)
+        }
     }
 }
 
@@ -442,7 +500,10 @@ struct ComposerTextView: NSViewRepresentable {
         tv.allowsUndo = true
         tv.drawsBackground = false
         tv.font = NSFont.preferredFont(forTextStyle: .body)
-        tv.textColor = .labelColor
+        tv.textColor = NSColor(Hideout.ink)
+        tv.insertionPointColor = NSColor(Hideout.emberText)
+        tv.selectedTextAttributes = [.backgroundColor: NSColor(Hideout.composerWash),
+                                     .foregroundColor: NSColor(Hideout.ink)]
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
@@ -456,6 +517,8 @@ struct ComposerTextView: NSViewRepresentable {
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.string = text
+        // Text that replaces the whole string, and pasted text, takes its colour from here.
+        tv.typingAttributes[.foregroundColor] = NSColor(Hideout.ink)
         tv.onPasteFiles = { onPasteFiles($0) }
         tv.onPasteImageData = { onPasteImageData($0) }
         // Dropped text is inserted as usual; dropped files become attachments (PastingTextView)

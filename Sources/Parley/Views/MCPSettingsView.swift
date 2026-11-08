@@ -10,6 +10,7 @@ struct MCPSettingsView: View {
     @ViewState private var confirmDelete = false
     @ViewState private var showImport = false
     @ViewState private var deleteError: String?
+    @FocusState private var listFocused: Bool
 
     var body: some View {
         @Bindable var settings = appState.settings
@@ -18,20 +19,28 @@ struct MCPSettingsView: View {
                 VStack(spacing: 0) {
                     List(selection: $selectedID) {
                         ForEach(settings.mcpServers) { server in
-                            HStack(spacing: 7) {
-                                MCPStatusDot(state: appState.mcpSnapshots[server.id]?.state ?? .stopped)
-                                Text(verbatim: server.name.isEmpty ? "Untitled" : ToolDisplay.line(server.name))
-                                    .lineLimit(1)
-                                Spacer()
-                                if !server.isEnabled {
-                                    Text("Off").font(.caption).foregroundStyle(.secondary)
+                            SettingsListTag(isSelected: selectedID == server.id, id: server.id, listFocused: listFocused) {
+                                HStack(spacing: 7) {
+                                    PaperStatusDot(state: appState.mcpSnapshots[server.id]?.state ?? .stopped,
+                                                   onWall: selectedID != server.id)
+                                    Text(verbatim: server.name.isEmpty ? "Untitled" : ToolDisplay.line(server.name))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    if !server.isEnabled {
+                                        Text("Off")
+                                            .font(.caption)
+                                            .foregroundStyle(selectedID == server.id ? Hideout.inkSoft : Hideout.wallInkSoft)
+                                    }
                                 }
                             }
                             .tag(server.id)
+                            .settingsListRow()
                         }
                     }
-                    .listStyle(.bordered(alternatesRowBackgrounds: false))
-                    HStack(spacing: 4) {
+                    .focused($listFocused)
+                    .settingsListChrome()
+                    .settingsKraftBoard(seed: 6)
+                    HStack(spacing: 6) {
                         Button {
                             // Off until its first Save: until then it has no program to run, and no
                             // chat or sheet should offer it.
@@ -39,20 +48,21 @@ struct MCPSettingsView: View {
                             settings.mcpServers.append(server)
                             selectedID = server.id
                         } label: { Image(systemName: "plus").frame(width: 14, height: 14) }
+                        .buttonStyle(RoundIconButtonStyle(size: 26))
                         .help("Add Server")
                         .accessibilityLabel("Add Server")
                         Button {
                             confirmDelete = true
                         } label: { Image(systemName: "minus").frame(width: 14, height: 14) }
+                        .buttonStyle(RoundIconButtonStyle(size: 26))
                         .disabled(selectedID == nil)
                         .help("Remove Server")
                         .accessibilityLabel("Remove Server")
                         Spacer()
                         Button("Import…") { showImport = true }
+                            .buttonStyle(TagButtonStyle())
                             .help("Paste a server config from another MCP client")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                     .padding(.top, 8)
                 }
                 .padding([.leading, .top], 20)
@@ -64,23 +74,23 @@ struct MCPSettingsView: View {
                         MCPServerEditor(serverID: id)
                             .id(id)
                     } else {
-                        ContentUnavailableView {
-                            Label("No server selected", systemImage: "wrench.and.screwdriver")
-                        } description: {
-                            Text("Add a server, or import a config from another MCP client. Parley starts nothing and looks for nothing on its own.")
-                        }
+                        SettingsEmptyNote(
+                            title: "No server selected",
+                            systemImage: "wrench.and.screwdriver",
+                            description: "Add a server, or import a config from another MCP client. Parley starts nothing and looks for nothing on its own."
+                        )
                     }
                 }
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
             }
-            Divider()
+            SettingsStitchLine()
             HStack(spacing: 12) {
                 Stepper(value: $settings.maxToolRounds, in: AppSettings.toolRoundsRange) {
                     Text("Tool rounds per reply: \(settings.maxToolRounds)")
                 }
                 .help("How many times in one reply the model may call tools before it has to answer.")
                 if let deleteError {
-                    Text(verbatim: deleteError).font(.caption).foregroundStyle(.red).lineLimit(2)
+                    SettingsNotice(.danger, deleteError).lineLimit(2)
                 }
                 Spacer()
             }
@@ -99,6 +109,7 @@ struct MCPSettingsView: View {
             MCPImportSheet { id in
                 if let id { selectedID = id }
             }
+            .hideoutSheet()
         }
         #if DEBUG
         .onReceive(NotificationCenter.default.publisher(for: SnapshotHarness.showMCPImportNotification)) { note in
@@ -307,19 +318,27 @@ struct MCPServerEditor: View {
     private var isDirty: Bool { loaded && draft != saved }
 
     var body: some View {
-        Form {
+        SettingsPage(labelWidth: 170) {
             statusSection
             connectionSection
             secretsSection
             if isHTTP, loaded {
-                MCPSignInSection(serverID: serverID, draft: $draft, needsAttention: snapshot?.signInNeed ?? .none) {
-                    draft.problem == nil && (!isDirty || save())
+                // A real Form inside the card, because the section relies on one for its
+                // field labels. Columns style does not scroll and takes its content's height.
+                SettingsSection(seed: 54) {
+                    Form {
+                        MCPSignInSection(serverID: serverID, draft: $draft, needsAttention: snapshot?.signInNeed ?? .none) {
+                            draft.problem == nil && (!isDirty || save())
+                        }
+                    }
+                    .formStyle(.columns)
+                    .scrollContentBackground(.hidden)
+                    .labeledContentStyle(.automatic)
                 }
             }
             useSection
             toolsSection
         }
-        .formStyle(.grouped)
         .safeAreaInset(edge: .bottom, spacing: 0) { saveBar }
         .onAppear(perform: load)
         // Closing Settings or switching servers must not silently drop typed values.
@@ -330,107 +349,113 @@ struct MCPServerEditor: View {
         }
         .sheet(isPresented: $showLog) {
             MCPLogSheet(serverID: serverID, serverName: draft.name)
+                .hideoutSheet()
         }
     }
 
     private var saveBar: some View {
         HStack(spacing: 8) {
             if let message = saveError ?? (isDirty ? draft.problem : nil) ?? loadError {
-                Text(verbatim: message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
+                SettingsNotice(.danger, message).lineLimit(2)
             }
             Spacer()
             Button("Revert") {
                 draft = saved
                 saveError = nil
             }
+            .buttonStyle(TagButtonStyle())
             .disabled(!isDirty)
             Button("Save") { _ = save() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(TagButtonStyle(kind: .primary))
                 .disabled(!isDirty || draft.problem != nil)
         }
-        .controlSize(.small)
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(RoomBackground(glow: false))
+        .overlay(alignment: .top) { SettingsStitchLine() }
     }
 
     private var connectionSection: some View {
-        Section("Connection") {
-            TextField("Name", text: $draft.name)
-            Picker("Type", selection: $draft.kind) {
-                Text("Local command").tag(MCPServerConfig.kindStdio)
-                Text("Remote URL").tag(MCPServerConfig.kindHTTP)
+        SettingsSection("Connection", seed: 52) {
+            SettingsField("Name") {
+                TextField("Name", text: $draft.name)
+            }
+            LabeledContent("Type") {
+                Picker("Type", selection: $draft.kind) {
+                    Text("Local command").tag(MCPServerConfig.kindStdio)
+                    Text("Remote URL").tag(MCPServerConfig.kindHTTP)
+                }
+                .labelsHidden()
+                .fixedSize()
             }
             if isHTTP {
-                TextField("URL", text: $draft.url, prompt: Text("https://example.com/mcp"))
-                    .textContentType(.URL)
+                SettingsField("URL") {
+                    TextField("URL", text: $draft.url, prompt: Text("https://example.com/mcp").foregroundStyle(Hideout.inkSoft))
+                        .textContentType(.URL)
+                }
                 if let warning = MCPServerDraft.urlWarning(draft.url) {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.caution, warning, systemImage: "exclamationmark.triangle.fill", font: .callout)
                 }
             } else {
-                TextField("Command", text: $draft.command, prompt: Text("npx, uvx, or a full path"))
-                    .font(.system(size: 12, design: .monospaced))
+                SettingsField("Command") {
+                    TextField("Command", text: $draft.command, prompt: Text("npx, uvx, or a full path").foregroundStyle(Hideout.inkSoft))
+                        .font(.system(size: 12, design: .monospaced))
+                        .fontDesign(.monospaced)
+                }
                 if let warning = draft.commandWarning {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.caution, warning, systemImage: "exclamationmark.triangle.fill", font: .callout)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Arguments")
                     TextEditor(text: $draft.arguments)
                         .font(.system(size: 12, design: .monospaced))
+                        .fontDesign(.monospaced)
                         .multilineTextAlignment(.leading)
                         .frame(height: 64)
                         .scrollContentBackground(.hidden)
-                        .padding(4)
-                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.25)))
+                        .settingsWell()
                         .accessibilityLabel("Arguments, one per line")
                 }
-                TextField("Working folder", text: $draft.workingDirectory, prompt: Text("your home folder"))
+                SettingsField("Working folder") {
+                    TextField("Working folder", text: $draft.workingDirectory, prompt: Text("your home folder").foregroundStyle(Hideout.inkSoft))
+                }
                 Text("Runs on your Mac with your permissions. One argument per line.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                 ForEach(dangers, id: \.self) { line in
-                    Label(ToolDisplay.line(line), systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.danger, ToolDisplay.line(line), systemImage: "exclamationmark.triangle.fill")
                 }
             }
         }
     }
 
     private var secretsSection: some View {
-        Section {
+        SettingsSection(isHTTP ? "Headers" : "Environment", seed: 53) {
             if isHTTP {
                 MCPPairRows(pairs: $draft.headers, namePrompt: "Authorization", addLabel: "Add Header")
             } else {
                 MCPPairRows(pairs: $draft.environment, namePrompt: "API_KEY", addLabel: "Add Variable")
             }
-        } header: {
-            Text(isHTTP ? "Headers" : "Environment")
         } footer: {
             Text("Arguments, the URL, environment values and headers are stored in your login Keychain (not synced).")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
         }
     }
 
     private var useSection: some View {
-        Section("Use") {
-            Toggle("Enabled", isOn: $draft.isEnabled)
-            Toggle("Use in new chats", isOn: $draft.useInNewChats)
-            TextField("Tool timeout (seconds)", text: $draft.callTimeout, prompt: Text(verbatim: String(Int(MCPServerConfig.defaultCallTimeout))))
-            TextField("Start timeout (seconds)", text: $draft.startupTimeout, prompt: Text(isHTTP ? "20" : "120"))
-            TextField("Result limit (characters)", text: $draft.maxResultCharacters, prompt: Text(verbatim: String(MCPServerConfig.defaultMaxResultCharacters)))
+        SettingsSection("Use", seed: 55) {
+            SettingsSwitchRow(isOn: $draft.isEnabled) { Text("Enabled") }
+            SettingsSwitchRow(isOn: $draft.useInNewChats) { Text("Use in new chats") }
+            SettingsField("Tool timeout (seconds)") {
+                TextField("Tool timeout (seconds)", text: $draft.callTimeout, prompt: Text(verbatim: String(Int(MCPServerConfig.defaultCallTimeout))).foregroundStyle(Hideout.inkSoft))
+            }
+            SettingsField("Start timeout (seconds)") {
+                TextField("Start timeout (seconds)", text: $draft.startupTimeout, prompt: Text(isHTTP ? "20" : "120").foregroundStyle(Hideout.inkSoft))
+            }
+            SettingsField("Result limit (characters)") {
+                TextField("Result limit (characters)", text: $draft.maxResultCharacters, prompt: Text(verbatim: String(MCPServerConfig.defaultMaxResultCharacters)).foregroundStyle(Hideout.inkSoft))
+            }
         }
     }
 
@@ -448,20 +473,23 @@ struct MCPServerEditor: View {
         return draft.isEnabled ? nil : "Turn on Enabled to connect."
     }
 
+    /// A failed server is an error; one that will restart on next use is a warning.
+    private var reasonKind: SettingsNotice.Kind {
+        if case .failed = snapshot?.state ?? .stopped { return .danger }
+        return .caution
+    }
+
     private var statusSection: some View {
-        Section {
+        SettingsSection("Status", seed: 51) {
             LabeledContent("State") {
                 HStack(spacing: 6) {
-                    MCPStatusDot(state: snapshot?.state ?? .stopped)
+                    PaperStatusDot(state: snapshot?.state ?? .stopped)
                     Text(verbatim: MCPStatusDot.label(snapshot?.state ?? .stopped))
                 }
             }
             if let reason = MCPStatusDot.reason(snapshot?.state ?? .stopped) {
-                Text(verbatim: reason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SettingsNotice(reasonKind, reason)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if let version = snapshot?.protocolVersion {
                 LabeledContent("Protocol") { Text(verbatim: version) }
@@ -483,14 +511,12 @@ struct MCPServerEditor: View {
             if let connectBlocker {
                 Text(verbatim: connectBlocker)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
             }
-        } header: {
-            Text("Status")
         } footer: {
             Text("A chat uses this server once you turn it on there, with the wrench button (⇧⌘T).")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
         }
     }
 
@@ -501,7 +527,7 @@ struct MCPServerEditor: View {
             let hidden = snapshot?.hiddenTools ?? []
             let remembered = MCPRememberedTool.list(server: server, listed: tools)
             if !tools.isEmpty || !hidden.isEmpty || !remembered.isEmpty {
-                Section("Tools") {
+                SettingsSection("Tools", seed: 56) {
                     ForEach(tools, id: \.name) { tool in
                         MCPToolRow(serverID: serverID, tool: tool, server: server)
                     }
@@ -509,12 +535,13 @@ struct MCPServerEditor: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verbatim: ToolDisplay.line(hidden.name))
                                 .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .fontDesign(.monospaced)
+                                .foregroundStyle(Hideout.inkSoft)
                                 .lineLimit(2)
                                 .truncationMode(.middle)
                             Text(verbatim: "Not available: \(hidden.reason)")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Hideout.inkSoft)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -526,7 +553,7 @@ struct MCPServerEditor: View {
                              ? "The server does not list these now."
                              : "Press Connect to see the server's whole list.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.inkSoft)
                     }
                     if !server.alwaysAllowedTools.isEmpty {
                         Button("Reset All Approvals") { appState.resetApprovals(serverID: serverID) }
@@ -580,21 +607,24 @@ private struct MCPPairRows: View {
     var body: some View {
         ForEach($pairs) { $pair in
             HStack(spacing: 6) {
-                TextField("Name", text: $pair.name, prompt: Text(verbatim: namePrompt))
+                TextField("Name", text: $pair.name, prompt: Text(verbatim: namePrompt).foregroundStyle(Hideout.inkSoft))
                     .labelsHidden()
                     .font(.system(size: 12, design: .monospaced))
-                SecureField("Value", text: $pair.value, prompt: Text("value"))
+                    .fontDesign(.monospaced)
+                    .settingsWell()
+                SecureField("Value", text: $pair.value, prompt: Text("value").foregroundStyle(Hideout.inkSoft))
                     .labelsHidden()
+                    .settingsWell()
                 Button {
                     pairs.removeAll { $0.id == pair.id }
                 } label: { Image(systemName: "minus.circle") }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
+                .foregroundStyle(Hideout.inkSoft)
                 .help("Remove")
                 .accessibilityLabel("Remove \(pair.name)")
             }
         }
         Button(addLabel) { pairs.append(MCPServerDraft.Pair()) }
-            .controlSize(.small)
     }
 }
 
@@ -608,23 +638,20 @@ private struct MCPRememberedToolRow: View {
         HStack(spacing: 6) {
             Text(verbatim: ToolDisplay.line(tool.name))
                 .font(.system(size: 12, design: .monospaced))
+                .fontDesign(.monospaced)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
             if tool.isAlwaysAllowed {
-                Text("Always allowed")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                AlwaysAllowedBadge()
                 Button("Revoke") { appState.revokeAlways(serverID: serverID, tool: tool.name) }
-                    .buttonStyle(.link)
+                    .buttonStyle(SettingsLinkButtonStyle())
                     .font(.caption)
             }
             if tool.isOff {
-                Text("Off").font(.caption).foregroundStyle(.secondary)
+                Text("Off").font(.caption).foregroundStyle(Hideout.inkSoft)
                 Button("Turn On") { appState.setToolDisabled(serverID: serverID, tool: tool.name, disabled: false) }
-                    .buttonStyle(.link)
+                    .buttonStyle(SettingsLinkButtonStyle())
                     .font(.caption)
             }
         }
@@ -646,35 +673,70 @@ private struct MCPToolRow: View {
     }
 
     var body: some View {
-        Toggle(isOn: isOn) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(verbatim: ToolDisplay.line(tool.name))
                         .font(.system(size: 12, design: .monospaced))
+                        .fontDesign(.monospaced)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if server.alwaysAllowedTools[tool.name] != nil {
-                        Text("Always allowed")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                        AlwaysAllowedBadge()
                         Button("Revoke") { appState.revokeAlways(serverID: serverID, tool: tool.name) }
-                            .buttonStyle(.link)
+                            .buttonStyle(SettingsLinkButtonStyle())
                             .font(.caption)
                     }
                 }
                 if let description = tool.description, !description.isEmpty {
                     (Text("From the server: ") + Text(verbatim: ToolDisplay.visible(description)))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(String(description.prefix(4000)))
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle(tool.name, isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .accessibilityLabel(tool.name)
         }
-        .accessibilityLabel(tool.name)
+    }
+}
+
+/// The server dot on paper: moss running, caution on the way or restarting, danger failed.
+/// (Same spoken text as MCPStatusDot.)
+private struct PaperStatusDot: View {
+    let state: MCPServerState
+    var onWall = false
+
+    private var color: Color {
+        switch state {
+        case .ready: return Hideout.moss
+        case .stopped: return onWall ? Hideout.wallInkSoft : Hideout.inkFaint
+        case .starting, .restarting: return Hideout.caution
+        case .failed: return Hideout.danger
+        }
+    }
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
+            .accessibilityLabel(MCPStatusDot.text(state))
+    }
+}
+
+private struct AlwaysAllowedBadge: View {
+    var body: some View {
+        Text("Always allowed")
+            .font(.caption2)
+            .foregroundStyle(Hideout.ink)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Hideout.emberWash, in: Capsule())
     }
 }
 
@@ -691,20 +753,21 @@ private struct MCPLogSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: "Log: \(ToolDisplay.visible(serverName))").font(.headline)
+            Text(verbatim: "Log: \(ToolDisplay.visible(serverName))").font(Hideout.title(16))
             ScrollView {
                 Text(verbatim: lines.isEmpty ? "Nothing yet." : ToolDisplay.visible(text))
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(lines.isEmpty ? .secondary : .primary)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(lines.isEmpty ? Hideout.boardInkSoft : Hideout.boardInk)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
+                    .padding(10)
             }
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+            .background(Hideout.board, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             HStack {
                 Text("Kept in memory only.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                 Spacer()
                 Button("Copy") { Pasteboard.copy(text) }
                     .disabled(lines.isEmpty)
@@ -718,6 +781,7 @@ private struct MCPLogSheet: View {
                 Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
+            .buttonStyle(TagButtonStyle())
         }
         .padding(20)
         .frame(width: 620, height: 420)

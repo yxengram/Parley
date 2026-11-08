@@ -71,40 +71,44 @@ struct LinkConfirmationSheet: View {
     @ViewState private var armed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Open this link in your browser?")
-                .font(.headline)
-            Text("Opening sends the whole address to this site, including anything a model put in it.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Site")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                // The end of a host is the part that says whose it is.
-                Text(verbatim: link.host)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .lineLimit(2)
-                    .truncationMode(.head)
-                    .textSelection(.enabled)
-            }
-            ToolTextBlock(title: "Address", text: link.address, maxHeight: 200)
-            if link.hasHiddenCharacters {
-                Label("The address contains hidden or right-to-left characters, shown here as \\u{…}.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                DecisionHeading(title: Text("Open this link in your browser?"))
+                Text("Opening sends the whole address to this site, including anything a model put in it.")
+                    .font(.callout)
+                    .foregroundStyle(Hideout.ink)
                     .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Site")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(Hideout.inkSoft)
+                    // The end of a host is the part that says whose it is.
+                    Text(verbatim: link.host)
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .fontDesign(.monospaced)
+                        .foregroundStyle(Hideout.ink)
+                        .lineLimit(2)
+                        .truncationMode(.head)
+                        .textSelection(.enabled)
+                }
+                ToolTextBlock(title: "Address", text: link.address, maxHeight: 200)
+                if link.hasHiddenCharacters {
+                    Label("The address contains hidden or right-to-left characters, shown here as \\u{…}.", systemImage: "exclamationmark.triangle.fill")
+                        .safetyNotice(.caution)
+                }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .noticeCard(fill: Hideout.attentionWash, edge: Hideout.attention)
             HStack(spacing: 8) {
                 Spacer()
                 Button("Cancel", action: cancel)
+                    .buttonStyle(TagButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button("Open", action: open)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(TagButtonStyle(kind: .primary))
                     .disabled(!armed)
             }
-            .padding(.top, 4)
         }
         .task(id: link.id) {
             armed = false
@@ -113,5 +117,43 @@ struct LinkConfirmationSheet: View {
         }
         .padding(20)
         .frame(width: 480)
+    }
+}
+
+// Private on purpose: other surfaces define their own helpers, and these must not collide.
+private enum SafetyTone { case caution, danger }
+
+private extension View {
+    /// A warning or an error on its own flat strip. Exact wording, no decoration.
+    func safetyNotice(_ tone: SafetyTone) -> some View {
+        let edge = tone == .danger ? Hideout.danger : Hideout.caution
+        return self
+            .font(.callout.weight(.medium))
+            .foregroundStyle(edge)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .noticeCard(fill: tone == .danger ? Hideout.dangerWash : Hideout.cautionWash, edge: edge, radius: 8)
+    }
+}
+
+
+/// The title of something that needs a decision: plain and strong, never lettered.
+private struct DecisionHeading: View {
+    let title: Text
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Hideout.paper)
+                .frame(width: 26, height: 26)
+                .background(Hideout.attention, in: Circle())
+                .accessibilityHidden(true)
+            title
+                .font(Hideout.title(16))
+                .foregroundStyle(Hideout.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

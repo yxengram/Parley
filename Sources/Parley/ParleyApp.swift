@@ -21,10 +21,11 @@ struct ParleyApp: App {
             ContentView()
                 .environment(appState)
                 .frame(minWidth: 760, minHeight: 480)
+                .hideoutScene()
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 760)
         .commands {
-            SidebarCommands()
             CommandGroup(replacing: .appInfo) {
                 Button("About Parley") { AboutPanel.show() }
             }
@@ -32,6 +33,12 @@ struct ParleyApp: App {
                 FileCommands(appState: appState)
             }
             CommandGroup(after: .sidebar) {
+                Button(appState.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
+                    appState.toggleSidebar()
+                }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+                Button("Search Conversations") { appState.focusSidebarSearch() }
+                    .keyboardShortcut("f", modifiers: .command)
                 Button("Refresh Conversation List") { appState.reloadLibrary() }
                 Divider()
             }
@@ -44,6 +51,8 @@ struct ParleyApp: App {
 
         Window("Parley Help", id: "help") {
             HelpView()
+                .hideoutScene()
+                .background(RoomBackground(glow: false))
         }
         .defaultSize(width: 620, height: 680)
         .windowResizability(.contentMinSize)
@@ -51,6 +60,7 @@ struct ParleyApp: App {
         Settings {
             SettingsView()
                 .environment(appState)
+                .hideoutScene()
         }
     }
 }

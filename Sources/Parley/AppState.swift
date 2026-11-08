@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Observation
 import ParleyCore
 
@@ -93,7 +94,28 @@ final class AppState {
         }
     }
 
-    /// Requests from menu commands that the sidebar carries out (it owns the sheets and dialogs).
+    /// Whether the cardboard wall (conversation list) is showing.
+    var isSidebarVisible = true
+
+    func toggleSidebar() {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            isSidebarVisible.toggle()
+        } else {
+            withAnimation(.easeInOut(duration: 0.18)) { isSidebarVisible.toggle() }
+        }
+    }
+
+    /// The sidebar's search text: it outlives the sidebar being hidden.
+    var sidebarQuery = ""
+    /// Set by ⌘F; the sidebar moves focus to its search field and clears it.
+    var sidebarSearchFocusPending = false
+
+    func focusSidebarSearch() {
+        if !isSidebarVisible { toggleSidebar() }
+        sidebarSearchFocusPending = true
+    }
+
+    /// Requests from menu commands and the sidebar's rows, carried out by ConversationDialogs.
     var sidebarRequest: SidebarRequest?
     /// Set by the Conversation menu: ChatView opens its settings popover for this conversation.
     var conversationSettingsRequest: UUID?

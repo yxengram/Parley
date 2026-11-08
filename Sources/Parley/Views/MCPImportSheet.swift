@@ -19,13 +19,13 @@ struct MCPImportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Import MCP Servers").font(.headline)
+            Text("Import MCP Servers")
+                .lettered(24)
+                .foregroundStyle(Hideout.emberText)
+                .accessibilityAddTraits(.isHeader)
             if reviewing { review } else { paste }
             if let error {
-                Label(error, systemImage: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
+                SettingsNotice(.danger, error, systemImage: "xmark.circle.fill", font: .callout)
             }
             HStack {
                 if reviewing {
@@ -39,16 +39,17 @@ struct MCPImportSheet: View {
                     .keyboardShortcut(.cancelAction)
                 if reviewing {
                     Button("Import") { importChosen() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(TagButtonStyle(kind: .primary))
                         .keyboardShortcut(.defaultAction)
                         .disabled(chosen.isEmpty)
                 } else {
                     Button("Review") { parse() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(TagButtonStyle(kind: .primary))
                         .keyboardShortcut(.defaultAction)
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .buttonStyle(TagButtonStyle())
         }
         .padding(20)
         .frame(width: 620, height: 500)
@@ -66,18 +67,18 @@ struct MCPImportSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Paste a server config from another MCP client: an object with mcpServers or servers, or the entries alone. Parley does not read other apps' files.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $text)
                 .font(.system(size: 12, design: .monospaced))
+                .fontDesign(.monospaced)
                 .scrollContentBackground(.hidden)
-                .padding(6)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.25)))
+                .settingsWell()
             Button("Paste from Clipboard") {
                 // Read only on this press.
                 if let pasted = NSPasteboard.general.string(forType: .string) { text = pasted }
             }
+            .buttonStyle(TagButtonStyle())
         }
     }
 
@@ -94,11 +95,15 @@ struct MCPImportSheet: View {
                 }
                 Text("Nothing starts when you import. Turn a server on for a chat with the wrench button (⇧⌘T).")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 6)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 3)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private func parse() {
@@ -151,18 +156,22 @@ private struct MCPImportRow: View {
                 .disabled(entry.error != nil)
             VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: ToolDisplay.line(entry.config.name))
-                    .font(.body.weight(.medium))
+                    .font(Hideout.title(14))
                 ForEach(entry.danger, id: \.self) { line in
-                    Label(ToolDisplay.line(line), systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.danger, ToolDisplay.line(line), systemImage: "exclamationmark.triangle.fill")
                 }
                 if !commandLine.isEmpty {
+                    // The exact thing being trusted: on the chalkboard, in full.
                     Text(verbatim: commandLine)
                         .font(.system(size: 12, design: .monospaced))
+                        .fontDesign(.monospaced)
+                        .foregroundStyle(Hideout.boardInk)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Hideout.board, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 if let folder = entry.config.workingDirectory {
                     Text(verbatim: "Working folder: \(ToolDisplay.line(folder))")
@@ -171,29 +180,20 @@ private struct MCPImportRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let warning = MCPServerDraft.urlWarning(entry.secrets.url) {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.caution, warning, systemImage: "exclamationmark.triangle.fill")
                 }
                 if let error = entry.error {
-                    Text(verbatim: error).font(.caption).foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.danger, error)
                 } else if isStdio {
-                    Text("Runs this program on your Mac with your permissions.")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    SettingsNotice(.caution, "Runs this program on your Mac with your permissions.")
                 }
                 ForEach(entry.warnings, id: \.self) { line in
-                    Text(verbatim: line)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.caution, line)
                 }
                 if !hiddenNames.isEmpty {
                     Text(verbatim: "Values hidden: " + hiddenNames.map(ToolDisplay.line).joined(separator: ", "))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if entry.error == nil {
@@ -201,9 +201,16 @@ private struct MCPImportRow: View {
                          ? "Arguments and environment values go to your login Keychain."
                          : "The URL and header values go to your login Keychain.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(14)
+        .paperCard(Hideout.card, seed: seed, radius: 12)
+    }
+
+    private var seed: Int {
+        entry.config.name.utf8.reduce(3) { $0 &+ Int($1) }
     }
 }

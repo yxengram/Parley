@@ -45,14 +45,16 @@ struct ThinkingDisclosure: View {
                     Image(systemName: "chevron.right")
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                         .font(.caption.weight(.semibold))
-                    Image(systemName: "brain")
+                    Image(systemName: "ellipsis.bubble")
                     label
                     if isThinking {
-                        ProgressView().controlSize(.mini)
+                        FirefliesIndicator()
+                            .scaleEffect(0.65)
+                            .frame(width: 38, height: 12)
                     }
                 }
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -60,11 +62,14 @@ struct ThinkingDisclosure: View {
 
             if expanded {
                 reasoningText
-                    .padding(.leading, 12)
+                    .padding(.leading, 14)
                     .overlay(alignment: .leading) {
-                        Capsule().fill(Color.secondary.opacity(0.3)).frame(width: 3)
+                        WhisperRule()
+                            .stroke(Hideout.stitch, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [0.1, 5.5]))
+                            .frame(width: 2)
+                            .accessibilityHidden(true)
                     }
-                    .padding(.leading, 2)
+                    .padding(.leading, 5)
             }
         }
         .onChange(of: isStreaming) { _, streaming in
@@ -91,8 +96,9 @@ struct ThinkingDisclosure: View {
         // DESIGN.md: secondary, monospaced-ish; at 12 pt it stays smaller than the reply text.
         let text = Text(reasoning)
             .font(.system(size: 12, design: .monospaced))
+            .fontDesign(.monospaced)
             .lineSpacing(2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Hideout.inkSoft)
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,6 +117,16 @@ struct ThinkingDisclosure: View {
                 }
         } else {
             text
+        }
+    }
+
+    /// The dotted line down the side of a whisper.
+    private struct WhisperRule: Shape {
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            path.move(to: CGPoint(x: rect.midX, y: rect.minY + 2))
+            path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+            return path
         }
     }
 }

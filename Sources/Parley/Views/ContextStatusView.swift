@@ -83,12 +83,18 @@ struct ContextSnapshot: Equatable {
 
     var percent: Double? { limit.map { usage.percent(of: $0.tokens) } }
 
-    /// Orange from 80 %, red from 95 %.
+    /// The gauge's fill: marigold, ember from 80 %, danger from 95 %.
     var tint: Color {
-        guard let p = percent else { return .secondary }
-        if p >= 95 { return .red }
-        if p >= 80 { return .orange }
-        return .accentColor
+        guard let p = percent else { return Hideout.inkSoft }
+        if p >= 95 { return Hideout.danger }
+        if p >= 80 { return Hideout.ember }
+        return Hideout.marigold
+    }
+
+    /// The usage figure beside the gauge. Marigold and ember are fills, too light to read on paper.
+    var textTint: Color {
+        guard let p = percent, p >= 80 else { return Hideout.inkSoft }
+        return p >= 95 ? Hideout.danger : Hideout.caution
     }
 
     @MainActor
@@ -161,18 +167,21 @@ struct ContextStatusBar: View {
             Button { showPopover.toggle() } label: {
                 label(snap)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StatusLineButtonStyle())
             .help(helpText(snap, provider: provider))
             .accessibilityLabel(Self.accessibilityText(snap))
             .accessibilityHint("Shows context details")
             // The strip sits on the window's bottom edge: open upwards, into the window.
             .popover(isPresented: $showPopover, arrowEdge: .top) {
-                if let provider, !model.isEmpty {
-                    ContextPopover(session: session, provider: provider, model: model)
-                } else {
-                    Text("Choose a model to see its context length.")
-                        .padding(16)
+                Group {
+                    if let provider, !model.isEmpty {
+                        ContextPopover(session: session, provider: provider, model: model)
+                    } else {
+                        Text("Choose a model to see its context length.")
+                            .padding(16)
+                    }
                 }
+                .hideoutSheet()
             }
         }
         .padding(.horizontal, 16)
@@ -193,7 +202,8 @@ struct ContextStatusBar: View {
                         .imageScale(.small)
                     Text(verbatim: activity)
                 }
-                Text("·").foregroundStyle(.tertiary)
+                .foregroundStyle(Hideout.ink)
+                Text("·").foregroundStyle(Hideout.inkFaint)
             } else if snap.isStreaming, let progress = snap.promptProgress {
                 // Prompt reading (Strata, llama.cpp) before the first token.
                 HStack(spacing: 3) {
@@ -201,40 +211,41 @@ struct ContextStatusBar: View {
                         .imageScale(.small)
                     Text("Reading prompt \(Int((progress.fraction * 100).rounded(.down)))%")
                 }
-                Text("·").foregroundStyle(.tertiary)
+                .foregroundStyle(Hideout.ink)
+                Text("·").foregroundStyle(Hideout.inkFaint)
             } else if snap.isStreaming || snap.tokensPerSecond != nil {
                 HStack(spacing: 3) {
                     Image(systemName: "gauge.with.dots.needle.67percent")
                         .imageScale(.small)
                     Text(speedText(snap))
                 }
-                .foregroundStyle(snap.isStreaming ? Color.primary : Color.secondary)
-                Text("·").foregroundStyle(.tertiary)
+                .foregroundStyle(snap.isStreaming ? Hideout.ink : Hideout.inkSoft)
+                Text("·").foregroundStyle(Hideout.inkFaint)
             }
             if case .failed = snap.reload {
                 Label("Reload failed", systemImage: "exclamationmark.triangle.fill")
                     .labelStyle(StripLabelStyle())
-                    .foregroundStyle(.red)
-                Text("·").foregroundStyle(.tertiary)
+                    .foregroundStyle(Hideout.danger)
+                Text("·").foregroundStyle(Hideout.inkFaint)
             }
             if snap.reload?.isRunning == true {
-                ProgressView().controlSize(.mini)
-                Text("Reloading model…").foregroundStyle(.secondary)
+                ProgressView().controlSize(.mini).tint(Hideout.inkSoft)
+                Text("Reloading model…").foregroundStyle(Hideout.inkSoft)
             } else if let limit = snap.limit {
                 ContextRing(fraction: (snap.percent ?? 0) / 100, tint: snap.tint)
                 // Only the model's maximum is known: the loaded size may be much smaller.
                 let limitText = (limit.source == .serverMaximum ? "max " : "") + TokenFormat.tokens(limit.tokens)
                 Text(usageText(snap.usage) + " / " + limitText
                      + (snap.usage.tokens > 0 ? " (" + TokenFormat.percent(snap.percent ?? 0) + ")" : ""))
-                    .foregroundStyle((snap.percent ?? 0) >= 80 ? snap.tint : Color.secondary)
+                    .foregroundStyle(snap.textTint)
             } else if snap.isProbing && snap.info == nil {
-                Text("Context: checking…").foregroundStyle(.secondary)
+                Text("Context: checking…").foregroundStyle(Hideout.inkSoft)
             } else {
                 if snap.usage.tokens > 0 {
-                    Text(usageText(snap.usage) + " tokens").foregroundStyle(.secondary)
-                    Text("·").foregroundStyle(.tertiary)
+                    Text(usageText(snap.usage) + " tokens").foregroundStyle(Hideout.inkSoft)
+                    Text("·").foregroundStyle(Hideout.inkFaint)
                 }
-                Text("Context: unknown — set…").foregroundStyle(Color.accentColor)
+                Text("Context: unknown — set…").foregroundStyle(Hideout.emberText)
             }
         }
         .font(.caption)
@@ -242,7 +253,6 @@ struct ContextStatusBar: View {
         .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .modifier(StatusCapsuleBackground())
         .contentShape(Capsule())
     }
 
@@ -309,7 +319,7 @@ struct ContextRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 2)
+            Circle().stroke(Hideout.line, lineWidth: 2)
             Circle()
                 .trim(from: 0, to: min(max(fraction, 0), 1))
                 .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
@@ -320,23 +330,72 @@ struct ContextRing: View {
     }
 }
 
-/// Liquid Glass on macOS 26 and later, a material elsewhere (like the composer).
-private struct StatusCapsuleBackground: ViewModifier {
-    private static var usesGlass: Bool {
-        #if DEBUG
-        if SnapshotHarness.disablesGlass { return false }
-        #endif
-        return true
+/// The strip is plain writing on the room's paper; a scrap of deeper paper shows it can be pressed.
+private struct StatusLineButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Inner(configuration: configuration)
     }
 
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *), Self.usesGlass {
-            content.glassEffect(.regular, in: Capsule())
-        } else {
-            content
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2)))
+    private struct Inner: View {
+        let configuration: ButtonStyle.Configuration
+        @ViewState private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .background {
+                    Capsule().fill(Hideout.paperDeep.opacity(hovering || configuration.isPressed ? 1 : 0))
+                }
+                .onHover { hovering = $0 }
         }
+    }
+}
+
+/// A slim bar for how full the context is.
+private struct ContextGaugeStyle: ProgressViewStyle {
+    let tint: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        let fraction = min(max(configuration.fractionCompleted ?? 0, 0), 1)
+        return Capsule()
+            .fill(Hideout.paperDeep)
+            .overlay(alignment: .leading) {
+                GeometryReader { proxy in
+                    if fraction > 0 {
+                        Capsule()
+                            .fill(tint)
+                            // A sliver is still visible as a dot.
+                            .frame(width: max(proxy.size.width * fraction, proxy.size.height))
+                    }
+                }
+            }
+            .overlay(Capsule().strokeBorder(Hideout.line))
+            .frame(height: 9)
+            .accessibilityElement(children: .ignore)
+            .accessibilityValue("\(Int((fraction * 100).rounded())) percent")
+    }
+}
+
+/// Text fields in the conversation's popovers: a little well of paper, inked around when focused.
+extension View {
+    func composerPopoverField() -> some View {
+        modifier(ComposerPopoverField())
+    }
+}
+
+private struct ComposerPopoverField: ViewModifier {
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        content
+            .textFieldStyle(.plain)
+            .focused($focused)
+            // The stroke below is the focus ring.
+            .focusEffectDisabled()
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Hideout.paper, in: shape)
+            .overlay(shape.strokeBorder(focused ? Hideout.emberText : Hideout.line, lineWidth: focused ? 1.5 : 1))
     }
 }
 
@@ -365,28 +424,37 @@ struct ContextPopover: View {
 
     var body: some View {
         let (snap, _, _) = ContextSnapshot.make(session: session, appState: appState)
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             header(snap)
-            if let limit = snap.limit {
-                ProgressView(value: min(snap.usage.percent(of: limit.tokens), 100), total: 100)
-                    .tint(snap.tint)
-                    .accessibilityLabel("Context used")
+            VStack(alignment: .leading, spacing: 12) {
+                if let limit = snap.limit {
+                    ProgressView(value: min(snap.usage.percent(of: limit.tokens), 100), total: 100)
+                        .progressViewStyle(ContextGaugeStyle(tint: snap.tint))
+                        .accessibilityLabel("Context used")
+                }
+                details(snap)
+                if snap.info?.serverKind == .strata {
+                    strataNote(snap)
+                }
             }
-            details(snap)
-            if snap.info?.serverKind == .strata {
-                strataNote(snap)
-            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .stitchedCard(Hideout.card, seed: 21, radius: 14)
             // The reload confirmation replaces the manual field, so the popover keeps its height.
             if !confirmingReload {
-                Divider()
                 manualSection(snap)
+                    .padding(15)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .stitchedCard(Hideout.card, seed: 22, radius: 14)
             }
             if snap.info?.canSetContextLength == true {
-                Divider()
                 reloadSection(snap)
+                    .padding(15)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .stitchedCard(Hideout.card, seed: 23, radius: 14)
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(width: 360)
         .onAppear {
             manualText = snap.manual.map(String.init) ?? ""
@@ -408,23 +476,23 @@ struct ContextPopover: View {
     private func header(_ snap: ContextSnapshot) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Context").font(.headline)
+                Text("Context").lettered(20)
                 Text(model)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer()
             if snap.isProbing {
-                ProgressView().controlSize(.small)
+                ProgressView().controlSize(.small).tint(Hideout.inkSoft)
             } else {
                 Button {
                     Task { await appState.refreshContextInfo(provider: provider, model: model, force: true) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(RoundIconButtonStyle(size: 28))
                 .help("Ask \(provider.name) again")
                 .accessibilityLabel("Refresh")
             }
@@ -434,7 +502,7 @@ struct ContextPopover: View {
     private func details(_ snap: ContextSnapshot) -> some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 6) {
             GridRow {
-                Text("In use").foregroundStyle(.secondary)
+                Text("In use").foregroundStyle(Hideout.inkSoft)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(snap.usage.tokens > 0
                          ? (snap.usage.isEstimated ? "≈ " : "") + "\(TokenFormat.grouped(snap.usage.tokens)) tokens"
@@ -442,68 +510,75 @@ struct ContextPopover: View {
                          : "Nothing yet")
                     if snap.usage.isEstimated {
                         Text("Estimated from the text; the server's count replaces it after the next reply.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Hideout.inkSoft)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             GridRow {
-                Text("Limit").foregroundStyle(.secondary)
+                Text("Limit").foregroundStyle(Hideout.inkSoft)
                 VStack(alignment: .leading, spacing: 1) {
                     if let limit = snap.limit {
                         let source = Self.sourceText(limit.source, serverKind: snap.info?.serverKind)
                         Text("\(TokenFormat.grouped(limit.tokens)) tokens")
                         Text(source.prefix(1).uppercased() + source.dropFirst())
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Hideout.inkSoft)
                     } else {
                         Text(snap.isProbing ? "Checking…" : "Unknown")
                         if !snap.isProbing && snap.info?.serverKind != .strata {
                             Text("\(provider.name) does not report it. Enter it below if you know it.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(Hideout.inkSoft)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let learned = snap.learned, snap.limit?.source != .learned {
                 GridRow {
-                    Text("Last error").foregroundStyle(.secondary)
+                    Text("Last error").foregroundStyle(Hideout.inkSoft)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(TokenFormat.grouped(learned)) tokens")
                         Text(learned == snap.limit?.tokens
                              ? "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named the same size."
                              : "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named this size; \(snap.limit?.source == .manual ? "your value, entered after it," : "the reported value") is used instead.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Hideout.inkSoft)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if let max = snap.info?.maxContextLength, max != snap.limit?.tokens || snap.limit?.source != .serverMaximum {
                 GridRow {
-                    Text("Model max").foregroundStyle(.secondary)
+                    Text("Model max").foregroundStyle(Hideout.inkSoft)
                     Text("\(TokenFormat.grouped(max)) tokens")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if let kind = snap.info?.serverKind {
                 GridRow {
-                    Text("Server").foregroundStyle(.secondary)
+                    Text("Server").foregroundStyle(Hideout.inkSoft)
                     Text(kind.displayName + (snap.info?.isLoaded.map { $0 ? " · model loaded" : " · model not loaded" } ?? ""))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if snap.tokensPerSecond != nil || snap.timeToFirstToken != nil {
                 GridRow {
-                    Text("Speed").foregroundStyle(.secondary)
+                    Text("Speed").foregroundStyle(Hideout.inkSoft)
                     Text([
                         snap.tokensPerSecond.map { (snap.speedIsEstimated ? "≈" : "") + TokenFormat.rate($0) + " tok/s" },
                         snap.timeToFirstToken.map { TokenFormat.seconds($0) + " to first token" },
                     ].compactMap { $0 }.joined(separator: " · "))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if let prompt = Self.promptText(snap) {
                 GridRow {
-                    Text("Prompt").foregroundStyle(.secondary)
+                    Text("Prompt").foregroundStyle(Hideout.inkSoft)
                     Text(prompt)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -539,26 +614,28 @@ struct ContextPopover: View {
              ? "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.\(shared) A value below overrides it."
              : "Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below, or Parley learns it from Strata's first overflow error; it can only be changed in Strata.")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Hideout.inkSoft)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func manualSection(_ snap: ContextSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Your value").font(.subheadline.weight(.medium))
+            Text("Your value").lettered(15)
             HStack {
-                TextField("Tokens", text: $manualText, prompt: Text("e.g. 32768"))
-                    .textFieldStyle(.roundedBorder)
+                TextField("Tokens", text: $manualText, prompt: Text("e.g. 32768").foregroundStyle(Hideout.inkFaint))
+                    .accessibilityLabel("Your context length in tokens")
+                    .composerPopoverField()
                     .frame(width: 120)
                     .onSubmit(saveManual)
-                    .accessibilityLabel("Your context length in tokens")
                 Button("Save", action: saveManual)
+                    .buttonStyle(TagButtonStyle(kind: .primary))
                     .disabled(TokenFormat.parse(manualText) == nil || TokenFormat.parse(manualText) == snap.manual)
                 if snap.manual != nil {
                     Button("Clear") {
                         manualText = ""
                         appState.setManualContextLength(nil, provider: provider, model: model)
                     }
+                    .buttonStyle(TagButtonStyle())
                 }
             }
             Text(snap.info?.loadedContextLength != nil && snap.manual != nil
@@ -567,7 +644,7 @@ struct ContextPopover: View {
                  ? "Used when the server does not report the loaded context length. A later overflow error naming another size replaces it."
                  : "Used when the server does not report the loaded context length.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -586,67 +663,79 @@ struct ContextPopover: View {
         // Reloading to the size already loaded would interrupt other apps for nothing.
         let valid = value >= 1 && value <= (max ?? Int.max) && value != loaded
         VStack(alignment: .leading, spacing: 6) {
-            Text("Change on the server").font(.subheadline.weight(.medium))
+            Text("Change on the server").lettered(15)
             if confirmingReload {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Reload \(model) with \(TokenFormat.grouped(value)) tokens?", systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout.weight(.medium))
-                        .symbolRenderingMode(.multicolor)
+                    Label {
+                        Text("Reload \(model) with \(TokenFormat.grouped(value)) tokens?")
+                            .foregroundStyle(Hideout.ink)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Hideout.caution)
+                    }
+                    .font(.callout.weight(.medium))
                     Text("LM Studio on \(provider.name) unloads the model and loads it again. This affects every app using the model on that server: replies in progress are cut off and the prompt cache is cleared. Loading can take a while; if memory runs out, the model stays unloaded. A model loaded this way may stay in memory until it is unloaded in LM Studio.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     if let key = snap.info?.modelKey, key != model {
                         Text("\(model) is an extra instance of \(key). Every instance is unloaded and one is loaded again; this conversation then uses the new one.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     HStack {
                         Spacer()
                         Button("Cancel") { confirmingReload = false }
+                            .buttonStyle(TagButtonStyle())
                             .keyboardShortcut(.cancelAction)
                         // No default-action shortcut: Return must not unload a model for every app.
                         Button("Reload Model", role: .destructive) { reload(value) }
+                            .buttonStyle(TagButtonStyle(kind: .danger))
                             .disabled(!valid || busy)
                     }
                 }
                 .padding(10)
-                .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .noticeCard(fill: Hideout.cautionWash, edge: Hideout.caution, radius: 10)
             } else if case .running(let requested) = snap.reload {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
+                    ProgressView().controlSize(.small).tint(Hideout.inkSoft)
                     Text("Reloading with \(TokenFormat.grouped(requested)) tokens… this can take a while.")
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                 }
             } else {
                 HStack {
                     TextField("Tokens", text: $reloadText,
-                              prompt: Text(loaded.map { "\($0)" } ?? "e.g. 16384"))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 120)
+                              prompt: Text(loaded.map { "\($0)" } ?? "e.g. 16384").foregroundStyle(Hideout.inkFaint))
                         .accessibilityLabel("New context length in tokens")
+                        .composerPopoverField()
+                        .frame(width: 120)
                     Button("Reload Model…") { confirmingReload = true }
+                        .buttonStyle(TagButtonStyle())
                         .disabled(!valid || busy)
                 }
                 Text(max.map { "LM Studio can load this model with up to \(TokenFormat.grouped($0)) tokens." }
                      ?? "LM Studio can reload this model with a different context length.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
             switch snap.reload {
             case .failed(let message):
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Hideout.danger)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .noticeCard(fill: Hideout.dangerWash, edge: Hideout.danger, radius: 10)
             case .finished(let note?):
                 Text(note)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             default:
                 EmptyView()

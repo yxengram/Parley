@@ -27,22 +27,27 @@ struct BuiltInToolsSettingsView: View {
     }
 
     private func row(_ tool: BuiltInTools.Tool) -> some View {
-        Toggle(isOn: isOn(tool)) {
-            Text(verbatim: tool.title)
-            Text(verbatim: Self.explanation(tool))
+        SettingsSwitchRow(isOn: isOn(tool)) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: tool.title)
+                Text(verbatim: Self.explanation(tool))
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     var body: some View {
         let settings = appState.settings
         let folder = settings.builtInFolderPath ?? ""
-        Form {
-            Section("Basic") {
+        SettingsPage(labelWidth: 196) {
+            SettingsSection("Basic", seed: 31) {
                 row(.currentTime)
                 row(.calculate)
             }
 
-            Section("Files") {
+            SettingsSection("Files", seed: 32) {
                 LabeledContent {
                     HStack {
                         if !folder.isEmpty {
@@ -50,39 +55,48 @@ struct BuiltInToolsSettingsView: View {
                                 .lineLimit(1)
                                 .help(abbreviated(folder))
                         }
+                        Spacer(minLength: 6)
                         Button("Choose…", action: chooseFolder)
                         Button("Clear", action: settings.clearBuiltInFolder)
                             .disabled(folder.isEmpty)
                     }
                 } label: {
-                    Text("Folder")
-                    Text(folder.isEmpty ? "None. The file tools need one." : abbreviated(folder))
-                        .lineLimit(2)
-                        .truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Folder")
+                        Text(folder.isEmpty ? "None. The file tools need one." : abbreviated(folder))
+                            .font(.caption)
+                            .foregroundStyle(Hideout.inkSoft)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                    }
                 }
                 if isCloudSyncedLocation(folder) {
-                    Label(Self.folderCloudWarning, systemImage: "icloud")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsNotice(.caution, Self.folderCloudWarning, systemImage: "icloud")
                 }
                 ForEach(BuiltInTools.Tool.allCases.filter(\.needsFolder), id: \.self) { tool in
                     row(tool).disabled(folder.isEmpty)
                 }
             }
 
-            Section("Web") {
+            SettingsSection("Web", seed: 33) {
                 row(.fetchURL)
             }
 
-            Section {
-                Text("A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // A note taped up at the end, not a card of controls.
+            Text("A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new.")
+                .font(.caption)
+                .foregroundStyle(Hideout.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
+                .paperCard(Hideout.card, seed: 34, radius: 10)
+                .overlay(alignment: .top) {
+                    WashiTape(color: Hideout.marigold, width: 66, height: 18, angle: -2)
+                        .offset(y: -8)
+                }
+                .padding(.top, 6)
         }
-        .formStyle(.grouped)
     }
 
     private func chooseFolder() {

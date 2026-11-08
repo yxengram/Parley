@@ -62,28 +62,33 @@ struct ConversationToolsPopover: View {
         let servers = appState.settings.mcpServers.filter(\.isEnabled)
         let builtIns = builtInTools
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tools").font(.headline)
+            Text("Tools").lettered(20)
             if servers.isEmpty, builtIns.isEmpty {
                 Text(appState.settings.mcpServers.isEmpty
                      ? "No MCP server yet. Add one in Settings > MCP."
                      : "Every MCP server is switched off. Turn one on in Settings > MCP.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    if !builtIns.isEmpty {
-                        builtInRow(builtIns)
+            if !servers.isEmpty || !builtIns.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !builtIns.isEmpty {
+                            builtInRow(builtIns)
+                        }
+                        ForEach(servers) { server in
+                            serverRow(server)
+                        }
                     }
-                    ForEach(servers) { server in
-                        serverRow(server)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxHeight: 260)
+                .fixedSize(horizontal: false, vertical: true)
+                // Outside the scroll view: rows scroll inside the stitching, never across it.
+                .padding(15)
+                .stitchedCard(Hideout.card, seed: 31, radius: 14)
             }
-            .frame(maxHeight: 260)
-            .fixedSize(horizontal: false, vertical: true)
 
             if appState.settings.offersTools {
                 Picker("Tool calling", selection: toolMode) {
@@ -95,7 +100,7 @@ struct ConversationToolsPopover: View {
                 if usesReAct {
                     Text("For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -104,19 +109,28 @@ struct ConversationToolsPopover: View {
             if tokens > 0 {
                 Text("Tool definitions: about \(TokenFormat.grouped(tokens)) tokens per request.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
             }
             if let warning = Self.definitionsWarning(tokens: tokens, limit: contextLimit) {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                Label {
+                    Text(warning)
+                        .foregroundStyle(Hideout.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Hideout.caution)
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .noticeCard(fill: Hideout.cautionWash, edge: Hideout.caution, radius: 10)
             }
 
             ForEach(notes, id: \.self) { note in
                 Label(note, systemImage: "info.circle")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -125,7 +139,7 @@ struct ConversationToolsPopover: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("\(provider.name) did not accept tools for \(model), so they are not offered.", systemImage: "info.circle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(refusal.message)
                     HStack(spacing: 8) {
@@ -134,22 +148,22 @@ struct ConversationToolsPopover: View {
                         }
                         Button("Use ReAct") { setReAct(true) }
                     }
-                    .controlSize(.small)
+                    .buttonStyle(TagButtonStyle())
                 }
             } else if Self.offersReActForIgnoredTools(info: serverInfo, usesReAct: usesReAct) {
                 Button("Use ReAct") { setReAct(true) }
-                    .controlSize(.small)
+                    .buttonStyle(TagButtonStyle())
             }
 
             Text(servers.isEmpty && !builtIns.isEmpty
                  ? "Tool names, descriptions, arguments and results go to the model's provider."
                  : "Tool names, descriptions, arguments and results go to the model's provider, and arguments to the MCP server. Toggling starts and stops nothing: a server starts when you send, and runs until you press Stop in Settings > MCP or quit.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .frame(width: 320)
+        .frame(width: 340)
     }
 
     private func builtInRow(_ tools: [BuiltInTools.Tool]) -> some View {
@@ -158,7 +172,7 @@ struct ConversationToolsPopover: View {
                 .toggleStyle(.checkbox)
             Text(verbatim: tools.map(\.title).joined(separator: ", "))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 20)
         }
@@ -177,7 +191,7 @@ struct ConversationToolsPopover: View {
                         let count = snapshot.tools.filter { !server.disabledTools.contains($0.name) }.count
                         Text(count == 1 ? "1 tool" : "\(count) tools")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Hideout.inkSoft)
                     }
                 }
             }
@@ -186,9 +200,13 @@ struct ConversationToolsPopover: View {
             if case .failed(let message) = state {
                 Text(verbatim: message)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Hideout.danger)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .noticeCard(fill: Hideout.dangerWash, edge: Hideout.danger, radius: 8)
                     .padding(.leading, 20)
             }
         }
