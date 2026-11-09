@@ -7,7 +7,7 @@
 # - builds the debug app (./build.sh debug)
 # - starts tools/mock_server.py on a free 127.0.0.1 port (killed afterwards)
 # - runs the app binary with PARLEY_SNAPSHOT_DIR / PARLEY_SNAPSHOT_MOCK_URL; it never activates,
-#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 310 s otherwise)
+#   keeps its windows off-screen at alpha 0, and exits on its own (killed after 600 s otherwise)
 # - a second mock (flavor strata-share, no API key) backs the Strata states; MOCK_STRATA_PROGRESS=1
 #   makes it send prompt progress (as Strata's engine does; the live share port sends none) so the
 #   "Reading the prompt" state can be captured
@@ -29,7 +29,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$1"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
-rm -f "$OUT"/[0-9][0-9]-*.png "$OUT"/snapshot-log.txt
+rm -f "$OUT"/[0-9][0-9]-*.png "$OUT"/[0-9][0-9][0-9]-*.png "$OUT"/snapshot-log.txt
 
 REAL_PLIST="$HOME/Library/Preferences/local.parley.chat.plist"
 SNAP_ID="local.parley.chat.snapshot"
@@ -107,19 +107,19 @@ for _ in {1..100}; do
 done
 curl -fsS "http://127.0.0.1:$STRATA_PORT/v1/models" >/dev/null || { echo "Strata mock did not start" >&2; exit 1; }
 
-echo "==> Running snapshot harness (exits on its own; hard limit 310 s)"
+echo "==> Running snapshot harness (exits on its own; hard limit 600 s)"
 NO_GLASS=""
 [[ -n "${PARLEY_SNAPSHOT_SDK:-}" ]] && NO_GLASS=1
 PARLEY_SNAPSHOT_DIR="$OUT" PARLEY_SNAPSHOT_MOCK_URL="http://127.0.0.1:$PORT/v1" PARLEY_SNAPSHOT_STRATA_URL="http://127.0.0.1:$STRATA_PORT/v1" \
     PARLEY_SNAPSHOT_MCP_COMMAND="$ROOT/tools/mock_mcp_server.py" PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
 APP_PID=$!
 STATUS=0
-for _ in {1..3100}; do
+for _ in {1..6000}; do
     kill -0 "$APP_PID" 2>/dev/null || break
     sleep 0.1
 done
 if kill -0 "$APP_PID" 2>/dev/null; then
-    echo "harness did not exit within 310 s; killing it" >&2
+    echo "harness did not exit within 600 s; killing it" >&2
     kill -9 "$APP_PID" 2>/dev/null || true
     STATUS=1
 fi
@@ -149,7 +149,7 @@ if [[ $SNAP_PLIST_EXISTED -eq 0 && -e "$SNAP_PLIST" ]]; then
 fi
 rm -rf "$SAVED_STATE/$SNAP_ID.savedState" 2>/dev/null || true
 
-PNGS=("$OUT"/[0-9][0-9]-*.png)
+PNGS=("$OUT"/[0-9][0-9]-*.png "$OUT"/[0-9][0-9][0-9]-*.png)
 COUNT=${#PNGS}
 echo "==> $COUNT PNGs in $OUT (log: $OUT/snapshot-log.txt)"
 for f in "${PNGS[@]}"; do print -r -- "    ${f:t}"; done

@@ -186,8 +186,8 @@ enum SnapshotHarness {
 
         // Hard stop, on a background queue so a modal on the main thread cannot block it.
         let rootPath = tmp.path
-        DispatchQueue.global().asyncAfter(deadline: .now() + 300) {
-            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 300 s\n".utf8))
+        DispatchQueue.global().asyncAfter(deadline: .now() + 590) {
+            FileHandle.standardError.write(Data("[snapshot] watchdog: giving up after 590 s\n".utf8))
             try? FileManager.default.removeItem(atPath: rootPath)
             exit(3)
         }
@@ -531,6 +531,43 @@ enum SnapshotHarness {
 
             // 11. Strata: its chat, context popover, settings, prompt reading, a refused image.
             await captureStrata(appearance)
+        }
+
+        // The other skins, switched live on the windows already open: a view that does not follow
+        // a change of skin shows up here in the previous skin's colours.
+        for skin in HideoutSkin.allCases where skin != .cardboard {
+            HideoutSkinStore.shared.skin = skin
+            for appearance in ["light", "dark"] {
+                let label = "\(skin.rawValue)-\(appearance)"
+                NSApp.appearance = NSAppearance(named: appearance == "dark" ? .darkAqua : .aqua)
+                appState.selection = nil
+                await wait(0.8)
+                capture(label, "empty-state")
+                await select(ids.main)
+                await scrollChat(toTop: true)
+                capture(label, "chat-top")
+                await scrollChat(toTop: false)
+                capture(label, "chat-bottom")
+                await select(ids.chinese)
+                capture(label, "chat-chinese")
+                await select(ids.encrypted)
+                capture(label, "unlock")
+                appState.showNewChatSheet = true
+                await wait(1.2)
+                capture(label, "new-chat-sheet", includeSheet: true)
+                appState.showNewChatSheet = false
+                await wait(0.8)
+                await captureSettings(label)
+                do {
+                    try await appState.createConversation(title: "", directory: defaultDirectory, password: nil)
+                } catch {
+                    log("createConversation failed: \(error)")
+                }
+                await wait(1.0)
+                capture(label, "new-chat-empty")
+                await captureTools(label)
+                await captureLinks(label)
+            }
         }
 
         finish()

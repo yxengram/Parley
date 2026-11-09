@@ -483,6 +483,8 @@ struct ComposerTextView: NSViewRepresentable {
     var onEditLast: () -> Bool = { false }
     var onPasteFiles: ([URL]) -> Void
     var onPasteImageData: (Data) -> Void
+    /// Read while the parent builds this view, so a change of skin reaches `updateNSView`.
+    var skin = Hideout.skin
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -500,10 +502,7 @@ struct ComposerTextView: NSViewRepresentable {
         tv.allowsUndo = true
         tv.drawsBackground = false
         tv.font = NSFont.preferredFont(forTextStyle: .body)
-        tv.textColor = NSColor(Hideout.ink)
-        tv.insertionPointColor = NSColor(Hideout.emberText)
-        tv.selectedTextAttributes = [.backgroundColor: NSColor(Hideout.composerWash),
-                                     .foregroundColor: NSColor(Hideout.ink)]
+        applyColors(to: tv)
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
@@ -517,8 +516,6 @@ struct ComposerTextView: NSViewRepresentable {
         tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.string = text
-        // Text that replaces the whole string, and pasted text, takes its colour from here.
-        tv.typingAttributes[.foregroundColor] = NSColor(Hideout.ink)
         tv.onPasteFiles = { onPasteFiles($0) }
         tv.onPasteImageData = { onPasteImageData($0) }
         // Dropped text is inserted as usual; dropped files become attachments (PastingTextView)
@@ -537,6 +534,11 @@ struct ComposerTextView: NSViewRepresentable {
         guard let tv = context.coordinator.textView else { return }
         tv.onPasteFiles = { onPasteFiles($0) }
         tv.onPasteImageData = { onPasteImageData($0) }
+        if context.coordinator.appliedSkin != skin {
+            context.coordinator.appliedSkin = skin
+            context.coordinator.recolorAfterEdits = true
+            applyColors(to: tv)
+        }
         if tv.string != text {
             // A programmatic change (sent, edit started or cancelled): old typing steps no longer
             // apply to this text, so they must not be undoable.
@@ -551,9 +553,21 @@ struct ComposerTextView: NSViewRepresentable {
         }
     }
 
+    private func applyColors(to tv: NSTextView) {
+        tv.textColor = NSColor(Hideout.ink)
+        tv.insertionPointColor = NSColor(Hideout.emberText)
+        tv.selectedTextAttributes = [.backgroundColor: NSColor(Hideout.composerWash),
+                                     .foregroundColor: NSColor(Hideout.ink)]
+        // Text that replaces the whole string, and pasted text, takes its colour from here.
+        tv.typingAttributes[.foregroundColor] = NSColor(Hideout.ink)
+    }
+
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ComposerTextView
+        lazy var appliedSkin = parent.skin
+        /// After a change of skin, undo can bring back text in the old skin's ink.
+        var recolorAfterEdits = false
         weak var textView: PastingTextView?
         var lastFocusToken = -1
         /// The composer's own undo stack, separate from other fields in the window.
@@ -565,6 +579,7 @@ struct ComposerTextView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let tv = textView else { return }
+            if recolorAfterEdits && !tv.hasMarkedText() { tv.textColor = NSColor(Hideout.ink) }
             if parent.text != tv.string { parent.text = tv.string }
             recalcHeight()
         }

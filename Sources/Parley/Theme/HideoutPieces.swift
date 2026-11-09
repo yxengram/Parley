@@ -152,8 +152,10 @@ struct Bunting: View {
     var height: CGFloat = 40
 
     var body: some View {
+        // Read here, not in the deferred drawing closure, so a change of skin redraws it.
+        let colors = Hideout.palette.flags.map(\.color)
+        let marigold = Hideout.marigold
         Canvas { context, size in
-            let colors = [Hideout.ember, Hideout.marigold, Hideout.rose, Color(red: 0.98, green: 0.93, blue: 0.82), Hideout.moss]
             let spans = max(1, Int((size.width / 130).rounded()))
             let spanWidth = size.width / CGFloat(spans)
             let sag: CGFloat = 11
@@ -176,8 +178,8 @@ struct Bunting: View {
                 if i % 3 == 2 {
                     let c = cordPoint(x + 6)
                     let bulb = CGRect(x: c.x - 3.5, y: c.y - 1, width: 7, height: 7)
-                    context.fill(Path(ellipseIn: bulb.insetBy(dx: -4, dy: -4)), with: .color(Hideout.marigold.opacity(0.28)))
-                    context.fill(Path(ellipseIn: bulb), with: .color(Hideout.marigold))
+                    context.fill(Path(ellipseIn: bulb.insetBy(dx: -4, dy: -4)), with: .color(marigold.opacity(0.28)))
+                    context.fill(Path(ellipseIn: bulb), with: .color(marigold))
                     x += 16
                 } else {
                     var flag = Path()
@@ -203,6 +205,8 @@ struct LanternMark: View {
     var size: CGFloat = 18
 
     var body: some View {
+        // Registers this view with the skin: the drawing closure below runs later.
+        let _ = Hideout.skin
         Canvas { context, canvas in
             let s = canvas.width / 18
             func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * s, y: y * s) }

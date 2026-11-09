@@ -18,7 +18,7 @@ struct SettingsView: View {
                 .settingsRoom()
                 .tabItem { Label("Built-in Tools", systemImage: "hammer") }
             GeneralSettingsView()
-                .frame(width: 560, height: 500)
+                .frame(width: 560, height: 620)
                 .settingsRoom()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
@@ -33,13 +33,15 @@ private extension View {
         background {
             RoomBackground(glow: false)
                 .ignoresSafeArea()
-                .background(SettingsWindowPaper())
+                .background(SettingsWindowPaper(skin: Hideout.skin))
         }
     }
 }
 
 /// Paints the Settings window itself, so the system toolbar sits on paper and not on white.
 private struct SettingsWindowPaper: NSViewRepresentable {
+    var skin: HideoutSkin
+
     final class Probe: NSView {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -51,7 +53,7 @@ private struct SettingsWindowPaper: NSViewRepresentable {
             apply()
         }
 
-        private func apply() {
+        func apply() {
             guard let window else { return }
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 window.backgroundColor = NSColor(Hideout.paper)
@@ -62,7 +64,7 @@ private struct SettingsWindowPaper: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> Probe { Probe() }
-    func updateNSView(_ nsView: Probe, context: Context) {}
+    func updateNSView(_ nsView: Probe, context: Context) { nsView.apply() }
 }
 
 /// One tab's scrolling page of cards. Rows inside it are label and value; buttons are paper tags.
@@ -665,12 +667,95 @@ struct ProviderEditor: View {
 
 // MARK: - General
 
+/// One picture card for each skin. Choosing one repaints every window at once.
+private struct SkinPicker: View {
+    var body: some View {
+        let current = Hideout.skin
+        HStack(alignment: .top, spacing: 10) {
+            ForEach(HideoutSkin.allCases) { skin in
+                SkinCard(skin: skin, isSelected: skin == current) {
+                    HideoutSkinStore.shared.skin = skin
+                }
+            }
+        }
+    }
+}
+
+private struct SkinCard: View {
+    @Environment(\.colorScheme) private var scheme
+    let skin: HideoutSkin
+    let isSelected: Bool
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            VStack(alignment: .leading, spacing: 6) {
+                picture
+                    .frame(height: 88)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                HStack(spacing: 4) {
+                    Text(skin.title)
+                        .font(Hideout.title(13))
+                        .foregroundStyle(Hideout.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Hideout.emberText)
+                    }
+                }
+                Text(skin.blurb)
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? Hideout.emberWash : Hideout.paperDeep)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isSelected ? Hideout.emberText : Hideout.line, lineWidth: isSelected ? 2 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(skin.title)
+        .accessibilityValue(skin.blurb)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder private var picture: some View {
+        if let image = Hideout.art(scheme == .dark ? "fort-night" : "fort-day", skin: skin) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+                .accessibilityHidden(true)
+        } else {
+            skin.palette.wall.color
+        }
+    }
+}
+
 private struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
         @Bindable var settings = appState.settings
         SettingsPage(labelWidth: 196) {
+            SettingsSection("Skin", seed: 40) {
+                SkinPicker()
+                Text("Each skin has an afternoon and a lights-out look, which follow the system appearance.")
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             SettingsSection("Conversations", seed: 41) {
                 LabeledContent {
                     HStack {

@@ -549,10 +549,12 @@ App:
 
 ## Visual design: the Hideout
 
-The interface is a childhood secret base: a cardboard-and-quilt fort, warm-dominant, conveying simple privacy and safety. Light appearance is afternoon sun; dark is lights-out by lantern.
+The interface is a childhood secret base, conveying simple privacy and safety. Light appearance is afternoon sun; dark is lights-out by lantern.
 
-- `Sources/Parley/Theme/Hideout.swift` holds every colour as a dynamic token; `HideoutPieces.swift` holds the shared shapes, cards and button styles. Views use tokens only: no literal or system colours, no materials or glass.
+- Skins: Cardboard Fort (warm, the default; an unknown saved value falls back to it), Pillow Fort (pink) and Treehouse (yellow-green), chosen in Settings > General. Each has an afternoon and a lights-out look. Skins change colours and pictures only, never words or controls. The `hideout.skin` default holds only the skin's name.
+- `Sources/Parley/Theme/HideoutSkins.swift` holds each skin's palette and the observable store; art is `<name>-<skin>.jpg`, with the unsuffixed cardboard art as the fallback. Read tokens while a view is being built, not in a deferred closure (`Canvas` renderers) or once into an AppKit object, or that surface will not follow a change of skin. Every skin must pass `SkinPaletteTests`.
+- `Sources/Parley/Theme/Hideout.swift` holds the tokens every view reads; `HideoutPieces.swift` holds the shared shapes, cards and button styles. Views use tokens only: no literal or system colours, no materials or glass.
 - The main window is a custom shell (`ContentView`: cardboard wall, seam, room) with `.windowStyle(.hiddenTitleBar)` and `RoomHeader`, not `NavigationSplitView` and a system toolbar. The conversation list is still `List(selection:)`, with its native highlight removed by `ListSelectionHighlightRemover` so a row can draw its own paper tag. Dialogs that menu commands open live on the window root (`ConversationDialogs`), so they work while the sidebar is hidden.
-- Safety colours (`danger`, `caution`, `attention`) are never decorative and stay distinct from the warm accents. Approval, link confirmation and errors use flat `noticeCard`s without tape, wobble or lettering.
+- Safety colours (`danger`, `caution`, `attention`) are never decorative and stay distinct from the skin's accents. Approval, link confirmation and errors use flat `noticeCard`s without tape, wobble or lettering.
 - `.lettered(_:)` (Noteworthy) is for fixed English strings only: it has no CJK glyphs. It sets `.fontDesign(nil)` because an inherited `.fontDesign(.rounded)` replaces custom fonts; for the same reason monospaced text must also set `.fontDesign(.monospaced)`.
 - Art is bundled in `Resources/Art` (copied by `build.sh`) and loaded from the app bundle; nothing is fetched. Fonts ship with macOS.

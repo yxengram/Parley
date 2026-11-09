@@ -725,6 +725,8 @@ private struct PaperStatusDot: View {
         Circle()
             .fill(color)
             .frame(width: 8, height: 8)
+            // On the bare wall the colour alone can fall short of 3:1, so it sits on a paper disc.
+            .background { if onWall { Circle().fill(Hideout.tag).padding(-2) } }
             .accessibilityLabel(MCPStatusDot.text(state))
     }
 }

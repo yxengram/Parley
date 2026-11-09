@@ -1,93 +1,87 @@
 import AppKit
 import SwiftUI
 
-/// The design system of Parley's "hideout": a cardboard-and-quilt fort, in afternoon sun (light
-/// appearance) or by lantern after lights-out (dark appearance). Colours are the only place
-/// the palette is written; every view uses these tokens, never literal or system colours.
+/// The design system of Parley's "hideout": a secret place in afternoon sun (light appearance) or
+/// by lantern after lights-out (dark appearance). The tokens below read the chosen skin's palette
+/// (HideoutSkins.swift); every view uses them, never literal or system colours. Read tokens while
+/// building a view, not in a deferred closure, or the view will not follow a change of skin.
 enum Hideout {
-    private static func dynamic(_ light: UInt32, _ dark: UInt32, alpha: CGFloat = 1) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            let v = isDark ? dark : light
-            return NSColor(srgbRed: CGFloat((v >> 16) & 0xFF) / 255,
-                           green: CGFloat((v >> 8) & 0xFF) / 255,
-                           blue: CGFloat(v & 0xFF) / 255,
-                           alpha: alpha)
-        })
-    }
+    /// The chosen skin. Reading it from a view body makes that view follow a change of skin.
+    static var skin: HideoutSkin { HideoutSkinStore.shared.skin }
+    static var palette: HideoutPalette { skin.palette }
 
     // MARK: Surfaces
 
     /// The room: behind everything in the main area.
-    static let paper = dynamic(0xFBF1DF, 0x241713)
+    static var paper: Color { palette.paper.color }
     /// Recessed areas on paper: inline code, section cards, hover.
-    static let paperDeep = dynamic(0xF4E3C6, 0x2F1F19)
+    static var paperDeep: Color { palette.paperDeep.color }
     /// Raised cards on paper: the composer, popovers, sheets' fields.
-    static let card = dynamic(0xFFF8EA, 0x35231B)
+    static var card: Color { palette.card.color }
     /// The composer: a card that still stands out where the lantern lights the floor around it.
-    static let composerCard = dynamic(0xFFF8EA, 0x4A3126)
+    static var composerCard: Color { palette.composerCard.color }
     /// Selection and hover on the composer card.
-    static let composerWash = dynamic(0xF9DFC4, 0x6E4229)
+    static var composerWash: Color { palette.composerWash.color }
     /// The cardboard wall behind the conversation list.
-    static let wall = dynamic(0xD8B07A, 0x3B261C)
-    static let wallDeep = dynamic(0xC4955C, 0x2A1A14)
+    static var wall: Color { palette.wall.color }
+    static var wallDeep: Color { palette.wallDeep.color }
     /// A paper tag pinned to the wall: the selected conversation, the search field.
-    static let tag = dynamic(0xFFF7E8, 0x4F3225)
+    static var tag: Color { palette.tag.color }
     /// The user's notes.
-    static let peach = dynamic(0xF9CF9A, 0x5A3524)
+    static var peach: Color { palette.peach.color }
     /// Chalkboard behind code, in both appearances.
-    static let board = dynamic(0x3A2619, 0x17100C)
+    static var board: Color { palette.board.color }
 
     // MARK: Text
 
     /// Main text on paper, card, tag and peach.
-    static let ink = dynamic(0x3A2416, 0xF6E7CF)
+    static var ink: Color { palette.ink.color }
     /// Secondary text on paper, card, tag and peach (at least 4.5:1 on each).
-    static let inkSoft = dynamic(0x6E4F39, 0xBFA286)
+    static var inkSoft: Color { palette.inkSoft.color }
     /// Least important metadata on paper and card.
-    static let inkFaint = dynamic(0x7A5B41, 0xB89C82)
+    static var inkFaint: Color { palette.inkFaint.color }
     /// Text on the bare wall.
-    static let wallInk = dynamic(0x2E1B0F, 0xF6E7CF)
+    static var wallInk: Color { palette.wallInk.color }
     /// Secondary text on the bare wall. Not for wallDeep.
-    static let wallInkSoft = dynamic(0x54351F, 0xCDB195)
-    static let boardInk = dynamic(0xF6E7CF, 0xF6E7CF)
-    static let boardInkSoft = dynamic(0xCDB195, 0xCDB195)
+    static var wallInkSoft: Color { palette.wallInkSoft.color }
+    static var boardInk: Color { palette.boardInk.color }
+    static var boardInkSoft: Color { palette.boardInkSoft.color }
 
     // MARK: Lines
 
-    static let line = dynamic(0x3A2416, 0xF6E7CF, alpha: 0.16)
+    static var line: Color { palette.line.color }
     /// Quilt stitching: decorative only.
-    static let stitch = dynamic(0xC4955C, 0x7A5238)
+    static var stitch: Color { palette.stitch.color }
 
     // MARK: Accents
 
     /// Fills: the primary button, the send button, toggles. Put `onEmber` on it.
-    static let ember = dynamic(0xC24A20, 0xF07A44)
-    static let onEmber = dynamic(0xFFFFFF, 0x241713)
+    static var ember: Color { palette.ember.color }
+    static var onEmber: Color { palette.onEmber.color }
     /// Ember as text, links and small icons on paper.
-    static let emberText = dynamic(0xA8401C, 0xF58A57)
-    static let emberWash = dynamic(0xF9DFC4, 0x4A2B1C)
-    static let marigold = dynamic(0xEFA92F, 0xFFC24D)
+    static var emberText: Color { palette.emberText.color }
+    static var emberWash: Color { palette.emberWash.color }
+    static var marigold: Color { palette.marigold.color }
     /// The "working on it" dots: marigold fades into cream paper, so afternoon uses ember.
-    static let firefly = dynamic(0xC24A20, 0xFFC24D)
-    static let rose = dynamic(0xE0707A, 0xF08F96)
-    static let moss = dynamic(0x4F6A22, 0xA5C266)
-    static let teal = dynamic(0x2F8F8A, 0x5FC2BA)
-    static let plum = dynamic(0x6B3A5B, 0xD29DC0)
+    static var firefly: Color { palette.firefly.color }
+    static var rose: Color { palette.rose.color }
+    static var moss: Color { palette.moss.color }
+    static var teal: Color { palette.teal.color }
+    static var plum: Color { palette.plum.color }
     /// Brass padlocks.
-    static let brass = dynamic(0x8A6414, 0xE3B95B)
+    static var brass: Color { palette.brass.color }
 
-    // MARK: Safety. Must stay distinct from the warm accents; never decorative.
+    // MARK: Safety. Must stay distinct from the skin's accents; never decorative.
 
     /// Errors, destructive actions.
-    static let danger = dynamic(0xA81E2D, 0xFF6B6B)
-    static let dangerWash = dynamic(0xF9D9D5, 0x4A1E22)
+    static var danger: Color { palette.danger.color }
+    static var dangerWash: Color { palette.dangerWash.color }
     /// Warnings.
-    static let caution = dynamic(0x8A5200, 0xFFE08A)
-    static let cautionWash = dynamic(0xFBE6B8, 0x453013)
+    static var caution: Color { palette.caution.color }
+    static var cautionWash: Color { palette.cautionWash.color }
     /// "This needs your decision": approval cards, link confirmation. The one cool colour.
-    static let attention = dynamic(0x176A68, 0x5FC2BA)
-    static let attentionWash = dynamic(0xD8EBE3, 0x17383A)
+    static var attention: Color { palette.attention.color }
+    static var attentionWash: Color { palette.attentionWash.color }
 
     // MARK: Type
 
@@ -107,12 +101,16 @@ enum Hideout {
 
     private static let artCache = NSCache<NSString, NSImage>()
 
-    /// Art shipped in Contents/Resources/Art; nil if the file is missing.
-    static func art(_ name: String) -> NSImage? {
-        if let cached = artCache.object(forKey: name as NSString) { return cached }
-        guard let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "Art"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        artCache.setObject(image, forKey: name as NSString)
+    /// A picture of the given skin (by default the chosen one), shipped in
+    /// Contents/Resources/Art. Falls back to the cardboard fort's; nil if that is missing too.
+    static func art(_ name: String, skin: HideoutSkin? = nil) -> NSImage? {
+        let file = (skin ?? Hideout.skin).artName(name)
+        if let cached = artCache.object(forKey: file as NSString) { return cached }
+        guard let url = Bundle.main.url(forResource: file, withExtension: "jpg", subdirectory: "Art"),
+              let image = NSImage(contentsOf: url) else {
+            return file == name ? nil : art(name, skin: .cardboard)
+        }
+        artCache.setObject(image, forKey: file as NSString)
         return image
     }
 
@@ -137,10 +135,7 @@ enum Hideout {
 extension View {
     /// Applied at the root of every window, sheet and popover.
     func hideoutScene() -> some View {
-        self
-            .tint(Hideout.ember)
-            .foregroundStyle(Hideout.ink)
-            .fontDesign(.rounded)
+        modifier(HideoutSceneStyle())
     }
 
     /// Hand-lettering. **Fixed English strings only** (no user content: it has no CJK glyphs),
@@ -151,7 +146,24 @@ extension View {
 
     /// Root of a sheet or popover: the scene styling on a card background.
     func hideoutSheet() -> some View {
-        self
+        modifier(HideoutSheetStyle())
+    }
+}
+
+// Modifiers, not plain chains: they are applied in scene and sheet closures, and a modifier's body
+// is what makes those follow a change of skin.
+private struct HideoutSceneStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .tint(Hideout.ember)
+            .foregroundStyle(Hideout.ink)
+            .fontDesign(.rounded)
+    }
+}
+
+private struct HideoutSheetStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
             .hideoutScene()
             .background(RoomBackground(glow: false))
             .presentationBackground(Hideout.paper)
@@ -187,14 +199,14 @@ struct RoomBackground: View {
             Hideout.paper
             if glow {
                 if scheme == .dark {
-                    RadialGradient(colors: [Color(red: 1, green: 0.66, blue: 0.3).opacity(0.14), .clear],
+                    RadialGradient(colors: [Hideout.palette.glow.color.opacity(0.14), .clear],
                                    center: UnitPoint(x: 0.5, y: 1.05), startRadius: 0, endRadius: 720)
                 } else {
-                    RadialGradient(colors: [Color(red: 1, green: 0.78, blue: 0.35).opacity(0.30), .clear],
+                    RadialGradient(colors: [Hideout.palette.glow.color.opacity(0.30), .clear],
                                    center: UnitPoint(x: 1.0, y: -0.05), startRadius: 0, endRadius: 760)
                 }
             }
-            GrainLayer(color: scheme == .dark ? .white : Color(red: 0.35, green: 0.2, blue: 0.08),
+            GrainLayer(color: Hideout.palette.grainTint.color,
                        opacity: scheme == .dark ? 0.10 : 0.16)
         }
         .allowsHitTesting(false)
@@ -202,7 +214,7 @@ struct RoomBackground: View {
     }
 }
 
-/// The cardboard wall: kraft with faint vertical corrugation and grain.
+/// The wall behind the list: the skin's wall colour with faint vertical corrugation and grain.
 struct WallBackground: View {
     @Environment(\.colorScheme) private var scheme
 
