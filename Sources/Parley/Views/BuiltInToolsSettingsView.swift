@@ -16,6 +16,7 @@ struct BuiltInToolsSettingsView: View {
         case .listFiles: return "Names and sizes in the folder above, one level at a time. Asks every time."
         case .readFile: return "Text files in the folder above. Asks every time."
         case .fetchURL: return "Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host."
+        case .browseURL: return "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host."
         }
     }
 
@@ -24,6 +25,23 @@ struct BuiltInToolsSettingsView: View {
             get: { appState.settings.builtInToolSettings.effectiveTools.contains(tool) },
             set: { appState.settings.setBuiltInTool(tool, on: $0) }
         )
+    }
+
+    static let otherSitesTitle = "Let Browse Web Page load from other sites"
+    static let otherSitesExplanation = "Off: a page may load only from the address you approved, so some pages show little. On: the page's scripts may contact other websites (CDNs, analytics and the like), which see your IP address and what the page sends them. Each is still checked to be a public address; images, video, fonts, other sites' frames, popups and downloads stay blocked. The card says which way this is."
+
+    private var otherSitesRow: some View {
+        let settings = appState.settings
+        return SettingsSwitchRow(isOn: Binding(get: { settings.builtInBrowseOtherSites },
+                                               set: { settings.builtInBrowseOtherSites = $0 })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: Self.otherSitesTitle)
+                Text(verbatim: Self.otherSitesExplanation)
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private func row(_ tool: BuiltInTools.Tool) -> some View {
@@ -80,6 +98,9 @@ struct BuiltInToolsSettingsView: View {
 
             SettingsSection("Web", seed: 33) {
                 row(.fetchURL)
+                row(.browseURL)
+                otherSitesRow
+                    .disabled(!settings.builtInToolSettings.effectiveTools.contains(.browseURL))
             }
 
             // A note taped up at the end, not a card of controls.

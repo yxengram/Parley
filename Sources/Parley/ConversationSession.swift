@@ -21,6 +21,8 @@ struct ConversationToolServices {
     var contextLimit: (Provider, String) -> ContextLimit?
     /// For the card of a built-in file tool, which names the folder.
     var builtInFolderPath: () -> String? = { nil }
+    /// For the card of Browse Web Page, which says whether other sites may be reached.
+    var builtInBrowseOtherSites: () -> Bool = { false }
 }
 
 enum ToolAllowance {
@@ -784,6 +786,7 @@ final class ConversationSession: Identifiable {
             }
             let allowance = tools.allowance(binding)
             let folderOnCard = tools.builtInFolderPath()
+            let otherSitesOnCard = tools.builtInBrowseOtherSites()
             if allowance != .always || fromText {
                 replyPhase = .awaitingApproval
                 let approval = PendingToolApproval(
@@ -815,8 +818,10 @@ final class ConversationSession: Identifiable {
                 }
                 // Switched off while the card was up, or the card's folder is no longer the shared
                 // one: its Allow can no longer mean anything.
+                // Likewise for Browse Web Page's "other sites" switch: the card said which way it was.
                 let folderMoved = BuiltInTools.readsFolder(binding) && tools.builtInFolderPath() != folderOnCard
-                guard !folderMoved, currentServer(for: binding, tools: tools) != nil else {
+                let switchMoved = BuiltInTools.dependsOnBrowseSwitch(binding) && tools.builtInBrowseOtherSites() != otherSitesOnCard
+                guard !folderMoved, !switchMoved, currentServer(for: binding, tools: tools) != nil else {
                     setResult(ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff), for: callID, in: messageID)
                     continue
                 }
@@ -842,6 +847,9 @@ final class ConversationSession: Identifiable {
             if BuiltInTools.readsFolder(binding), tools.builtInFolderPath() != folderOnCard {
                 result = ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff)
             }
+            if BuiltInTools.dependsOnBrowseSwitch(binding), tools.builtInBrowseOtherSites() != otherSitesOnCard {
+                result = ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff)
+            }
             setResult(result, for: callID, in: messageID)
         }
     }
@@ -857,7 +865,8 @@ final class ConversationSession: Identifiable {
     private static func serverDetail(_ server: MCPServerConfig, binding: MCPToolBinding, arguments: [String: JSONValue],
                                      tools: ConversationToolServices) -> String {
         if server.kind == MCPServerConfig.kindBuiltIn {
-            return BuiltInTools.approvalDetail(toolName: binding.tool.name, arguments: arguments, folderPath: tools.builtInFolderPath())
+            return BuiltInTools.approvalDetail(toolName: binding.tool.name, arguments: arguments, folderPath: tools.builtInFolderPath(),
+                                               browseOtherSites: tools.builtInBrowseOtherSites())
         }
         return server.kind == MCPServerConfig.kindHTTP ? server.urlHost : "Local command: \(server.command)"
     }

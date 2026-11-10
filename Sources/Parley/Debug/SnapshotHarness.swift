@@ -727,8 +727,10 @@ enum SnapshotHarness {
         let settings = AppState.shared.settings
         settings.builtInFolderPath = outputDirectoryPath
         settings.builtInTools = BuiltInTools.Tool.allCases.map(\.rawValue)
+        settings.builtInBrowseOtherSites = true
         await wait(0.4)
         await capture()
+        settings.builtInBrowseOtherSites = false
         settings.builtInTools = []
         settings.builtInFolderPath = nil
         await wait(0.2)
@@ -1048,8 +1050,14 @@ enum SnapshotHarness {
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
                 if name == "mcp" { await captureMCPSettings(appearance, window) }
-                if name == "built-in-tools" {
-                    await withBuiltInTools { capture(appearance, "settings-built-in-tools-on", window: window) }
+            }
+            if tabNames.contains("built-in-tools") {
+                window.close()
+                await captureBuiltInToolsOn(appearance) { fresh in
+                    guard let tabs = fresh.contentViewController as? NSTabViewController,
+                          let index = tabNames.firstIndex(of: "built-in-tools"), index < tabs.tabViewItems.count else { return false }
+                    tabs.selectedTabViewItemIndex = index
+                    return true
                 }
             }
         } else if let toolbar = window.toolbar, !toolbar.items.isEmpty {
@@ -1061,8 +1069,15 @@ enum SnapshotHarness {
                 await wait(0.6)
                 capture(appearance, "settings-\(name)", window: window)
                 if name == "mcp" { await captureMCPSettings(appearance, window) }
-                if name == "built-in-tools" {
-                    await withBuiltInTools { capture(appearance, "settings-built-in-tools-on", window: window) }
+            }
+            if let index = tabNames.firstIndex(of: "built-in-tools"), index < toolbar.items.count {
+                window.close()
+                await captureBuiltInToolsOn(appearance) { fresh in
+                    guard let toolbar = fresh.toolbar, index < toolbar.items.count else { return false }
+                    let item = toolbar.items[index]
+                    toolbar.selectedItemIdentifier = item.itemIdentifier
+                    if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
+                    return true
                 }
             }
         } else {
@@ -1071,6 +1086,40 @@ enum SnapshotHarness {
         }
         window.close()
         await wait(0.4)
+    }
+
+    /// Built-in Tools with every tool on, in a Settings window opened after they were turned on.
+    /// Turned on under an open window, a switch animates to on, and an off-screen window never shows
+    /// that animation move: the capture would show every switch off.
+    private static func captureBuiltInToolsOn(_ appearance: String, select: @escaping (NSWindow) -> Bool) async {
+        await wait(0.4)
+        await withBuiltInTools {
+            openSettingsWindow()
+            await waitFor(seconds: 3) { settingsWindow != nil }
+            await wait(0.6)
+            guard let fresh = settingsWindow, select(fresh) else {
+                skip("\(appearance) settings-built-in-tools-on (the window did not reopen)")
+                return
+            }
+            hideWindows()
+            await wait(0.8)
+            capture(appearance, "settings-built-in-tools-on", window: fresh)
+            // The end of the page, where Browse Web Page's "other sites" switch is.
+            if let content = fresh.contentView, let scrollView = chatScrollView(in: content) {
+                let clip = scrollView.contentView
+                let docHeight = scrollView.documentView?.frame.height ?? 0
+                let flipped = scrollView.documentView?.isFlipped ?? clip.isFlipped
+                let y = flipped ? max(0, docHeight - clip.bounds.height + scrollView.contentInsets.bottom) : -scrollView.contentInsets.bottom
+                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: y))
+                scrollView.reflectScrolledClipView(clip)
+                await wait(0.5)
+                capture(appearance, "settings-built-in-tools-on-end", window: fresh)
+            } else {
+                skip("\(appearance) settings-built-in-tools-on-end (no scroll view)")
+            }
+            fresh.close()
+            await wait(0.4)
+        }
     }
 
     /// The editor's tool list after Connect, then the import sheet's review.

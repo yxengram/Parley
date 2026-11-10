@@ -138,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         AppState.shared.flushAllSync()
+        AppState.shared.pageLoader.cancelAll()
         // Instant when no server runs.
         AppState.shared.mcp.shutdownSync(grace: 0.4)
         #if DEBUG

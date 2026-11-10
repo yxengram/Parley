@@ -804,7 +804,7 @@ private struct GeneralSettingsView: View {
 
             SettingsSection("Privacy", seed: 43, tape: Hideout.rose) {
                 Label {
-                    Text("Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page, each website you approve for one call. No telemetry.")
+                    Text("Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.")
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "hand.raised.fill").foregroundStyle(Hideout.brass)

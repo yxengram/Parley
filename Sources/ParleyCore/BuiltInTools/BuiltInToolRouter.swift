@@ -7,9 +7,11 @@ public final class BuiltInToolRouter: MCPToolHost, Sendable {
     private let host: MCPToolHost
     private let runner: BuiltInToolRunner
 
-    /// `settings` is read on every call, so a change in Settings applies to the next one.
-    public convenience init(wrapping host: MCPToolHost, settings: @escaping @Sendable () async -> BuiltInToolSettings) {
-        self.init(wrapping: host, runner: BuiltInToolRunner(settings: settings))
+    /// `settings` is read on every call, so a change in Settings applies to the next one. `pageLoader`
+    /// is the app's WebKit side of `browse_url`; without one that tool reports it is not available.
+    public convenience init(wrapping host: MCPToolHost, settings: @escaping @Sendable () async -> BuiltInToolSettings,
+                            pageLoader: BuiltInPageLoader? = nil) {
+        self.init(wrapping: host, runner: BuiltInToolRunner(settings: settings, browser: pageLoader.map(BuiltInBrowser.init(loader:))))
     }
 
     init(wrapping host: MCPToolHost, runner: BuiltInToolRunner) {

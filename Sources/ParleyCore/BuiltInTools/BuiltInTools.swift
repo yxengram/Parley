@@ -21,6 +21,7 @@ public enum BuiltInTools {
         case listFiles = "list_files"
         case readFile = "read_file"
         case fetchURL = "fetch_url"
+        case browseURL = "browse_url"
 
         /// The Settings toggle.
         public var title: String {
@@ -30,6 +31,7 @@ public enum BuiltInTools {
             case .listFiles: return "List Files"
             case .readFile: return "Read File"
             case .fetchURL: return "Fetch Web Page"
+            case .browseURL: return "Browse Web Page"
             }
         }
 
@@ -38,7 +40,10 @@ public enum BuiltInTools {
 
         /// Reads the user's files or contacts a website, so there is no Always Allow: a page or file
         /// can tell the model to send what it read somewhere, and each card is where that stops.
-        public var asksEveryTime: Bool { needsFolder || self == .fetchURL }
+        public var asksEveryTime: Bool { needsFolder || contactsWebsites }
+
+        /// Fetch and Browse: the card names the host.
+        public var contactsWebsites: Bool { self == .fetchURL || self == .browseURL }
 
         fileprivate var description: String {
             switch self {
@@ -59,6 +64,14 @@ public enum BuiltInTools {
                 return "Fetches one public web page over http or https and returns its text. Scripts are not run and "
                     + "images are not loaded. Private and local addresses are refused. A redirect to another address "
                     + "is reported, not followed. The user approves every call."
+            case .browseURL:
+                return "Opens one public web page over http or https in a private browser that runs its scripts, waits for "
+                    + "the page to render, and returns its address, title and visible text. Use it for a page that "
+                    + "fetch_url returns with little or no text because scripts build it. Slower than fetch_url. Images, "
+                    + "video and fonts are not loaded, and nothing is kept afterwards. The page may load only from its "
+                    + "own site unless the user has allowed other sites in Settings; the result says what was blocked. "
+                    + "Private and local addresses are refused, for the page and for everything it loads. Going to "
+                    + "another address is reported, not followed. The user approves every call."
             }
         }
 
@@ -85,6 +98,13 @@ public enum BuiltInTools {
                 required = ["path"]
             case .fetchURL:
                 properties["url"] = string("The full http or https address.")
+                required = ["url"]
+            case .browseURL:
+                properties["url"] = string("The full http or https address.")
+                properties["links"] = .object([
+                    "type": .string("boolean"),
+                    "description": .string("Also list the page's links, up to \(BuiltInBrowser.maxLinks). Leave it out for text only."),
+                ])
                 required = ["url"]
             }
             var schema: [String: JSONValue] = ["type": .string("object"), "properties": .object(properties)]
@@ -133,15 +153,27 @@ public enum BuiltInTools {
         binding.serverID == serverID && Tool(rawValue: binding.tool.name)?.needsFolder == true
     }
 
+    /// True for a `browse_url` call, whose Allow means the "other sites" switch as its card showed it.
+    public static func dependsOnBrowseSwitch(_ binding: MCPToolBinding) -> Bool {
+        binding.serverID == serverID && binding.tool.name == Tool.browseURL.rawValue
+    }
+
     /// The line under the tool's name on the approval card. The card is local, so the folder's name
     /// may be here; it never goes to the model. The path is here too: the arguments block scrolls and
     /// the model picks its keys, so a decoy could fill what shows there and push the real one out of view.
-    public static func approvalDetail(toolName: String, arguments: [String: JSONValue], folderPath: String?) -> String {
+    /// For `browse_url` it says whether the page's scripts may reach other sites (`browseOtherSites`).
+    public static func approvalDetail(toolName: String, arguments: [String: JSONValue], folderPath: String?,
+                                      browseOtherSites: Bool = false) -> String {
         let plain = "Built-in tool"
         switch Tool(rawValue: toolName) {
         case .fetchURL?:
             guard let text = arguments["url"]?.stringValue, let host = BuiltInFetcher.parse(text)?.host else { return plain }
             return "\(plain), contacts \(host)"
+        case .browseURL?:
+            guard let text = arguments["url"]?.stringValue, let host = BuiltInFetcher.parse(text)?.host else { return plain }
+            return browseOtherSites
+                ? "\(plain), opens \(host) in a private browser; its scripts may contact other public sites"
+                : "\(plain), opens \(host) in a private browser, loading only from that site"
         case let tool? where tool.needsFolder:
             guard let folderPath, !folderPath.isEmpty else { return plain }
             let folder = "\(plain), in folder \(URL(fileURLWithPath: folderPath).lastPathComponent)"
@@ -158,10 +190,13 @@ public struct BuiltInToolSettings: Sendable, Equatable {
     /// `Tool` raw values. A String list, so a name a later version adds is ignored here.
     public var enabled: [String]
     public var folderPath: String?
+    /// Browse Web Page may load from other public sites, not only the approved one. Off by default.
+    public var browseOtherSites: Bool
 
-    public init(enabled: [String] = [], folderPath: String? = nil) {
+    public init(enabled: [String] = [], folderPath: String? = nil, browseOtherSites: Bool = false) {
         self.enabled = enabled
         self.folderPath = folderPath
+        self.browseOtherSites = browseOtherSites
     }
 
     public static let off = BuiltInToolSettings()

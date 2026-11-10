@@ -20,7 +20,8 @@ extension AppState {
             approvalNeeded: { NSApp?.requestUserAttention(.informationalRequest) },
             maxRounds: { [weak self] in self?.settings.maxToolRounds ?? AppSettings.defaultMaxToolRounds },
             contextLimit: { [weak self] provider, model in self?.contextLimit(provider: provider, model: model) },
-            builtInFolderPath: { [weak self] in self?.settings.builtInFolderPath }
+            builtInFolderPath: { [weak self] in self?.settings.builtInFolderPath },
+            builtInBrowseOtherSites: { [weak self] in self?.settings.builtInBrowseOtherSites ?? false }
         )
     }
 

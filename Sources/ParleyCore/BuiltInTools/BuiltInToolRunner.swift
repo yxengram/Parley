@@ -21,13 +21,17 @@ final class BuiltInCancelFlag: @unchecked Sendable {
 final class BuiltInToolRunner: Sendable {
     private let settings: @Sendable () async -> BuiltInToolSettings
     private let fetcher: BuiltInFetcher
+    /// Nil where there is no app to run WebKit in: `browse_url` then says it is not available.
+    private let browser: BuiltInBrowser?
     private let now: @Sendable () -> Date
     private let timeZone: @Sendable () -> TimeZone
 
     init(settings: @escaping @Sendable () async -> BuiltInToolSettings, fetcher: BuiltInFetcher = BuiltInFetcher(),
+         browser: BuiltInBrowser? = nil,
          now: @escaping @Sendable () -> Date = { Date() }, timeZone: @escaping @Sendable () -> TimeZone = { TimeZone.current }) {
         self.settings = settings
         self.fetcher = fetcher
+        self.browser = browser
         self.now = now
         self.timeZone = timeZone
     }
@@ -66,6 +70,15 @@ final class BuiltInToolRunner: Sendable {
         case .fetchURL:
             let fetcher = self.fetcher
             answer = await Self.race(timeout: timeout) { await fetcher.fetch(arguments["url"]?.stringValue) }
+        case .browseURL:
+            if let browser {
+                let otherSites = current.browseOtherSites
+                answer = await Self.race(timeout: timeout) {
+                    await browser.browse(arguments, budget: maxCharacters, otherSites: otherSites)
+                }
+            } else {
+                answer = .error("Browse Web Page is not available here.")
+            }
         }
 
         switch answer {

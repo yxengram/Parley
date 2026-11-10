@@ -25,6 +25,7 @@ final class AppSettings {
         static let maxToolRounds = "maxToolRounds"
         static let builtInTools = "builtInTools"
         static let builtInFolderPath = "builtInFolderPath"
+        static let builtInBrowseOtherSites = "builtInBrowseOtherSites"
     }
 
     static let defaultMaxToolRounds = 10
@@ -77,8 +78,14 @@ final class AppSettings {
         didSet { defaults.set(builtInFolderPath, forKey: Key.builtInFolderPath) }
     }
 
+    /// Browse Web Page may load from other public sites, not only the address the user approved.
+    /// Off by default.
+    var builtInBrowseOtherSites: Bool {
+        didSet { defaults.set(builtInBrowseOtherSites, forKey: Key.builtInBrowseOtherSites) }
+    }
+
     var builtInToolSettings: BuiltInToolSettings {
-        BuiltInToolSettings(enabled: builtInTools, folderPath: builtInFolderPath)
+        BuiltInToolSettings(enabled: builtInTools, folderPath: builtInFolderPath, browseOtherSites: builtInBrowseOtherSites)
     }
 
     /// Something can be turned on for a conversation: the composer's tools button and ⇧⌘T need it.
@@ -325,6 +332,7 @@ final class AppSettings {
         self.builtInTools = defaults.stringArray(forKey: Key.builtInTools) ?? []
         let storedFolder = defaults.string(forKey: Key.builtInFolderPath) ?? ""
         self.builtInFolderPath = storedFolder.isEmpty ? nil : storedFolder
+        self.builtInBrowseOtherSites = defaults.bool(forKey: Key.builtInBrowseOtherSites)
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }
         self.learnedContextLengths = (defaults.dictionary(forKey: Key.learnedContextLengths) ?? [:])

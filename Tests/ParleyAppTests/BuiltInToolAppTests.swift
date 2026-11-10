@@ -157,7 +157,7 @@ private func firstCall(_ message: Message) throws -> ToolCallRecord {
             let server = try #require(servers.first)
             #expect(servers.count == 1)
             #expect(server.id == BuiltInTools.serverID && server.kind == MCPServerConfig.kindBuiltIn)
-            #expect(Set(server.disabledTools) == ["current_time", "calculate", "fetch_url"])
+            #expect(Set(server.disabledTools) == ["current_time", "calculate", "fetch_url", "browse_url"])
             #expect(fx.settings.offersTools)
         }
     }
@@ -169,11 +169,11 @@ private func firstCall(_ message: Message) throws -> ToolCallRecord {
             fx.settings.clearBuiltInFolder()
             #expect(fx.settings.builtInFolderPath == nil)
             #expect(fx.defaults.object(forKey: "builtInFolderPath") == nil)
-            #expect(fx.settings.builtInTools == ["current_time", "calculate", "fetch_url", "web_search"])
+            #expect(fx.settings.builtInTools == ["current_time", "calculate", "fetch_url", "browse_url", "web_search"])
 
             // A new folder shares nothing until a file tool is turned on again.
             fx.settings.builtInFolderPath = "/another/folder"
-            #expect(fx.settings.builtInToolSettings.effectiveTools == [.currentTime, .calculate, .fetchURL])
+            #expect(fx.settings.builtInToolSettings.effectiveTools == [.currentTime, .calculate, .fetchURL, .browseURL])
         }
     }
 
@@ -225,7 +225,8 @@ private func firstCall(_ message: Message) throws -> ToolCallRecord {
             #expect(allowance["list_files"] == .ask)
             #expect(allowance["read_file"] == .ask)
             #expect(allowance["fetch_url"] == .ask)
-            #expect(allowance.count == 5)
+            #expect(allowance["browse_url"] == .ask)
+            #expect(allowance.count == 6)
 
             // Nothing can be stored for them, and nothing is.
             let before = fx.settings.mcpServers
@@ -434,6 +435,70 @@ struct BuiltInLoopTests {
             let result = try #require(try firstCall(try reply(session)).result)
             #expect(result.callStatus == .toolError)
             #expect(!result.text.contains("mock-tools"), "no answer came back")
+        }
+    }
+
+    /// Denied: nothing is opened, and the name is never looked up.
+    @Test func theBrowseCardNamesTheHostAndSaysOtherSitesMayBeContacted() async throws {
+        try await withBuiltIns([.browseURL]) { fx, session, _ in
+            fx.settings.builtInBrowseOtherSites = true
+            start(ask("browse_url", args: #"{"url":"https://example.org/a?b=c","links":true}"#), fx, session)
+            let approval = try await waitForApproval(session)
+            #expect(approval.serverDetail == "Built-in tool, opens example.org in a private browser; its scripts may contact other public sites")
+            #expect(approval.arguments.contains("https://example.org/a?b=c"))
+            #expect(approval.asksEveryTime && !approval.offersAlwaysAllow)
+            session.answerApproval(.deny)
+            try await fx.waitForReply(session)
+            #expect(try firstCall(try reply(session)).result?.callStatus == .denied)
+            #expect(fx.state.pageLoader.openPages == 0)
+        }
+    }
+
+    @Test func otherSitesAreOffByDefaultAndTheCardSaysSo() async throws {
+        try await withBuiltIns([.browseURL]) { fx, session, _ in
+            #expect(!fx.settings.builtInBrowseOtherSites)
+            #expect(fx.defaults.object(forKey: "builtInBrowseOtherSites") == nil)
+            #expect(!fx.settings.builtInToolSettings.browseOtherSites)
+            start(ask("browse_url", args: #"{"url":"https://example.org/"}"#), fx, session)
+            #expect(try await waitForApproval(session).serverDetail
+                == "Built-in tool, opens example.org in a private browser, loading only from that site")
+            session.answerApproval(.deny)
+            try await fx.waitForReply(session)
+            fx.settings.builtInBrowseOtherSites = true
+            #expect(fx.defaults.bool(forKey: "builtInBrowseOtherSites"))
+            #expect(fx.settings.builtInToolSettings.browseOtherSites)
+        }
+    }
+
+    /// An Allow means the switch as the card showed it, as it does for the folder.
+    @Test func turningOtherSitesOnDuringTheCardRunsNothing() async throws {
+        try await withBuiltIns([.browseURL]) { fx, session, _ in
+            start(ask("browse_url", args: #"{"url":"https://example.org/"}"#), fx, session)
+            #expect(try await waitForApproval(session).serverDetail.hasSuffix("loading only from that site"))
+            fx.settings.builtInBrowseOtherSites = true
+            session.answerApproval(.allowOnce)
+            try await fx.waitForReply(session)
+            let result = try #require(try firstCall(try reply(session)).result)
+            #expect(result.text == ToolResultText.turnedOff)
+            #expect(result.callStatus == .notCalled)
+            #expect(fx.state.pageLoader.openPages == 0)
+        }
+    }
+
+    /// The app's own router has the WebKit loader (the tool is not "not available"), and its floor
+    /// refuses the loopback mock before any web view exists.
+    @Test func allowedBrowsesOfThisMacAreStillRefused() async throws {
+        try await withBuiltIns([.browseURL]) { fx, session, _ in
+            let target = fx.provider.baseURL + "/models"
+            start(ask("browse_url", args: #"{"url":"\#(target)"}"#), fx, session)
+            _ = try await waitForApproval(session)
+            session.answerApproval(.allowOnce)
+            try await fx.waitForReply(session)
+            let result = try #require(try firstCall(try reply(session)).result)
+            #expect(result.callStatus == .toolError)
+            #expect(result.text.contains("was refused: only public internet addresses can be opened"))
+            #expect(!result.text.contains("mock-tools"), "no answer came back")
+            #expect(fx.state.pageLoader.openPages == 0)
         }
     }
 

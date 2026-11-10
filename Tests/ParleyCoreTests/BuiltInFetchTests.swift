@@ -7,7 +7,7 @@ import Testing
 // resolves a name or leaves this Mac: the refused hosts are refused before any lookup or connection.
 
 /// One HTTP listener on 127.0.0.1. A route is a full response; an unknown path is a 404.
-private final class LoopbackWeb: @unchecked Sendable {
+final class LoopbackWeb: @unchecked Sendable {
     struct Request {
         var line: String
         var headers: [String: String]

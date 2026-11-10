@@ -114,7 +114,7 @@ struct BuiltInFetcher: Sendable {
 
     private func hop(_ url: URL, session: URLSession) async throws -> Hop {
         guard let host = url.host else { throw BuiltInRefusal("The address has no host.") }
-        try await checkHost(host)
+        try await Self.checkHost(host, floor: floor)
         // A lookup cannot be interrupted, and Stop during one must not still send the GET.
         try Task.checkCancellation()
 
@@ -185,11 +185,12 @@ struct BuiltInFetcher: Sendable {
         return .done(.text(out + "\n" + (isHTML ? HTMLText.plain(decoded) : decoded)))
     }
 
-    private func checkHost(_ host: String) async throws {
+    /// Shared with `browse_url`, which checks the page's host the same way before anything starts.
+    static func checkHost(_ host: String, floor: MCPOAuthLocality, verb: String = "fetched") async throws {
         // The name's own class first: a name it refuses is never looked up, so asking about a
         // `.local` name sends nothing to the network.
-        guard let named = MCPOAuthPolicy.locality(ofHost: host), named >= floor else { throw Self.refused(host) }
-        guard let resolved = await MCPOAuthHTTP.resolvedLocality(of: host), resolved >= floor else { throw Self.refused(host) }
+        guard let named = MCPOAuthPolicy.locality(ofHost: host), named >= floor else { throw refused(host, verb: verb) }
+        guard let resolved = await MCPOAuthHTTP.resolvedLocality(of: host), resolved >= floor else { throw refused(host, verb: verb) }
     }
 
     private func checkConnection(_ delegate: FetchTaskDelegate, host: String) async throws {
@@ -233,8 +234,8 @@ struct BuiltInFetcher: Sendable {
         BuiltInRefusal("The connection to \(host) failed.")
     }
 
-    private static func refused(_ host: String) -> BuiltInRefusal {
-        BuiltInRefusal("\(host) was refused: only public internet addresses can be fetched, not this computer, the local network or a VPN.")
+    static func refused(_ host: String, verb: String = "fetched") -> BuiltInRefusal {
+        BuiltInRefusal("\(host) was refused: only public internet addresses can be \(verb), not this computer, the local network or a VPN.")
     }
 
     private static func redirectTarget(_ location: String, from url: URL) -> URL? {
