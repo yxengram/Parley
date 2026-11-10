@@ -1,0 +1,2158 @@
+<!doctype html>
+<!--
+  Parley Reader page template. tools/build_reader.sh turns it into Reader/ParleyReader.html by
+  filling the three script placeholders below (art, core.js, markdown.js). Everything the page
+  shows from a file is built with createElement and textContent; nothing goes over the network.
+-->
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none'">
+<meta name="google" content="notranslate">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Parley Reader</title>
+<style>
+:root {
+  --rounded: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --system: system-ui, -apple-system, "Helvetica Neue", "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --lettered: "Noteworthy", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --wall-w: 268px;
+  /* Fallback colours until the script applies the chosen skin (cardboard, light). */
+  --paper: #FBF1DF; --paperDeep: #F4E3C6; --card: #FFF8EA; --ink: #3A2416; --inkSoft: #6E4F39;
+  --wall: #D8B07A; --wallDeep: #C4955C; --wallInk: #2E1B0F; --stitch: #C4955C; --ember: #C24A20;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--paper); color: var(--ink);
+  font: 13px/1.25 var(--rounded);
+  overflow: hidden; -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: 4px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lettered { font-family: var(--lettered); font-weight: 700; }
+
+/* ---- shapes: an SVG behind the content, redrawn on resize */
+.has-shape { position: relative; isolation: isolate; }
+.shape { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; z-index: -1; pointer-events: none; }
+.shadow-paper { filter: drop-shadow(0 1.5px 3px rgba(0,0,0,.10)); }
+.shadow-code { filter: drop-shadow(0 1.5px 3px rgba(0,0,0,.14)); }
+.shadow-pic { filter: drop-shadow(0 4px 8px rgba(0,0,0,.22)); }
+.shadow-row { filter: drop-shadow(0 1.5px 2.5px rgba(0,0,0,.18)); }
+.shadow-btn { filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
+.washi { position: absolute; pointer-events: none; overflow: visible; }
+.icon { width: 1em; height: 1em; flex: none; overflow: visible; vertical-align: -0.125em; }
+
+/* ---- layout */
+.app { display: grid; grid-template-columns: var(--wall-w) minmax(0, 1fr); height: 100vh; height: 100dvh; }
+.app.wall-hidden { grid-template-columns: 0 minmax(0, 1fr); }
+.app.wall-hidden .wall { display: none; }
+.scrim { display: none; }
+
+/* ---- the wall (sidebar) */
+.wall {
+  position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  color: var(--wallInk); isolation: isolate;
+  background: linear-gradient(to bottom, var(--wall), var(--wall-bottom)), var(--paper); /* over the window's paper, like the app */
+  border-right: 1px solid var(--wallDeep);
+}
+.wall::before, .wall::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; }
+.wall::before { background: repeating-linear-gradient(90deg, transparent 0 2.5px, var(--corrugation) 2.5px 3.5px, transparent 3.5px 7px); }
+.wall::after { background-image: var(--grain-wall); background-size: 96px 96px; opacity: var(--grain-wall-opacity); }
+.seam { position: absolute; top: 0; bottom: 0; right: -5px; width: 9px; cursor: col-resize; z-index: 3; touch-action: none; }
+.wall-top { position: relative; height: 76px; flex: none; }
+.bunting { position: absolute; left: 0; right: 0; top: 34px; height: 40px; width: 100%; pointer-events: none; }
+.wall-buttons { position: absolute; top: 5px; right: 10px; display: flex; gap: 6px; }
+.round-btn {
+  width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; flex: none;
+  display: inline-grid; place-items: center; font-size: 14px;
+  background: var(--paperDeep); color: var(--inkSoft); transition: background .12s;
+}
+.round-btn:hover { background: var(--emberWash); }
+.round-btn:active { opacity: .7; }
+.wall .round-btn { width: 28px; height: 28px; color: var(--wallInk); background: rgb(var(--tag-rgb) / .45); }
+.wall .round-btn:hover { background: rgb(var(--tag-rgb) / .75); }
+.wordmark { padding: 0 16px; margin: 8px 0 0; font-size: 30px; line-height: normal; color: var(--wallInk); }
+.search { margin: 8px 12px 8px; padding: 7px 10px; display: flex; align-items: center; gap: 6px; color: var(--inkSoft); }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--ink); font-size: 13px; padding: 0; }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.search input { -webkit-appearance: none; appearance: none; }
+.search input::placeholder { color: var(--inkSoft); opacity: 1; }
+.search:focus-within .shape path { stroke: var(--ember); stroke-width: 1.5px; }
+.clear-btn { border: 0; background: none; padding: 0; color: var(--inkSoft); display: inline-grid; place-items: center; font-size: 13px; }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 0 12px; scrollbar-width: thin; }
+.group-title { font-family: var(--lettered); font-weight: 700; font-size: 15px; color: var(--wallInkSoft); padding: 10px 14px 2px; margin: 0; }
+.rows { list-style: none; margin: 0; padding: 0; }
+/* The list insets (2px, 8px) plus the inset of the app's sidebar List style: row text lands at x = 34. */
+.row { position: relative; margin: 2px 23px 2px 24px; display: flex; align-items: center; }
+.row-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; text-align: left;
+  padding: 7px 10px; border: 0; background: none; color: var(--wallInk); border-radius: 8px;
+}
+.row-main:focus-visible { outline: none; }
+.row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 11px; color: var(--wallInkSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.locked .row-title { color: var(--wallInkSoft); }
+.row-lock { font-size: 11px; color: var(--wallInkSoft); flex: none; display: inline-grid; }
+.row .shape path { fill: var(--tag); fill-opacity: 0; stroke: var(--ember); stroke-opacity: 0; stroke-width: 1.5px; }
+.row:hover .shape path { fill-opacity: .35; }
+.row.selected .shape path { fill-opacity: 1; }
+.row:has(.row-main:focus-visible) .shape path { stroke-opacity: 1; }
+.row.selected .row-main { color: var(--ink); }
+.row.selected .row-title { font-weight: 600; color: var(--ink); }
+.row.selected .row-sub { color: var(--inkSoft); }
+.row.selected .row-lock { color: var(--brass); }
+.row.selected.locked .row-title { font-weight: 500; color: var(--inkSoft); }
+.row .washi { display: none; right: -6px; top: -3px; }
+.row.selected .washi { display: block; }
+.row .shape { filter: none; }
+.row.selected .shape { filter: drop-shadow(0 1.5px 2.5px rgba(0,0,0,.18)); }
+.row-remove {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border-radius: 50%; border: 0; padding: 0; display: grid; place-items: center;
+  background: var(--paperDeep); color: var(--inkSoft); font-size: 10px; opacity: 0; transition: opacity .12s;
+}
+.row:hover .row-remove, .row:focus-within .row-remove { opacity: 1; }
+/* The viewer-only remove button gets its own room, so the padlock always stays visible. */
+.row:hover .row-main, .row:focus-within .row-main { padding-right: 30px; }
+@media (hover: none) { .row-remove { opacity: .8; } .row-main { padding-right: 30px; } }
+.search input:focus-visible, .pw-field input:focus-visible { outline: none; } /* the shape's ember edge shows focus */
+.wall-empty { padding: 30px 16px; text-align: center; color: var(--wallInk); }
+.wall-empty .lettered { font-size: 20px; margin-bottom: 6px; }
+.wall-empty p { margin: 0; font-size: 12px; color: var(--wallInkSoft); }
+.wall-foot { flex: none; display: flex; gap: 8px; align-items: center; padding: 8px 12px 10px; border-top: 1px solid rgb(var(--wallInk-rgb) / .12); font-size: 11px; color: var(--wallInkSoft); flex-wrap: wrap; }
+.wall-foot label { display: flex; align-items: center; gap: 4px; }
+.wall-foot select { font-size: 11px; color: var(--ink); background: rgb(var(--tag-rgb) / .7); border: 1px solid rgb(var(--wallInk-rgb) / .25); border-radius: 6px; padding: 2px 4px; }
+.menu {
+  position: fixed; z-index: 60; min-width: 160px; padding: 4px; background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; }
+.menu button:hover, .menu button:focus-visible { background: var(--emberWash); outline: none; }
+
+/* ---- the room (detail) */
+.room { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; isolation: isolate; }
+.room::before, .room::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; }
+.room::before { background: var(--room-glow); }
+.room::after { background-image: var(--grain-room); background-size: 96px 96px; opacity: var(--grain-room-opacity); }
+.room-header { position: relative; height: 54px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+.room-header::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.25px;
+  background: repeating-linear-gradient(90deg, var(--stitch) 0 6px, transparent 6px 11px);
+}
+.header-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.header-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-sub { font-size: 11px; color: var(--inkSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.parcel { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px 5px 22px; font-size: 13px; color: var(--ink); max-width: 260px; flex: none; }
+.parcel .icon { color: var(--inkSoft); }
+.parcel-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.parcel .shape path.tag { fill: var(--tag); stroke: var(--line); stroke-width: 1px; }
+.parcel .shape circle { fill: var(--paper); stroke: var(--line); stroke-width: 1px; }
+.parcel .shape path.string { fill: none; stroke: var(--stitch); stroke-width: 1.25px; stroke-linecap: round; }
+.parcel .shape { filter: drop-shadow(0 1px 2px rgba(0,0,0,.12)); }
+
+/* centred screens: empty state, unlock */
+.centred { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 40px; }
+.centred .lettered.big { font-size: 30px; line-height: 1.15; margin: 0; }
+.centred p { margin: 0; color: var(--inkSoft); max-width: 460px; }
+/* the empty detail: top-aligned scroll content, like the app's EmptyDetailView */
+.empty-detail { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 40px; }
+.empty-detail .lettered.big { font-size: 30px; line-height: 1.15; margin: 0; }
+.empty-detail p { margin: 0; color: var(--inkSoft); max-width: 460px; }
+.empty-detail .taped { margin-bottom: 12px; }
+.taped { position: relative; padding: 9px; max-width: 100%; }
+.taped img, .taped .art-missing { display: block; width: 100%; height: auto; border-radius: 6px; object-fit: cover; background: var(--paperDeep); }
+.taped .washi { left: 50%; top: -10px; }
+.privacy { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--inkSoft); margin-top: 18px; max-width: 460px; text-align: left; }
+.privacy .icon { color: var(--brass); font-size: 11px; }
+.tag-btn {
+  position: relative; isolation: isolate; border: 0; background: none; padding: 6px 14px;
+  font: 600 13px/1.25 var(--rounded); color: var(--onEmber); transition: transform .08s;
+}
+.tag-btn .shape path { fill: var(--ember); }
+.tag-btn:active { transform: scale(.98); }
+.tag-btn:active .shape { filter: brightness(.95); }
+.tag-btn.soft { color: var(--ink); }
+.tag-btn.soft .shape path { fill: var(--paperDeep); stroke: rgb(var(--inkFaint-rgb) / .55); stroke-width: 1px; }
+.tag-btn:disabled { color: var(--inkSoft); cursor: default; transform: none; }
+.tag-btn:disabled .shape { filter: none; }
+.tag-btn:disabled .shape path { fill: var(--paperDeep); stroke: rgb(var(--inkFaint-rgb) / .55); stroke-width: 1px; stroke-dasharray: 3 3; }
+.pw-row { display: flex; gap: 10px; align-items: center; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+.pw-field { width: 260px; max-width: 100%; padding: 7px 10px; display: flex; }
+.pw-field input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 13px; color: var(--ink); padding: 0; }
+.pw-field input::placeholder { color: var(--inkSoft); opacity: 1; }
+.pw-field .shape path { fill: var(--tag); stroke: var(--line); stroke-width: 1px; }
+.pw-field:focus-within .shape path { stroke: var(--ember); stroke-width: 1.5px; }
+.pw-field.shake { animation: shake .4s linear; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 12.5% { transform: translateX(8px); } 37.5% { transform: translateX(-8px); } 62.5% { transform: translateX(8px); } 87.5% { transform: translateX(-8px); } }
+.status-slot { min-height: 20px; max-width: 420px; display: flex; align-items: center; justify-content: center; }
+.spinner-line { display: inline-flex; align-items: center; gap: 8px; color: var(--inkSoft); font-size: 12px; }
+.spinner { width: 14px; height: 14px; animation: spin 1.2s linear infinite; color: var(--emberText); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.notice { display: inline-flex; align-items: flex-start; gap: 6px; padding: 7px 10px; border-radius: 8px; border: 1.5px solid; font-size: 12px; font-weight: 500; text-align: left; }
+.notice.danger { color: var(--danger); background: var(--dangerWash); border-color: var(--danger); }
+.notice .icon { margin-top: 1px; }
+.unlock-meta { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.unlock-meta .where { font-size: 10px; color: var(--inkSoft); max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unlock-meta .warn { font-size: 12px; font-weight: 500; color: var(--ink); }
+
+/* ---- conversation */
+.column { max-width: 740px; margin: 0 auto; padding: 16px 0 8px; }
+.msg { padding: 9px 20px; content-visibility: auto; contain-intrinsic-size: auto 90px; }
+.msg-user { display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; padding-left: 80px; }
+.msg-user .stack { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 0; max-width: 100%; }
+.note { padding: 9px 14px; font: 13px/18px var(--system); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.note .shape path { fill: var(--peach); }
+.msg-assistant { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.msg-assistant > * { max-width: 100%; }
+.a-head { position: relative; display: flex; align-items: center; gap: 5px; min-height: 24px; }
+.a-model { font-size: 10px; font-weight: 500; color: var(--inkSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-time { font-size: 10px; color: var(--inkFaint); white-space: nowrap; }
+.actions { display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
+.msg:hover .actions, .actions:focus-within { opacity: 1; }
+@media (hover: none) { .actions { opacity: .85; } }
+.a-head .actions { position: absolute; right: 0; top: 0; }
+.msg-user .actions { padding-top: 2px; flex: none; }
+.paper-btn {
+  width: 24px; height: 24px; border-radius: 50%; padding: 0; display: grid; place-items: center;
+  background: var(--card); color: var(--inkSoft); border: 1px solid var(--line); font-size: 11px;
+  box-shadow: 0 1px 1.5px rgba(0,0,0,.10);
+}
+.paper-btn:hover { background: var(--paperDeep); color: var(--ink); }
+.forked { font-size: 10px; color: var(--inkFaint); padding: 0 20px 4px; }
+.small-note { display: flex; gap: 5px; align-items: flex-start; font-size: 10px; line-height: 13px; color: var(--inkSoft); }
+.small-note .icon { margin-top: 1px; }
+.footer-stats { font-size: 10px; color: var(--inkFaint); font-variant-numeric: tabular-nums; }
+.stopped { display: flex; gap: 8px; align-items: center; font-size: 10px; color: var(--inkSoft); }
+.row-failed { font-size: 11px; color: var(--inkSoft); font-style: italic; }
+
+/* thinking disclosure */
+.disclosure-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 1px 0; font-size: 12px; color: var(--inkSoft); text-align: left; align-self: flex-start; }
+.chev { font-size: 10px; transition: transform .15s ease-in-out; }
+[aria-expanded="true"] > .chev { transform: rotate(90deg); }
+.thinking-body {
+  margin: 6px 0 0 5px; padding-left: 14px; font: 12px/17px var(--mono); color: var(--inkSoft); white-space: pre-wrap; overflow-wrap: anywhere;
+  background: radial-gradient(circle, var(--stitch) 1px, transparent 1.2px) left 0 top 2px / 2px 5.6px repeat-y;
+}
+
+/* tool calls */
+.tool { display: flex; flex-direction: column; align-items: flex-start; }
+.slip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 0; background: none; padding: 6px 11px 6px 15px; font-size: 12px; color: var(--ink); text-align: left; }
+.slip .shape path { fill: var(--card); }
+.slip::before { content: ""; position: absolute; left: 7.4px; top: 6px; bottom: 6px; width: 1.25px; background: repeating-linear-gradient(to bottom, var(--stitch) 0 3px, transparent 3px 7px); }
+.slip .chev, .slip .wrench { color: var(--inkSoft); }
+.slip-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.slip-dot { color: var(--inkFaint); }
+.slip-status { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.slip-time { color: var(--inkFaint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tool-body { position: relative; margin: 6px 0 0 7px; padding-left: 13px; display: flex; flex-direction: column; gap: 8px; width: calc(100% - 7px); }
+.tool-body::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1.25px; background: repeating-linear-gradient(to bottom, var(--stitch) 0 3px, transparent 3px 7px); }
+.board-block { background: var(--board); color: var(--boardInk); border-radius: 9px; padding: 7px 12px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.board-head { display: flex; align-items: center; gap: 6px; }
+.board-title { font-size: 10px; font-weight: 500; color: var(--boardInkSoft); flex: 1; }
+.board-copy { width: 18px; height: 18px; border: 0; background: none; padding: 0; color: var(--boardInkSoft); font-size: 10px; display: grid; place-items: center; }
+.board-text { margin: 0; font: 12px/17px var(--mono); color: var(--boardInk); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; color-scheme: dark; user-select: text; }
+.board-more { font-size: 10px; color: var(--boardInkSoft); }
+.tool-lines { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--inkSoft); }
+
+/* attachments */
+.strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.msg-user .strip { justify-content: flex-end; }
+.thumb { width: 120px; height: 120px; padding: 7px; border: 0; background: none; flex: none; }
+.thumb .shape path { fill: var(--card); }
+.thumb img, .thumb .no-image { width: 106px; height: 106px; display: grid; place-items: center; object-fit: cover; border-radius: 4px; background: var(--paperDeep); color: var(--inkSoft); font-size: 22px; }
+.thumb .washi { left: 50%; top: -6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; background: none; font-size: 12px; color: var(--ink); }
+.chip .shape path { fill: var(--card); }
+.chip .icon { color: var(--emberText); }
+.chip span { white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+/* markdown */
+.md { display: flex; flex-direction: column; gap: 8px; font: 13px/19px var(--system); color: var(--ink); width: 100%; min-width: 0; user-select: text; }
+.md-p, .md-li-text, .md-quote { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.md-h { font-family: var(--rounded); font-weight: 600; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md-h1 { font-size: 17px; line-height: 22px; padding-top: 6px; }
+.md-h2 { font-size: 15px; line-height: 20px; padding-top: 6px; }
+.md-h3 { font-size: 13px; line-height: 16px; padding-top: 3px; }
+.md-list { display: flex; flex-direction: column; gap: 4px; }
+.md-li { display: flex; align-items: baseline; gap: 6px; }
+.md-marker { color: var(--emberText); min-width: 14px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.md-li-text { min-width: 0; flex: 1; }
+.md-quote { position: relative; color: var(--inkSoft); padding-left: 12px; }
+.md-quote::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 1.5px; background: var(--stitch); }
+.md-rule { height: 1.25px; margin: 6px 0; background: repeating-linear-gradient(90deg, var(--stitch) 0 6px, transparent 6px 11px); }
+.i-em { font-style: italic; }
+.i-strong { font-weight: 700; }
+.i-strike { text-decoration: line-through; }
+.i-code { font-family: var(--mono); font-size: 12px; background: var(--paperDeep); padding: 0 1px; }
+.md-link { color: var(--emberText); cursor: pointer; border-radius: 2px; }
+.md-link:hover { text-decoration: underline; text-decoration-thickness: 1px; }
+.code-card { color: var(--boardInk); min-width: 0; }
+.code-card .shape path { fill: var(--board); }
+.code-head { display: flex; align-items: center; padding: 6px 6px 0 12px; }
+.code-lang { flex: 1; font: 500 10px/1.3 var(--mono); color: var(--boardInkSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.code-copy { width: 20px; height: 18px; border: 0; background: none; padding: 0; color: var(--boardInkSoft); font-size: 10px; display: grid; place-items: center; }
+.code-body { margin: 0; padding: 2px 12px 12px; font: 12px/17px var(--mono); color: var(--boardInk); white-space: pre; overflow-x: auto; scrollbar-width: none; tab-size: 4; user-select: text; }
+.code-body::-webkit-scrollbar { display: none; }
+
+/* error callout */
+.callout { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; border: 1.5px solid var(--danger); background: var(--dangerWash); width: 100%; text-align: left; }
+.callout > .icon { color: var(--danger); font-size: 14px; margin-top: 1px; }
+.callout-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.callout-title { font-size: 12px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.callout-detail { font-size: 12px; color: var(--inkSoft); overflow-wrap: anywhere; }
+.callout-row { display: flex; gap: 10px; align-items: center; font-size: 10px; color: var(--inkSoft); }
+.callout-toggle { border: 0; background: none; padding: 0; font-size: 10px; color: var(--danger); text-decoration: underline; }
+.callout-raw { font: 11px/15px var(--mono); color: var(--inkSoft); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.msg-user .callout { max-width: 520px; }
+
+/* empty chat invitation */
+/* a chat with no messages: the card centred both ways (the app's EmptyChatHint fills the room) */
+.scroller.no-messages { display: flex; flex-direction: column; }
+.scroller.no-messages > .column { flex: 1 0 auto; width: 100%; display: flex; flex-direction: column; justify-content: center; }
+.invite { margin: 24px auto; max-width: 430px; padding: 26px 30px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.invite .shape path.fill { fill: var(--card); }
+.invite .shape path.stitch { fill: none; stroke: var(--stitch); stroke-width: 1.25px; stroke-dasharray: 6 5; stroke-linecap: round; }
+.invite .washi { left: 50%; top: -9px; }
+
+.to-bottom {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13px; display: grid; place-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12); opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.to-bottom.shown { opacity: 1; pointer-events: auto; }
+
+/* toasts (file errors) */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; }
+.toast { flex: none; }
+.toast { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--danger); background: var(--dangerWash); color: var(--ink); font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.toast > .icon { color: var(--danger); margin-top: 1px; }
+.toast-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast-text strong { display: block; font-weight: 600; }
+.toast button { border: 0; background: none; padding: 2px; color: var(--inkSoft); display: grid; place-items: center; }
+
+/* drop overlay */
+.drop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(var(--paper-rgb) / .7); pointer-events: none; }
+.drop-card { padding: 30px 40px; font-size: 20px; color: var(--ink); }
+.drop-card .shape path.fill { fill: var(--card); }
+.drop-card .shape path.stitch { fill: none; stroke: var(--ember); stroke-width: 1.5px; stroke-dasharray: 6 5; stroke-linecap: round; }
+
+/* dialogs */
+dialog { border: 0; padding: 0; background: transparent; color: var(--ink); max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: visible; }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+.sheet { background: var(--paper); border-radius: 12px; padding: 20px; box-shadow: 0 12px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 32px); overflow: auto; }
+.link-sheet { width: 480px; max-width: 100%; }
+.notice-card { padding: 14px; border-radius: 12px; border: 1.5px solid var(--attention); background: var(--attentionWash); display: flex; flex-direction: column; gap: 12px; }
+.notice-head { display: flex; align-items: center; gap: 9px; }
+.hand { width: 26px; height: 26px; border-radius: 50%; background: var(--attention); color: var(--paper); display: grid; place-items: center; font-size: 13px; flex: none; }
+.notice-head h2 { margin: 0; font: 600 16px/1.25 var(--rounded); }
+.notice-card p { margin: 0; font-size: 12px; }
+.site { display: flex; flex-direction: column; gap: 3px; }
+.site-label { font-size: 12px; font-weight: 500; color: var(--inkSoft); }
+.site-host { font: 600 14px/1.3 var(--mono); word-break: break-all; user-select: text; }
+.board-text.address { word-break: break-all; max-height: 200px; }
+.hidden-warn { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; font-weight: 500; color: var(--caution); padding: 7px 10px; background: var(--cautionWash); border: 1.5px solid var(--caution); border-radius: 8px; }
+.sheet-buttons { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.sheet-btn { border-radius: 10px; padding: 6px 14px; font: 600 13px/1.25 var(--rounded); border: 1px solid transparent; box-shadow: 0 1px 1.5px rgba(0,0,0,.12); transition: transform .08s; }
+.sheet-btn:active { transform: scale(.98); filter: brightness(.95); }
+.sheet-btn.soft { background: var(--paperDeep); color: var(--ink); border-color: rgb(var(--inkFaint-rgb) / .55); }
+.sheet-btn.primary { background: var(--ember); color: var(--onEmber); }
+.sheet-btn.primary:disabled { background: var(--paperDeep); color: var(--inkSoft); border: 1px dashed rgb(var(--inkFaint-rgb) / .55); box-shadow: none; cursor: default; transform: none; filter: none; }
+.preview-sheet { padding: 8px; }
+.preview-sheet img { display: block; max-width: min(700px, calc(100vw - 48px)); max-height: min(700px, calc(100vh - 80px)); object-fit: contain; border-radius: 6px; }
+.text-sheet { width: 560px; height: 420px; max-width: 100%; padding: 12px; gap: 6px; }
+.text-sheet h2, .info-sheet h2 { margin: 0; font: 600 13px/1.3 var(--rounded); overflow-wrap: anywhere; }
+.text-sheet pre { flex: 1; min-height: 0; margin: 0; overflow: auto; font: 12px/16px var(--mono); white-space: pre; user-select: text; background: var(--card); border-radius: 8px; padding: 8px; }
+.sheet-close { align-self: flex-end; }
+.info-sheet { width: 520px; max-width: 100%; }
+.info-sheet .viewer-note { font-size: 11px; color: var(--inkSoft); margin: -8px 0 0; }
+.info-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 12px; margin: 0; }
+.info-grid dt { color: var(--inkSoft); }
+.info-grid dd { margin: 0; overflow-wrap: anywhere; }
+.info-prompt { margin: 0; font: 12px/17px var(--system); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card); border-radius: 8px; padding: 8px 10px; max-height: 260px; overflow: auto; user-select: text; }
+.info-prompt.none { color: var(--inkSoft); font-style: italic; }
+
+/* narrow windows: the wall becomes an overlay */
+@media (max-width: 640px) {
+  .app, .app.wall-hidden { grid-template-columns: minmax(0, 1fr); }
+  .app .wall, .app.wall-hidden .wall {
+    display: flex; position: fixed; z-index: 30; left: 0; top: 0; bottom: 0; width: min(300px, 86vw);
+    transform: translateX(-104%); transition: transform .2s ease; box-shadow: 0 0 24px rgba(0,0,0,.25); visibility: hidden;
+  }
+  .app.wall-open .wall { transform: none; visibility: visible; }
+  .app.wall-open .scrim { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.3); }
+  .seam { display: none; }
+  .msg { padding-left: 14px; padding-right: 14px; }
+  .msg-user { padding-left: 40px; }
+  .centred { padding: 28px 16px; }
+  .room-header { padding: 0 12px; gap: 8px; }
+  .parcel { max-width: 40vw; }
+  .parcel-text { max-width: 30vw; }
+}
+/* printing (or saving as PDF): the whole conversation, without the wall and the controls */
+@media print {
+  html, body { height: auto; overflow: visible; }
+  .app, .app.wall-hidden { display: block; height: auto; }
+  .wall, .scrim, .to-bottom, .toasts, .actions, .drop, .menu, .room-header .round-btn { display: none !important; }
+  .room, .room-body, .scroller { display: block; overflow: visible; height: auto; min-height: 0; flex: none; }
+  .msg { content-visibility: visible; contain-intrinsic-size: none; }
+  .board-text, .info-prompt { max-height: none; overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<noscript><p style="padding:20px">Parley Reader needs JavaScript to open conversation files. It runs entirely in this tab.</p></noscript>
+<div class="app" id="app">
+  <aside class="wall" id="wall" aria-label="Conversations">
+    <div class="wall-top">
+      <svg class="bunting" id="bunting" aria-hidden="true" focusable="false"></svg>
+      <div class="wall-buttons">
+        <button class="round-btn" type="button" id="wall-open" title="Open conversation files" aria-label="Open…"></button>
+        <button class="round-btn" type="button" id="wall-hide" title="Hide Sidebar" aria-label="Hide Sidebar"></button>
+      </div>
+    </div>
+    <div class="wordmark lettered">Parley</div>
+    <div class="search" id="search">
+      <span id="search-icon"></span>
+      <input id="search-input" type="search" placeholder="Search" aria-label="Search conversation titles" autocomplete="off" spellcheck="false">
+      <button class="clear-btn" type="button" id="search-clear" aria-label="Clear Search" title="Clear Search" hidden></button>
+    </div>
+    <nav class="list" id="list" aria-label="Opened conversations"></nav>
+    <div class="wall-foot">
+      <label>Skin <select id="skin-select" aria-label="Skin"></select></label>
+      <label>Light <select id="appearance-select" aria-label="Appearance"></select></label>
+    </div>
+    <div class="seam" id="seam" aria-hidden="true"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="room" id="room"></main>
+</div>
+<input type="file" id="file-input" multiple accept=".json,application/json" hidden>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div class="sr-only" id="announcer" role="status" aria-live="polite"></div>
+<div class="drop" id="drop" hidden><div class="drop-card lettered" id="drop-card">Drop Parley files to open them</div></div>
+<dialog id="link-dialog" aria-labelledby="link-title"></dialog>
+<dialog id="image-dialog" aria-label="Image preview"></dialog>
+<dialog id="text-dialog" aria-label="Text file preview"></dialog>
+<dialog id="info-dialog" aria-label="Conversation details"></dialog>
+
+<script>/*@@PARLEY_ART@@*/</script>
+<script>/*@@PARLEY_CORE@@*/</script>
+<script>/*@@PARLEY_MARKDOWN@@*/</script>
+<script>
+(() => {
+  'use strict';
+  const Core = window.ParleyCore;
+  const MD = window.ParleyMarkdown;
+  const ART = window.PARLEY_ART || {};
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const LOOK_KEY = 'parley-reader.look';
+
+  // ===========================================================================================
+  // Design tokens: [cardboard light, cardboard dark, pillow light, pillow dark, treehouse light, treehouse dark]
+  const SKINS = ['cardboard', 'pillow', 'treehouse'];
+  const SKIN_TITLES = { cardboard: 'Cardboard Fort', pillow: 'Pillow Fort', treehouse: 'Treehouse' };
+  const APPEARANCES = [['auto', 'Auto'], ['light', 'Afternoon'], ['dark', 'Lights-out']];
+  const TOKENS = {
+    paper: ['#FBF1DF', '#241713', '#FFF1F3', '#26121C', '#F8F8DE', '#1A2012'],
+    paperDeep: ['#F4E3C6', '#2F1F19', '#FBE0E7', '#331A26', '#EDEFC2', '#242C18'],
+    card: ['#FFF8EA', '#35231B', '#FFF9FA', '#3B1F2D', '#FDFDEC', '#2C351C'],
+    wall: ['#D8B07A', '#3B261C', '#EFA6BA', '#42202F', '#BCCB62', '#2E381B'],
+    wallDeep: ['#C4955C', '#2A1A14', '#DE859E', '#2E1521', '#9DB143', '#1F2711'],
+    tag: ['#FFF7E8', '#4F3225', '#FFF5F7', '#56293E', '#FBFBE8', '#3D4A24'],
+    peach: ['#F9CF9A', '#5A3524', '#FBCAD8', '#663048', '#DFE99E', '#465525'],
+    board: ['#3A2619', '#17100C', '#4A2035', '#170A10', '#2B3316', '#10140A'],
+    ink: ['#3A2416', '#F6E7CF', '#43182B', '#FBE7EE', '#2B3210', '#EFF2CF'],
+    inkSoft: ['#6E4F39', '#C3A68A', '#74384F', '#CFA8B8', '#4F5823', '#C4CC9A'],
+    inkFaint: ['#7A5B41', '#B89C82', '#7C4259', '#C69AAC', '#586229', '#ACB685'],
+    wallInk: ['#2E1B0F', '#F6E7CF', '#34101F', '#FBE7EE', '#1F260A', '#EFF2CF'],
+    wallInkSoft: ['#54351F', '#CDB195', '#561F35', '#D9B3C2', '#35401A', '#C2CB98'],
+    boardInk: ['#F6E7CF', '#F6E7CF', '#FBE7EE', '#FBE7EE', '#F2F4D6', '#F2F4D6'],
+    boardInkSoft: ['#CDB195', '#CDB195', '#D9B3C2', '#D9B3C2', '#C2CB98', '#C2CB98'],
+    stitch: ['#C4955C', '#7A5238', '#DE859E', '#84506A', '#9DB143', '#66783A'],
+    ember: ['#C24A20', '#F07A44', '#BE2F74', '#F578AC', '#587A0E', '#B6D84A'],
+    onEmber: ['#FFFFFF', '#241713', '#FFFFFF', '#26121C', '#FFFFFF', '#1A2012'],
+    emberText: ['#A8401C', '#F58A57', '#A3265F', '#F78CB9', '#4A6908', '#C2E25C'],
+    emberWash: ['#F9DFC4', '#4A2B1C', '#FBD3E0', '#552238', '#E3ECB0', '#3D4A1C'],
+    marigold: ['#EFA92F', '#FFC24D', '#F4B03F', '#FFC24D', '#E8C22A', '#F2D64B'],
+    rose: ['#E0707A', '#F08F96', '#E5608A', '#F08FB0', '#9CC23E', '#A8CF52'],
+    moss: ['#4F6A22', '#A5C266', '#4F6A22', '#A5C266', '#3F6B2A', '#8FD08A'],
+    brass: ['#8A6414', '#E3B95B', '#8A6414', '#E3B95B', '#7A6410', '#E3C95B'],
+    danger: ['#A81E2D', '#FF6B6B', '#B3261A', '#FF7A59', '#A81E2D', '#FF8080'],
+    dangerWash: ['#F9D9D5', '#4A1E22', '#F9DDD0', '#4A2018', '#F9D9D5', '#4A1E22'],
+    caution: ['#8A5200', '#FFE08A', '#8A5200', '#FFE08A', '#8A5200', '#FFE08A'],
+    cautionWash: ['#FBE6B8', '#453013', '#FBE6B8', '#453013', '#FBE6B8', '#453013'],
+    attention: ['#176A68', '#5FC2BA', '#176A68', '#5FC2BA', '#15657A', '#6CC3DB'],
+    attentionWash: ['#D8EBE3', '#17383A', '#D8EBE3', '#17383A', '#D6EAF0', '#17343F'],
+    glow: ['#FFC759', '#FFA84D', '#FF9EB8', '#FF7FA8', '#D9F06A', '#C6E85A'],
+    grainTint: ['#593314', '#FFFFFF', '#5A1A35', '#FFFFFF', '#3D4412', '#FFFFFF'],
+  };
+  const FLAGS = {
+    cardboard: [['#C24A20', '#EFA92F', '#E0707A', '#FAEDD1', '#4F6A22'], ['#F07A44', '#FFC24D', '#F08F96', '#FAEDD1', '#A5C266']],
+    pillow: [['#BE2F74', '#E5608A', '#FBEFE4', '#7A3A78', '#F4B03F'], ['#F578AC', '#F08FB0', '#FBEFE4', '#D29DC0', '#FFC24D']],
+    treehouse: [['#8CB02A', '#E8C22A', '#FBF7DC', '#4F7A1E', '#C9DA5E'], ['#B6D84A', '#F2D64B', '#FBF7DC', '#8FBF5A', '#D9EE6A']],
+  };
+
+  // ===========================================================================================
+  // DOM helpers. Text from files only ever goes through textContent or a plain-text attribute.
+  function h(tag, attrs, ...children) {
+    const el = document.createElement(tag);
+    if (attrs) {
+      for (const key of Object.keys(attrs)) {
+        const v = attrs[key];
+        if (v === null || v === undefined || v === false) continue;
+        if (key === 'class') el.className = v;
+        else if (key === 'text') el.textContent = v;
+        else el.setAttribute(key, v === true ? '' : String(v));
+      }
+    }
+    for (const c of children) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  function s(tag, attrs) {
+    const el = document.createElementNS(SVGNS, tag);
+    if (attrs) for (const key of Object.keys(attrs)) el.setAttribute(key, String(attrs[key]));
+    return el;
+  }
+  const on = (el, type, fn, opts) => { el.addEventListener(type, fn, opts); return el; };
+
+  // Icons (own constants only), 16-unit boxes, drawn in currentColor.
+  const ICONS = {
+    chevron: [['path', 'M6 3.5 10.5 8 6 12.5']],
+    bubble: [['path', 'M3.2 3h9.6A1.7 1.7 0 0 1 14.5 4.7v5.1a1.7 1.7 0 0 1-1.7 1.7H8.4l-3.2 2.6v-2.6h-2A1.7 1.7 0 0 1 1.5 9.8V4.7A1.7 1.7 0 0 1 3.2 3z'], ['dot', 5.2, 7.25], ['dot', 8, 7.25], ['dot', 10.8, 7.25]],
+    wrench: [['path', 'M10.6 1.9a3.3 3.3 0 0 0-3 4.5L2.3 11.7a1.4 1.4 0 0 0 2 2l5.3-5.3a3.3 3.3 0 0 0 4.5-3l-2 1.4-1.8-.6-.6-1.8z'], ['path', 'M2.2 2.2l3.4 3.4M2.2 2.2 1.6 4l1.8 1.8 1.8-.6']],
+    check: [['path', 'M3 8.6 6.4 12 13 4.4']],
+    triangle: [['path', 'M8 2.2 14.6 13.6H1.4z'], ['path', 'M8 6.4v3.4'], ['dot', 8, 11.6]],
+    triangleFill: [['fill', 'M8.9 1.9a1 1 0 0 0-1.8 0L.9 12.7a1 1 0 0 0 .9 1.5h12.4a1 1 0 0 0 .9-1.5zM7.2 5.4h1.6l-.2 4.9H7.4zM8 11.3a.95.95 0 1 1 0 1.9.95.95 0 0 1 0-1.9z']],
+    hand: [['path', 'M5.2 8.5V3.6a1 1 0 0 1 2 0V7.4M7.2 7V2.6a1 1 0 0 1 2 0V7.2M9.2 7.4V3.6a1 1 0 0 1 2 0v4.2M11.2 8.2V5.8a1 1 0 0 1 2 0V10a4.6 4.6 0 0 1-4.6 4.6h-.4a4.6 4.6 0 0 1-3.9-2.2L2.6 9.9a1 1 0 0 1 1.6-1.2l1 1.1']],
+    stop: [['circle', 8, 8, 6.4], ['fillrect', 5.7, 5.7, 4.6, 4.6]],
+    xmark: [['path', 'M4 4l8 8M12 4l-8 8']],
+    question: [['path', 'M5.8 5.8a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.7v.5'], ['dot', 8, 12.6]],
+    copy: [['path', 'M5.5 5.5h7.3v8.8H5.5z'], ['path', 'M3.3 11.2V2.3h7.1']],
+    doc: [['path', 'M3.8 1.6h5.6l2.9 2.9v9.9H3.8z'], ['path', 'M9.4 1.6v2.9h2.9M5.9 8.1h4.3M5.9 10.6h4.3M5.9 5.7h1.8']],
+    photo: [['path', 'M2 3.4h12v9.2H2z'], ['path', 'M2 11.2l3.6-3.6 3 3 1.9-1.9 3.5 3.4'], ['circle', 10.9, 6, 1.1]],
+    scissors: [['circle', 4.3, 4.4, 2], ['circle', 4.3, 11.6, 2], ['path', 'M6 5.6 14 12M6 10.4 14 4']],
+    info: [['circle', 8, 8, 6.4], ['path', 'M8 7.2v4.2'], ['dot', 8, 5]],
+    lockFill: [['path', 'M5.4 7V5.1a2.6 2.6 0 0 1 5.2 0V7'], ['fillrect', 3.4, 6.9, 9.2, 7.3, 1.3]],
+    lockOpen: [['path', 'M5.4 7V5.1a2.6 2.6 0 0 1 5.1-.7'], ['rect', 3.4, 6.9, 9.2, 7.3, 1.3]],
+    lock: [['path', 'M5.4 7V5.1a2.6 2.6 0 0 1 5.2 0V7'], ['rect', 3.4, 6.9, 9.2, 7.3, 1.3]],
+    cpu: [['rect', 4, 4, 8, 8, 1.2], ['rect', 6.2, 6.2, 3.6, 3.6, .4], ['path', 'M6.5 4V2M9.5 4V2M6.5 14v-2M9.5 14v-2M4 6.5H2M4 9.5H2M14 6.5h-2M14 9.5h-2']],
+    arrowDown: [['path', 'M8 2.6v10.6M3.6 8.9 8 13.3l4.4-4.4']],
+    xcircle: [['circle', 8, 8, 6.4], ['path', 'M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4']],
+    search: [['circle', 7, 7, 4.6], ['path', 'M10.4 10.4 14 14']],
+    sidebar: [['rect', 1.6, 2.6, 12.8, 10.8, 1.8], ['path', 'M6 2.6v10.8']],
+    folder: [['path', 'M1.6 4.2c0-.6.5-1.1 1.1-1.1h3.5l1.5 1.7h5.6c.6 0 1.1.5 1.1 1.1v6.6c0 .6-.5 1.1-1.1 1.1H2.7c-.6 0-1.1-.5-1.1-1.1z'], ['path', 'M8 7v4.4M5.8 9.2h4.4']],
+  };
+  function icon(name, cls) {
+    const svg = s('svg', { viewBox: '0 0 16 16', class: 'icon' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', focusable: 'false' });
+    for (const part of ICONS[name]) {
+      const [kind, a, b, c, d, r] = part;
+      let el;
+      if (kind === 'path') el = s('path', { d: a, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+      else if (kind === 'fill') el = s('path', { d: a, fill: 'currentColor', 'fill-rule': 'evenodd' });
+      else if (kind === 'dot') el = s('circle', { cx: a, cy: b, r: 1, fill: 'currentColor' });
+      else if (kind === 'circle') el = s('circle', { cx: a, cy: b, r: c, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5 });
+      else if (kind === 'rect') el = s('rect', { x: a, y: b, width: c, height: d, rx: r || 0, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5, 'stroke-linejoin': 'round' });
+      else el = s('rect', { x: a, y: b, width: c, height: d, rx: r || .6, fill: 'currentColor' });
+      svg.append(el);
+    }
+    return svg;
+  }
+
+  // ===========================================================================================
+  // Hand-cut shapes (Hideout WobblyRect), drawn into an SVG behind the element and redrawn on resize.
+  const r2 = v => Math.round(v * 100) / 100;
+  function wobblyPath(w, h, { seed = 1, radius = 14, amplitude = 1.4, inset = 0 } = {}) {
+    const x0 = inset, y0 = inset, x1 = w - inset, y1 = h - inset;
+    const W = x1 - x0, H = y1 - y0;
+    if (!(W > 2 && H > 2)) return '';
+    const r = Math.min(radius, Math.min(W, H) / 2), step = 44;
+    const jitter = i => { const v = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453; return ((v - Math.floor(v)) * 2 - 1) * amplitude; };
+    const pts = [];
+    let idx = 0;
+    const add = (x, y, nx, ny) => { const j = jitter(idx++); pts.push([x + nx * j, y + ny * j]); };
+    const edge = (ax, ay, bx, by, nx, ny) => {
+      const len = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.trunc(len / step));
+      for (let k = 0; k <= n; k++) { const t = k / n; add(ax + (bx - ax) * t, ay + (by - ay) * t, nx, ny); }
+    };
+    const corner = (cx, cy, start) => {
+      for (let k = 1; k <= 2; k++) { const a = start + k / 3 * Math.PI / 2; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    };
+    edge(x0 + r, y0, x1 - r, y0, 0, -1); corner(x1 - r, y0 + r, -Math.PI / 2);
+    edge(x1, y0 + r, x1, y1 - r, 1, 0); corner(x1 - r, y1 - r, 0);
+    edge(x1 - r, y1, x0 + r, y1, 0, 1); corner(x0 + r, y1 - r, Math.PI / 2);
+    edge(x0, y1 - r, x0, y0 + r, -1, 0); corner(x0 + r, y0 + r, Math.PI);
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const m = mid(pts[pts.length - 1], pts[0]);
+    let d = `M${r2(m[0])},${r2(m[1])}`;
+    for (let i = 0; i < pts.length; i++) {
+      const e = mid(pts[i], pts[(i + 1) % pts.length]);
+      d += `Q${r2(pts[i][0])},${r2(pts[i][1])} ${r2(e[0])},${r2(e[1])}`;
+    }
+    return d + 'Z';
+  }
+  function parcelPath(w, h) {
+    const cut = 7;
+    return `M${cut},0L${w - 6},0Q${w},0 ${w},6L${w},${h - 6}Q${w},${h} ${w - 6},${h}L${cut},${h}L0,${h - cut}L0,${cut}Z`;
+  }
+
+  // One observer for every shape; it only writes path data, sizes come from the entries.
+  const shapeObserver = new ResizeObserver(list => {
+    for (const entry of list) {
+      const el = entry.target, shape = el.__shape;
+      if (!shape) continue;
+      const box = entry.borderBoxSize && entry.borderBoxSize[0];
+      const w = box ? box.inlineSize : el.offsetWidth;
+      const hh = box ? box.blockSize : el.offsetHeight;
+      if (w === shape.w && hh === shape.h) continue;
+      shape.w = w; shape.h = hh;
+      shape.draw(w, hh);
+    }
+  });
+  /** layers: [{seed, radius, amplitude, inset, cls}] or {path: (w, h) => d, cls}. */
+  function addShape(el, layers, shadow) {
+    const svg = s('svg', { class: 'shape' + (shadow ? ' ' + shadow : ''), 'aria-hidden': 'true', focusable: 'false', preserveAspectRatio: 'none' });
+    const paths = layers.map(layer => {
+      const p = s('path', layer.cls ? { class: layer.cls } : null);
+      svg.append(p);
+      return p;
+    });
+    el.classList.add('has-shape');
+    el.prepend(svg);
+    el.__shape = {
+      w: -1, h: -1, svg,
+      draw(w, hh) {
+        svg.setAttribute('viewBox', `0 0 ${r2(w)} ${r2(hh)}`);
+        layers.forEach((layer, i) => paths[i].setAttribute('d', layer.path ? layer.path(w, hh) : wobblyPath(w, hh, layer)));
+      },
+    };
+    shapeObserver.observe(el);
+    return svg;
+  }
+  function dropShapes(root) {
+    if (!root) return;
+    if (root.__shape) shapeObserver.unobserve(root);
+    for (const el of root.querySelectorAll('.has-shape')) shapeObserver.unobserve(el);
+  }
+  const paperCard = (el, seed, radius, shadow = true) => addShape(el, [{ seed, radius, amplitude: 1.4 }], shadow ? 'shadow-paper' : null);
+
+  function washi(color, w, hgt, angle, extraStyle) {
+    const path = (y0, hh) => {
+      let d = `M0,${y0}L${w},${y0}`;
+      for (let i = 0; i < 4; i++) { const y = y0 + i * hh / 4; d += `L${w - 3},${r2(y + hh / 8)}L${w},${r2(y + hh / 4)}`; }
+      d += `L0,${y0 + hh}`;
+      for (let i = 3; i >= 0; i--) { const y = y0 + i * hh / 4; d += `L3,${r2(y + hh / 8)}L0,${r2(y)}`; }
+      return d + 'Z';
+    };
+    const svg = s('svg', { class: 'washi', width: w, height: hgt, viewBox: `0 0 ${w} ${hgt}`, 'aria-hidden': 'true', focusable: 'false' });
+    const outer = s('path', { d: path(0, hgt), 'fill-opacity': .82 });
+    outer.style.fill = color;
+    const inner = s('path', { d: path(5, Math.max(1, hgt - 10)), fill: '#FFFFFF', 'fill-opacity': .10 });
+    svg.append(outer, inner);
+    svg.style.transform = (extraStyle || '') + ` rotate(${angle}deg)`;
+    return svg;
+  }
+
+  function lantern(size) {
+    const svg = s('svg', { viewBox: '0 0 18 18', width: size, height: size, 'aria-hidden': 'true', focusable: 'false', class: 'lantern' });
+    const parts = [
+      ['circle', { cx: 9, cy: 10.7, r: 7.5, 'fill-opacity': .22 }, 'fill:var(--marigold)'],
+      ['circle', { cx: 9, cy: 2, r: 1.3, fill: 'none', 'stroke-width': .8 }, 'stroke:var(--emberText)'],
+      ['path', { d: 'M6,5.6 Q4.6,10.1 6,14.6 L12,14.6 Q13.4,10.1 12,5.6 Z', 'fill-opacity': .45 }, 'fill:var(--marigold)'],
+      ['path', { d: 'M4.7,5.6 L4.7,14.8 M13.3,5.6 L13.3,14.8', fill: 'none', 'stroke-width': .9 }, 'stroke:var(--emberText)'],
+      ['path', { d: 'M9,2.8 L13.8,6 L4.2,6 Z' }, 'fill:var(--emberText)'],
+      ['path', { d: 'M9,7 C9.5,8.8 11.4,13.4 9,13.4 C6.6,13.4 8.5,8.8 9,7 Z' }, 'fill:var(--ember)'],
+      ['rect', { x: 4.2, y: 14.6, width: 9.6, height: 1.9, rx: .7 }, 'fill:var(--emberText)'],
+    ];
+    for (const [tag, attrs, style] of parts) { const el = s(tag, attrs); el.setAttribute('style', style); svg.append(el); }
+    return svg;
+  }
+
+  // ===========================================================================================
+  // Look: skin and light/dark. Only this choice is ever saved.
+  const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  let look = { skin: 'cardboard', appearance: 'auto' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOOK_KEY) || 'null');
+    if (saved && SKINS.includes(saved.skin)) look.skin = saved.skin;
+    if (saved && APPEARANCES.some(a => a[0] === saved.appearance)) look.appearance = saved.appearance;
+  } catch (_) { /* storage unavailable: defaults */ }
+  function saveLook() {
+    try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (_) { /* ignore */ }
+  }
+  const isDark = () => look.appearance === 'dark' || (look.appearance === 'auto' && !!(media && media.matches));
+  const rgbOf = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+
+  const grainCache = new Map();
+  function grain(hex) {
+    if (grainCache.has(hex)) return grainCache.get(hex);
+    let url = 'none';
+    try {
+      const [r, g, b] = rgbOf(hex);
+      const c = document.createElement('canvas');
+      c.width = c.height = 192;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(192, 192);
+      let st = 0x2F6E2B1 >>> 0;
+      for (let i = 0; i < 192 * 192; i++) {
+        st = (st ^ (st << 13)) >>> 0; st = (st ^ (st >>> 17)) >>> 0; st = (st ^ (st << 5)) >>> 0;
+        img.data[i * 4] = r; img.data[i * 4 + 1] = g; img.data[i * 4 + 2] = b; img.data[i * 4 + 3] = st & 0x3F;
+      }
+      ctx.putImageData(img, 0, 0);
+      url = `url("${c.toDataURL()}")`;
+    } catch (_) { /* no canvas: no grain */ }
+    grainCache.set(hex, url);
+    return url;
+  }
+
+  function applyLook() {
+    const dark = isDark();
+    const col = SKINS.indexOf(look.skin) * 2 + (dark ? 1 : 0);
+    const root = document.documentElement.style;
+    for (const name of Object.keys(TOKENS)) {
+      const hex = TOKENS[name][col];
+      root.setProperty('--' + name, hex);
+      root.setProperty('--' + name + '-rgb', rgbOf(hex).join(' '));
+    }
+    const ink = rgbOf(TOKENS.ink[col]).join(' ');
+    root.setProperty('--line', `rgb(${ink} / .16)`);
+    const glow = rgbOf(TOKENS.glow[col]).join(' ');
+    root.setProperty('--room-glow', dark
+      ? `radial-gradient(circle 720px at 50% 105%, rgb(${glow} / .14) 0, rgb(${glow} / 0) 720px)`
+      : `radial-gradient(circle 760px at 100% -5%, rgb(${glow} / .30) 0, rgb(${glow} / 0) 760px)`);
+    root.setProperty('--wall-bottom', `rgb(${rgbOf(TOKENS.wallDeep[col]).join(' ')} / ${dark ? 1 : .55})`);
+    root.setProperty('--corrugation', `rgba(0,0,0,${dark ? .10 : .045})`);
+    root.setProperty('--grain-room', grain(TOKENS.grainTint[col]));
+    root.setProperty('--grain-room-opacity', dark ? '.10' : '.16');
+    root.setProperty('--grain-wall', grain(dark ? '#FFFFFF' : '#000000'));
+    root.setProperty('--grain-wall-opacity', dark ? '.09' : '.14');
+    root.colorScheme = dark ? 'dark' : 'light';
+    for (const img of document.querySelectorAll('img[data-art]')) setArt(img);
+    drawBunting();
+  }
+  function artURL(name) {
+    const key = `${name}-${isDark() ? 'night' : 'day'}${look.skin === 'cardboard' ? '' : '-' + look.skin}`;
+    const url = ART[key];
+    return typeof url === 'string' && url.startsWith('data:image/jpeg;base64,') ? url : null;
+  }
+  function setArt(img) {
+    const url = artURL(img.getAttribute('data-art'));
+    if (url) { img.src = url; img.hidden = false; } else { img.removeAttribute('src'); }
+  }
+  if (media) {
+    const changed = () => { if (look.appearance === 'auto') applyLook(); };
+    if (media.addEventListener) media.addEventListener('change', changed); else if (media.addListener) media.addListener(changed);
+  }
+
+  // Bunting across the top of the wall.
+  const bunting = document.getElementById('bunting');
+  let buntingWidth = 0;
+  function drawBunting() {
+    const width = buntingWidth;
+    bunting.replaceChildren();
+    if (width < 20) return;
+    const dark = isDark();
+    const flags = FLAGS[look.skin][dark ? 1 : 0];
+    const marigold = TOKENS.marigold[SKINS.indexOf(look.skin) * 2 + (dark ? 1 : 0)];
+    bunting.setAttribute('viewBox', `0 0 ${r2(width)} 40`);
+    const spans = Math.max(1, Math.round(width / 130)), spanWidth = width / spans, sag = 11;
+    const cord = x => { const t = (x % spanWidth) / spanWidth; return [x, 3 + 4 * sag * t * (1 - t)]; };
+    let d = '';
+    for (let x = 0; x <= width; x += 2) { const [cx, cy] = cord(Math.min(x, width - 0.001)); d += (x ? 'L' : 'M') + r2(cx) + ',' + r2(cy); }
+    bunting.append(s('path', { d, fill: 'none', stroke: '#FAEDD1', 'stroke-opacity': .85, 'stroke-width': 1.25 }));
+    let x = 12, i = 0;
+    while (x < width - 10) {
+      if (i % 3 === 2) {
+        const [cx, cy] = cord(x + 6);
+        bunting.append(s('circle', { cx: r2(cx), cy: r2(cy + 2.5), r: 7.5, fill: marigold, 'fill-opacity': .28 }));
+        bunting.append(s('ellipse', { cx: r2(cx), cy: r2(cy + 2.5), rx: 3.5, ry: 3.5, fill: marigold }));
+        x += 16;
+      } else {
+        const a = cord(x), b = cord(x + 16);
+        const tip = [(a[0] + b[0]) / 2 + 0.8, Math.max(a[1], b[1]) + 16];
+        bunting.append(s('path', { d: `M${r2(a[0])},${r2(a[1])}L${r2(b[0])},${r2(b[1])}L${r2(tip[0])},${r2(tip[1])}Z`, fill: flags[i % flags.length] }));
+        x += 23;
+      }
+      i++;
+    }
+  }
+  new ResizeObserver(list => {
+    for (const entry of list) {
+      const box = entry.borderBoxSize && entry.borderBoxSize[0];
+      const w = box ? box.inlineSize : entry.contentRect.width;
+      if (Math.abs(w - buntingWidth) >= 1) { buntingWidth = w; drawBunting(); }
+    }
+  }).observe(bunting);
+
+  // ===========================================================================================
+  // Formatting (TokenFormat and friends). Every value from a file is checked before use.
+  const str = v => (typeof v === 'string' ? v : '');
+  const arr = v => (Array.isArray(v) ? v : []);
+  const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+  const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const dateOf = v => { if (typeof v !== 'string') return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; };
+  const fmt = (opts, d) => { try { return new Intl.DateTimeFormat(undefined, opts).format(d); } catch (_) { return ''; } };
+  const fmtTime = d => fmt({ hour: 'numeric', minute: '2-digit' }, d);
+  const fmtWeekday = d => fmt({ weekday: 'long' }, d);
+  const fmtDate = d => fmt({ day: 'numeric', month: 'short', year: 'numeric' }, d);
+  const fmtNoteTip = d => fmt({ weekday: 'short', hour: 'numeric', minute: '2-digit' }, d);
+  const grouped = n => { try { return Number(n).toLocaleString(); } catch (_) { return String(n); } };
+  const rate = r => (r >= 100 ? String(Math.round(r)) : r.toFixed(1));
+  const seconds = t => (t < 10 ? t.toFixed(2) + ' s' : t.toFixed(1) + ' s');
+  function thoughtFor(sec) {
+    if (sec < 1) return 'less than a second';
+    if (sec < 60) return `${Math.round(sec)} s`;
+    return `${Math.floor(sec / 60)} min ${Math.floor(sec) % 60} s`;
+  }
+  function middle(text, max) {
+    const chars = Array.from(text);
+    if (chars.length <= max) return text;
+    const head = Math.ceil((max - 1) / 2), tail = Math.floor((max - 1) / 2);
+    return chars.slice(0, head).join('') + '…' + chars.slice(chars.length - tail).join('');
+  }
+  function relative(ms) {
+    const diff = (ms - Date.now()) / 1000;
+    const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+    try {
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+      for (const [unit, size] of units) if (Math.abs(diff) >= size || unit === 'second') return rtf.format(Math.round(diff / size), unit);
+    } catch (_) { /* fall through */ }
+    return fmtDate(new Date(ms));
+  }
+  function uuidSeed(id) {
+    const t = str(id);
+    if (/^[0-9a-fA-F]{4}/.test(t)) return parseInt(t.slice(0, 2), 16) * 251 + parseInt(t.slice(2, 4), 16);
+    let a = 7;
+    for (const b of new TextEncoder().encode(t)) a = (a * 31 + b) % 997;
+    return a + 1;
+  }
+  function slipSeed(id) {
+    let a = 7;
+    for (const b of new TextEncoder().encode(str(id))) a = (a * 31 + b) % 997;
+    return a;
+  }
+
+  // ===========================================================================================
+  // Clipboard, announcements, copy buttons.
+  const announcer = document.getElementById('announcer');
+  function announce(text) { announcer.textContent = ''; setTimeout(() => { announcer.textContent = text; }, 30); }
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch (_) { /* fall back */ }
+    const area = h('textarea', { 'aria-hidden': 'true', readonly: true });
+    area.value = text;
+    area.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.append(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    area.remove();
+    return ok;
+  }
+  /** A copy button whose icon turns into a checkmark for 1.2 s. getText runs on click. */
+  function copyButton(cls, label, tip, getText, copiedTip) {
+    const btn = h('button', { type: 'button', class: cls, 'aria-label': label, title: tip });
+    btn.append(icon('copy'));
+    let timer = 0;
+    on(btn, 'click', async ev => {
+      ev.stopPropagation();
+      const ok = await copyText(getText());
+      if (!ok) { announce('Could not copy'); return; }
+      announce('Copied');
+      btn.replaceChildren(icon('check'));
+      if (copiedTip) btn.title = copiedTip;
+      clearTimeout(timer);
+      timer = setTimeout(() => { btn.replaceChildren(icon('copy')); btn.title = tip; }, 1200);
+    });
+    return btn;
+  }
+
+  // ===========================================================================================
+  // Files and their state. Nothing about files is ever stored outside this tab's memory.
+  const entries = [];
+  let nextKey = 1;
+  let selectedKey = null;
+  const app = document.getElementById('app');
+  const room = document.getElementById('room');
+  const fileInput = document.getElementById('file-input');
+
+  // The app's ParleyError texts where they exist; the last three are the viewer's own.
+  const ERROR_TEXT = {
+    notParley: 'This file is not a Parley conversation.',
+    corrupt: 'The conversation file is damaged.',
+    noWebCrypto: 'This browser can\'t decrypt files here (Web Crypto is missing). Try a current Safari, Chrome or Firefox.',
+    unreadable: 'The file couldn\'t be read.',
+  };
+  const DAMAGE_DETAILS = new Set(['invalid JSON', 'missing version', 'missing encryption flag', 'invalid conversation data',
+    'invalid encrypted header', 'invalid conversation id', 'unsupported key derivation function', 'unsupported cipher',
+    'invalid iteration count', 'invalid salt', 'invalid payload encoding', 'encrypted payload is malformed',
+    'invalid decrypted payload', 'conversation id does not match header']);
+
+  function readText(file) {
+    if (typeof file.text === 'function') return file.text();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  /** ParleyError.errorDescription for a ReaderError (codes and fixed details only, never file text). */
+  function errorText(e) {
+    if (!e || e.name !== 'ReaderError') return ERROR_TEXT.unreadable;
+    if (e.code === 'unsupportedVersion') {
+      return /^-?\d{1,20}$/.test(e.detail) ? `Unsupported conversation file version ${e.detail}.` : 'Unsupported conversation file version.';
+    }
+    if (e.code === 'corrupt') return DAMAGE_DETAILS.has(e.detail) ? `The conversation file is damaged: ${e.detail}` : ERROR_TEXT.corrupt;
+    return Object.prototype.hasOwnProperty.call(ERROR_TEXT, e.code) ? ERROR_TEXT[e.code] : ERROR_TEXT.unreadable;
+  }
+
+  async function openFiles(fileList) {
+    const files = Array.from(fileList || []);
+    let first = null;
+    const failed = [];
+    for (const file of files) {
+      const name = str(file.name) || 'Untitled file';
+      let parsed;
+      try {
+        parsed = Core.parseFile(await readText(file));
+      } catch (e) {
+        failed.push([name, errorText(e)]);
+        continue;
+      }
+      if (parsed.kind === 'encrypted' && !(globalThis.crypto && globalThis.crypto.subtle)) {
+        failed.push([name, ERROR_TEXT.noWebCrypto]);
+        continue;
+      }
+      const lastModified = num(file.lastModified) ?? Date.now();
+      const same = entries.find(e => e.name === name && e.size === file.size && e.lastModified === lastModified);
+      if (same) { first = first || same; continue; }
+      const entry = {
+        key: nextKey++, name, size: file.size, lastModified,
+        encrypted: parsed.kind === 'encrypted',
+        header: parsed.kind === 'encrypted' ? parsed : null,
+        conversation: parsed.kind === 'plain' ? parsed.conversation : null,
+        blobs: [], view: null, decrypting: null, unlockError: null, unlockShake: false,
+      };
+      entries.push(entry);
+      first = first || entry;
+    }
+    // A few failures get a toast each; more than that get one summary, so the stack stays small.
+    if (failed.length > 3) {
+      const names = failed.slice(0, 3).map(([name]) => `“${middle(name, 40)}”`).join(', ');
+      toast(`Can't open ${failed.length} files`, `${names} and ${failed.length - 3} more.`);
+    } else {
+      for (const [name, message] of failed) toast(`Can't open “${middle(name, 60)}”`, message);
+    }
+    renderList();
+    if (first) select(first.key);
+  }
+
+  const entryOf = key => entries.find(e => e.key === key) || null;
+  const titleOf = entry => {
+    if (!entry.conversation) return null;
+    const t = str(entry.conversation.title).trim();
+    return t || 'Untitled';
+  };
+  function sortDate(entry) {
+    if (entry.conversation) {
+      const d = dateOf(entry.conversation.updatedAt);
+      if (d) return d;
+    }
+    return new Date(entry.lastModified);
+  }
+
+  /** Drops everything decrypted or derived from a conversation: DOM, blob URLs, dialogs. */
+  function dropView(entry) {
+    if (entry.view) { entry.view.io.disconnect(); dropShapes(entry.view.root); entry.view.root.remove(); entry.view = null; }
+    for (const url of entry.blobs) URL.revokeObjectURL(url);
+    entry.blobs = [];
+    closeDialogs();
+  }
+  function lock(entry) {
+    if (!entry.encrypted) return;
+    entry.decrypting = null;
+    entry.unlockError = null;
+    entry.unlockShake = false;
+    entry.conversation = null;
+    dropView(entry);
+    renderList();
+    if (selectedKey === entry.key) renderRoom();
+    announce('Locked');
+  }
+  function removeEntry(entry) {
+    entry.decrypting = null;
+    entry.unlockError = null;
+    entry.conversation = null;
+    entry.header = null;
+    dropView(entry);
+    const i = entries.indexOf(entry);
+    if (i >= 0) entries.splice(i, 1);
+    if (selectedKey === entry.key) { selectedKey = null; renderRoom(); }
+    renderList();
+    announce('Removed from the list');
+  }
+  function select(key) {
+    selectedKey = key;
+    renderList();
+    renderRoom();
+    closeOverlayWall();
+  }
+
+  // ===========================================================================================
+  // Toasts for files that cannot be opened (file names only, never their content).
+  const toasts = document.getElementById('toasts');
+  function toast(title, message) {
+    const close = h('button', { type: 'button', 'aria-label': 'Dismiss', title: 'Dismiss' }, icon('xmark'));
+    const el = h('div', { class: 'toast' }, icon('triangleFill'), h('div', { class: 'toast-text' }, h('strong', { text: title }), message), close);
+    on(close, 'click', () => el.remove());
+    toasts.append(el);
+    setTimeout(() => el.remove(), 12000);
+  }
+
+  // ===========================================================================================
+  // The wall: list of opened files, grouped like the app.
+  const listEl = document.getElementById('list');
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+  const fold = t => t.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+
+  function groupOf(date) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const week = new Date(today); week.setDate(today.getDate() - 7);
+    if (date >= today) return ['Today', fmtTime(date)];
+    if (date >= yesterday) return ['Yesterday', fmtTime(date)];
+    if (date >= week) return ['Previous 7 Days', fmtWeekday(date)];
+    return ['Older', fmtDate(date)];
+  }
+
+  function renderList() {
+    const hadFocus = listEl.contains(document.activeElement) ? document.activeElement.getAttribute('data-key') : null;
+    dropShapes(listEl);
+    listEl.replaceChildren();
+    const query = fold(searchInput.value.trim());
+    searchClear.hidden = searchInput.value === '';
+    if (!entries.length) {
+      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: 'The wall is bare' }), h('p', { text: 'Open or drop Parley .json files here.' })));
+      return;
+    }
+    const shown = entries.filter(e => !query || (e.conversation && fold(titleOf(e)).includes(query)))
+      .map(e => ({ e, date: sortDate(e) }))
+      .sort((a, b) => b.date - a.date);
+    if (!shown.length) {
+      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: 'Not on this wall' }),
+        h('p', { text: `No conversation matches “${searchInput.value.trim()}”.` })));
+      return;
+    }
+    const groups = new Map();
+    for (const item of shown) {
+      const [group, label] = groupOf(item.date);
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push({ ...item, label });
+    }
+    for (const name of ['Today', 'Yesterday', 'Previous 7 Days', 'Older']) {
+      const items = groups.get(name);
+      if (!items) continue;
+      const headId = 'group-' + name.replace(/\W/g, '');
+      listEl.append(h('h2', { class: 'group-title', id: headId, text: name }));
+      const ul = h('ul', { class: 'rows', 'aria-labelledby': headId });
+      for (const { e, label } of items) ul.append(rowFor(e, label));
+      listEl.append(ul);
+    }
+    if (hadFocus) { const again = listEl.querySelector(`[data-key="${CSS.escape(hadFocus)}"]`); if (again) again.focus(); }
+  }
+
+  function rowFor(entry, dateLabel) {
+    const locked = entry.encrypted && !entry.conversation;
+    const selected = entry.key === selectedKey;
+    const title = locked ? 'Encrypted conversation' : titleOf(entry);
+    const li = h('li', { class: 'row' + (selected ? ' selected' : '') + (locked ? ' locked' : '') });
+    const sub = locked ? `${dateLabel} · ${entry.name}` : dateLabel;
+    const main = h('button', { type: 'button', class: 'row-main', title: entry.name, 'data-key': entry.key, 'aria-current': selected ? 'true' : null },
+      h('span', { class: 'row-text' }, h('span', { class: 'row-title', dir: locked ? null : 'auto', text: title }), h('span', { class: 'row-sub', text: sub })));
+    if (entry.encrypted) {
+      const lockIcon = h('span', { class: 'row-lock', title: locked ? 'Encrypted, locked' : 'Encrypted, unlocked', 'aria-label': locked ? 'Locked' : 'Unlocked', role: 'img' }, icon(locked ? 'lockFill' : 'lockOpen'));
+      main.append(lockIcon);
+    }
+    on(main, 'click', () => select(entry.key));
+    on(main, 'keydown', ev => {
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); removeAndRefocus(entry, main); }
+      else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const all = [...listEl.querySelectorAll('.row-main')];
+        const i = all.indexOf(main) + (ev.key === 'ArrowDown' ? 1 : -1);
+        if (all[i]) all[i].focus();
+      }
+    });
+    on(li, 'contextmenu', ev => {
+      ev.preventDefault();
+      const items = [['Remove from List', () => removeAndRefocus(entry, main)]];
+      if (entry.encrypted && entry.conversation) items.unshift(['Lock', () => lock(entry)]);
+      openMenu(ev.clientX, ev.clientY, items, main);
+    });
+    const remove = h('button', { type: 'button', class: 'row-remove', 'aria-label': `Remove “${title}” from the list`, title: 'Remove from List' }, icon('xmark'));
+    on(remove, 'click', ev => { ev.stopPropagation(); removeAndRefocus(entry, main); });
+    li.append(main, remove);
+    addShape(li, [{ seed: uuidSeed(locked ? entry.header && entry.header.id : entry.conversation && entry.conversation.id), radius: 8, amplitude: 1.4 }]);
+    li.append(washi('var(--marigold)', 34, 11, 6));
+    return li;
+  }
+  /** Removes a row and puts focus on the row that takes its place (or the search field). */
+  function removeAndRefocus(entry, main) {
+    const index = [...listEl.querySelectorAll('.row-main')].indexOf(main);
+    removeEntry(entry);
+    const rows = [...listEl.querySelectorAll('.row-main')];
+    const next = rows[Math.min(Math.max(index, 0), rows.length - 1)];
+    if (next) next.focus(); else searchInput.focus();
+  }
+
+  on(searchInput, 'input', renderList);
+  on(searchInput, 'keydown', ev => { if (ev.key === 'Escape' && searchInput.value) { ev.preventDefault(); searchInput.value = ''; renderList(); } });
+  on(searchClear, 'click', () => { searchInput.value = ''; renderList(); searchInput.focus(); });
+
+  // A small context menu (sidebar rows only).
+  let menuEl = null;
+  function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+  function openMenu(x, y, items, returnFocus) {
+    closeMenu();
+    menuEl = h('div', { class: 'menu', role: 'menu' });
+    for (const [label, act] of items) {
+      const b = h('button', { type: 'button', role: 'menuitem', text: label });
+      on(b, 'click', () => { closeMenu(); act(); });
+      menuEl.append(b);
+    }
+    on(menuEl, 'keydown', ev => {
+      if (ev.key === 'Escape') { ev.preventDefault(); closeMenu(); if (returnFocus && returnFocus.isConnected) returnFocus.focus(); }
+    });
+    document.body.append(menuEl);
+    const w = menuEl.offsetWidth, hh = menuEl.offsetHeight;
+    menuEl.style.left = Math.min(x, innerWidth - w - 8) + 'px';
+    menuEl.style.top = Math.min(y, innerHeight - hh - 8) + 'px';
+    menuEl.querySelector('button').focus();
+  }
+  on(document, 'pointerdown', ev => { if (menuEl && !menuEl.contains(ev.target)) closeMenu(); });
+  on(window, 'blur', closeMenu);
+
+  // Sidebar: hide/show, overlay on narrow windows, seam drag.
+  const narrow = window.matchMedia('(max-width: 640px)');
+  function wallVisible() { return narrow.matches ? app.classList.contains('wall-open') : !app.classList.contains('wall-hidden'); }
+  function hideWall() {
+    if (narrow.matches) app.classList.remove('wall-open'); else app.classList.add('wall-hidden');
+    renderHeaderToggle();
+  }
+  function showWall() {
+    if (narrow.matches) { app.classList.add('wall-open'); setTimeout(() => searchInput.focus(), 50); } else app.classList.remove('wall-hidden');
+    renderHeaderToggle();
+  }
+  function closeOverlayWall() { if (narrow.matches && app.classList.contains('wall-open')) { app.classList.remove('wall-open'); renderHeaderToggle(); } }
+  on(document.getElementById('scrim'), 'click', closeOverlayWall);
+  const onNarrow = () => { app.classList.remove('wall-open'); renderHeaderToggle(); };
+  if (narrow.addEventListener) narrow.addEventListener('change', onNarrow); else if (narrow.addListener) narrow.addListener(onNarrow);
+  const seam = document.getElementById('seam');
+  on(seam, 'pointerdown', ev => {
+    ev.preventDefault();
+    seam.setPointerCapture(ev.pointerId);
+    const move = e => { app.style.setProperty('--wall-w', Math.max(220, Math.min(380, e.clientX)) + 'px'); };
+    const up = () => { seam.removeEventListener('pointermove', move); seam.removeEventListener('pointerup', up); };
+    on(seam, 'pointermove', move);
+    on(seam, 'pointerup', up);
+  });
+
+  // ===========================================================================================
+  // The room: header + body, for the empty state, the unlock screen or a chat.
+  function roundButton(iconName, label, tip, onClick) {
+    const b = h('button', { type: 'button', class: 'round-btn', 'aria-label': label, title: tip }, icon(iconName));
+    on(b, 'click', onClick);
+    return b;
+  }
+  let headerToggleSlot = null;
+  function renderHeaderToggle() {
+    if (!headerToggleSlot || !headerToggleSlot.isConnected) return;
+    headerToggleSlot.replaceChildren();
+    if (!wallVisible()) headerToggleSlot.append(roundButton('sidebar', 'Show Sidebar', 'Show Sidebar', showWall));
+  }
+  function header(titleText, subText, trailing, titleIsFixed) {
+    headerToggleSlot = h('div', { style: 'display:contents' });
+    const titles = h('div', { class: 'header-titles' });
+    if (titleText) titles.append(h('div', { class: 'header-title', dir: titleIsFixed ? null : 'auto', text: titleText, title: titleText }));
+    if (subText) titles.append(h('div', { class: 'header-sub', text: subText }));
+    const el = h('header', { class: 'room-header' }, headerToggleSlot, titles, ...(trailing || []));
+    return el;
+  }
+  function openButton(primaryLabel) {
+    const b = h('button', { type: 'button', class: 'tag-btn' }, primaryLabel);
+    addShape(b, [{ seed: 11, radius: 10, amplitude: 0.8 }], 'shadow-btn');
+    on(b, 'click', () => fileInput.click());
+    return b;
+  }
+  function tapedPicture(artName, width, aspect) {
+    const frame = h('div', { class: 'taped' });
+    frame.style.width = (width + 18) + 'px';
+    addShape(frame, [{ seed: 7, radius: 9, amplitude: 1.2 }], 'shadow-pic');
+    frame.__shape.svg.firstChild.style.fill = 'var(--card)';
+    const img = h('img', { alt: '', 'data-art': artName, decoding: 'async', draggable: 'false' });
+    img.style.aspectRatio = String(aspect);
+    setArt(img);
+    frame.append(img, washi('var(--rose)', 84, 22, -2.5, 'translateX(-50%)'));
+    return frame;
+  }
+
+  function renderRoom() {
+    // Take down what is shown. A chat view stays with its entry (detached) so it is built once per
+    // unlock or open; anything else is dropped.
+    for (const child of [...room.children]) {
+      const owner = entries.find(e => e.view && e.view.root === child);
+      if (owner) owner.view.scrollTop = owner.view.scroller.scrollTop; else dropShapes(child);
+      child.remove();
+    }
+    const entry = entryOf(selectedKey);
+    if (!entry) { room.append(emptyScreen()); renderHeaderToggle(); return; }
+    if (!entry.conversation) { room.append(unlockScreen(entry)); renderHeaderToggle(); return; }
+    if (!entry.view) {
+      try { entry.view = chatView(entry); } catch (e) { entry.view = null; room.append(failedScreen()); return; }
+      room.append(entry.view.root);
+      renderHeaderToggle();
+      scrollToEnd(entry.view.scroller);
+    } else {
+      room.append(entry.view.root);
+      headerToggleSlot = entry.view.toggleSlot;
+      renderHeaderToggle();
+      entry.view.scroller.scrollTop = entry.view.scrollTop || 0;
+    }
+  }
+  function failedScreen() {
+    return h('div', { class: 'room-body' }, h('div', { class: 'centred' }, h('p', { text: 'This conversation could not be shown.' })));
+  }
+
+  function emptyScreen() {
+    const lock = icon('lockFill');
+    // (Only the skin and light choice is saved, in this browser's storage; files never are.)
+    const body = h('div', { class: 'scroller' }, h('div', { class: 'empty-detail' },
+      tapedPicture('fort', 340, 1.5),
+      h('h1', { class: 'lettered big', text: 'Nobody here but us' }),
+      h('p', { text: 'Pick a note from the wall, or open a Parley conversation file.' }),
+      openButton('Open…'),
+      h('div', { class: 'privacy' }, lock, h('span', { text: 'Files you open stay in this browser tab. Nothing is uploaded.' }))));
+    return h('div', { class: 'room-body', style: 'flex:1' }, header(null, null), body);
+  }
+
+  // ---- unlock screen
+  // A decrypt attempt's state lives on the entry (decrypting, unlockError, unlockShake), not in the
+  // screen: selecting another row and coming back builds a new screen that shows the same state.
+  function unlockScreen(entry) {
+    const input = h('input', { type: 'password', placeholder: 'Password', 'aria-label': 'Password', autocomplete: 'off', spellcheck: 'false' });
+    const field = h('div', { class: 'pw-field' }, input);
+    addShape(field, [{ seed: 19, radius: 9, amplitude: 1.4, inset: 0.5 }]);
+    const unlockBtn = h('button', { type: 'button', class: 'tag-btn', disabled: true, text: 'Unlock' });
+    addShape(unlockBtn, [{ seed: 11, radius: 10, amplitude: 0.8 }], 'shadow-btn');
+    const status = h('div', { class: 'status-slot', role: 'status', 'aria-live': 'polite' });
+    const working = () => entry.decrypting !== null;
+    const refresh = () => { unlockBtn.disabled = input.value === '' || working(); input.disabled = working(); };
+    on(input, 'input', refresh);
+    on(input, 'keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); attempt(); } });
+    on(unlockBtn, 'click', attempt);
+
+    // The spinner alone, as in the app (with words for screen readers only).
+    if (working()) status.append(h('span', { class: 'spinner-line' }, spinner(), h('span', { class: 'sr-only', text: 'Decrypting' })));
+    else if (entry.unlockError) status.append(h('span', { class: 'notice danger' }, icon('xcircle'), h('span', { text: entry.unlockError })));
+    refresh();
+    if (!working() && entry.unlockShake) {
+      entry.unlockShake = false; // once per failed attempt, not on every visit
+      field.classList.add('shake'); // a new element, so the animation runs when it is shown
+    }
+
+    async function attempt() {
+      if (input.value === '' || working()) return;
+      // Read the password and clear the field at once; it is never kept after this call.
+      let password = input.value;
+      input.value = '';
+      const token = {};
+      entry.decrypting = token;
+      entry.unlockError = null;
+      entry.unlockShake = false;
+      if (selectedKey === entry.key) renderRoom();
+      let conversation = null, error = null;
+      try {
+        conversation = await Core.decrypt(entry.header, password);
+      } catch (e) {
+        error = e;
+      }
+      password = null;
+      if (entry.decrypting !== token || !entries.includes(entry)) return; // locked or removed meanwhile
+      entry.decrypting = null;
+      if (conversation) {
+        entry.conversation = conversation;
+        renderList();
+        if (selectedKey === entry.key) {
+          // The focused password field goes away: hand focus to the conversation, unless the
+          // user has moved it somewhere else (the search field, another row) meanwhile.
+          const active = document.activeElement;
+          const ours = !active || active === document.body || room.contains(active);
+          renderRoom();
+          if (ours && entry.view) entry.view.scroller.focus({ preventScroll: true });
+        }
+        announce('Unlocked');
+        return;
+      }
+      entry.unlockError = error && (error.code === 'corrupt' || error.code === 'noWebCrypto') ? errorText(error)
+        : 'Wrong password, or the file has been tampered with.';
+      entry.unlockShake = true;
+      // The screen is rebuilt, so its status region is new: say the error through the announcer.
+      if (selectedKey === entry.key) { renderRoom(); announce(entry.unlockError); }
+    }
+
+    const meta = h('div', { class: 'unlock-meta' },
+      h('div', { class: 'where', text: `“${entry.name}” · modified ${relative(entry.lastModified)}`, title: entry.name }),
+      h('div', { class: 'warn', text: 'Forgotten passwords can\'t be recovered.' }));
+    const body = h('div', { class: 'scroller' }, h('div', { class: 'centred', style: 'padding:30px 40px' },
+      tapedPicture('door', 220, 1),
+      h('h1', { class: 'lettered big', text: 'Encrypted Conversation', style: 'margin-top:8px' }),
+      h('p', { text: 'Enter the password to decrypt it in memory.', style: 'font-size:13px' }),
+      h('div', { class: 'pw-row' }, field, unlockBtn),
+      status, meta));
+    const root = h('div', { class: 'room-body', style: 'flex:1' }, header('Locked Conversation', null, null, true), body);
+    setTimeout(() => { if (input.isConnected && !input.disabled) input.focus(); }, 0);
+    return root;
+  }
+  function spinner() {
+    const svg = s('svg', { class: 'spinner', viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' });
+    // A 72% arc, as the app's HideoutSpinner draws it.
+    svg.append(s('circle', { cx: 8, cy: 8, r: 6.5, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.75, 'stroke-linecap': 'round', 'stroke-dasharray': `${r2(2 * Math.PI * 6.5 * .72)} 100` }));
+    return svg;
+  }
+
+  // ===========================================================================================
+  // The chat.
+  function chatView(entry) {
+    const c = entry.conversation;
+    const settings = obj(c.settings) || {};
+    const title = str(c.title).trim() || 'Untitled';
+    // No subtitle for a plain file (the app shows none for one in its default folder).
+    const sub = entry.encrypted ? `Encrypted · ${entry.name}` : '';
+    const trailing = [];
+    const model = str(settings.model);
+    if (model) trailing.push(parcelTag(model));
+    trailing.push(roundButton('info', 'Conversation details', 'Conversation details: system prompt and settings (read-only)', () => showInfo(entry)));
+    if (entry.encrypted) trailing.push(roundButton('lock', 'Lock', 'Lock: remove the decrypted conversation from memory', () => lock(entry)));
+    const head = header(title, sub, trailing);
+    const toggleSlot = headerToggleSlot;
+
+    const column = h('div', { class: 'column' });
+    const messages = arr(c.messages);
+    if (obj(c.forkedFrom)) column.append(h('div', { class: 'forked', text: 'Forked from another conversation' }));
+    if (!messages.length) column.append(invitation(model));
+    const notes = thinkingOffRepeats(messages);
+    messages.forEach((m, i) => {
+      let row;
+      try { row = messageRow(entry, c, m, notes[i]); } catch (_) { row = h('div', { class: 'msg' }, h('div', { class: 'row-failed', text: 'This message could not be shown.' })); }
+      column.append(row);
+    });
+    const sentinel = h('div', { 'aria-hidden': 'true', style: 'height:1px' });
+    column.append(sentinel);
+    const scroller = h('div', { class: 'scroller' + (messages.length ? '' : ' no-messages'), tabindex: '-1' }, column);
+    const toBottom = h('button', { type: 'button', class: 'to-bottom', 'aria-label': 'Scroll to Bottom', title: 'Scroll to the latest message', tabindex: '-1' }, icon('arrowDown'));
+    on(toBottom, 'click', () => scrollToEnd(scroller, true));
+    const io = new IntersectionObserver(list => {
+      const visible = list[list.length - 1].isIntersecting;
+      toBottom.classList.toggle('shown', !visible);
+      toBottom.tabIndex = visible ? -1 : 0;
+    }, { root: scroller, rootMargin: '0px 0px 40px 0px' });
+    io.observe(sentinel);
+    const root = h('div', { class: 'room-body', style: 'flex:1' }, head, h('div', { class: 'room-body' }, scroller, toBottom));
+    return { root, scroller, toggleSlot, io, scrollTop: 0 };
+  }
+  /** Scrolls to the end; rows render lazily (content-visibility), so settle over a few frames. */
+  function scrollToEnd(scroller, smooth) {
+    let frames = 0, last = -1;
+    const step = () => {
+      if (!scroller.isConnected) return;
+      const target = scroller.scrollHeight - scroller.clientHeight;
+      if (smooth && frames === 0) scroller.scrollTo({ top: target, behavior: 'smooth' }); else scroller.scrollTop = target;
+      if (target !== last && frames++ < 8) { last = target; requestAnimationFrame(step); }
+    };
+    requestAnimationFrame(step);
+  }
+
+  function parcelTag(model) {
+    const tag = h('div', { class: 'parcel', title: model, role: 'img', 'aria-label': `Model: ${model}` }, icon('cpu'), h('span', { class: 'parcel-text', text: middle(model, 36) }));
+    const svg = s('svg', { class: 'shape', 'aria-hidden': 'true', focusable: 'false' });
+    const path = s('path', { class: 'tag' }), hole = s('circle', { r: 3.5 }), string = s('path', { class: 'string' });
+    svg.append(path, hole, string);
+    tag.classList.add('has-shape');
+    tag.prepend(svg);
+    tag.__shape = { w: -1, h: -1, svg, draw(w, hh) {
+      svg.setAttribute('viewBox', `0 0 ${r2(w)} ${r2(hh)}`);
+      path.setAttribute('d', parcelPath(w, hh));
+      const cx = 14, cy = hh / 2;
+      hole.setAttribute('cx', cx); hole.setAttribute('cy', r2(cy));
+      string.setAttribute('d', `M${cx},${r2(cy)}Q${cx - 12},${r2(cy - 2)} ${cx - 14},${r2(cy - 13)}`);
+    } };
+    shapeObserver.observe(tag);
+    return tag;
+  }
+
+  function invitation(model) {
+    const card = h('div', { class: 'invite' },
+      lantern(46),
+      h('div', { class: 'lettered', style: 'font-size:28px;margin-top:2px', text: 'The lantern\'s on' }),
+      h('div', { style: 'color:var(--inkSoft)', text: 'This conversation has no messages yet.' }));
+    if (model) card.append(h('div', { style: 'font-size:14px;font-weight:600;margin-top:8px', text: middle(model, 48) }));
+    addShape(card, [{ seed: 4, radius: 18, amplitude: 1.4, cls: 'fill' }, { seed: 4, radius: 13, amplitude: 0.8, inset: 5, cls: 'stitch' }], 'shadow-paper');
+    card.append(washi('var(--rose)', 84, 20, -2.5, 'translateX(-50%)'));
+    return card;
+  }
+
+  // ---- derived message values (Models.swift)
+  function visibleText(m) {
+    const rounds = arr(m.toolRounds);
+    if (!rounds.length) return str(m.content);
+    return [...rounds.map(r => str(obj(r) && r.content)), str(m.content)].filter(t => t.trim() !== '').join('\n\n');
+  }
+  function latestStats(m) {
+    if (obj(m.stats)) return m.stats;
+    const rounds = arr(m.toolRounds);
+    for (let i = rounds.length - 1; i >= 0; i--) if (obj(rounds[i]) && obj(rounds[i].stats)) return rounds[i].stats;
+    return null;
+  }
+  function footerUsage(m) {
+    if (obj(m.usage)) return m.usage;
+    const rounds = arr(m.toolRounds);
+    for (let i = rounds.length - 1; i >= 0; i--) if (obj(rounds[i]) && obj(rounds[i].usage)) return rounds[i].usage;
+    return null;
+  }
+  function footerLine(m) {
+    const groups = [];
+    const usage = footerUsage(m), stats = latestStats(m);
+    if (usage) {
+      const parts = [];
+      if (num(usage.promptTokens) !== null) parts.push(`${usage.promptTokens} prompt`);
+      if (num(usage.completionTokens) !== null) parts.push(`${usage.completionTokens} completion`);
+      if (num(usage.totalTokens) !== null) parts.push(`${usage.totalTokens} total`);
+      if (parts.length) groups.push(parts.join(' · ') + ' tokens');
+    }
+    if (stats) {
+      const approx = stats.isEstimated === true ? '≈' : '';
+      if (!groups.length && num(stats.completionTokens) !== null) groups.push(`${approx}${stats.completionTokens} tokens`);
+      if (num(stats.tokensPerSecond) !== null) groups.push(approx + rate(stats.tokensPerSecond) + ' tok/s');
+      if (num(stats.timeToFirstToken) !== null) groups.push(seconds(stats.timeToFirstToken) + ' to first token');
+    }
+    const n = arr(m.toolRounds).length;
+    if (n > 0) groups.push(n === 1 ? '1 tool round' : `${n} tool rounds`);
+    return groups.join(' · ');
+  }
+  function finishNote(m, settings) {
+    const stats = obj(m.stats);
+    if (m.role !== 'assistant' || !stats || stats.finishReason !== 'length') return null;
+    const usage = obj(m.usage);
+    const completion = usage && num(usage.completionTokens) !== null ? usage.completionTokens
+      : (stats.isEstimated === true ? null : num(stats.completionTokens));
+    const maxTokens = num(settings.maxTokens);
+    const contextFull = maxTokens === null ? true : (completion !== null && completion < maxTokens);
+    const emptyButThought = str(m.content).trim() === '' && str(m.reasoning) !== '';
+    if (emptyButThought) return contextFull
+      ? 'The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer.'
+      : 'The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate.';
+    return contextFull
+      ? 'The reply was cut off at the end of the context (or the server\'s own output limit). Start a new chat, fork from an earlier message or roll back to make room.'
+      : 'The reply was cut off at the token limit (Max tokens).';
+  }
+  function thinkingOffKind(m) {
+    if (m.role !== 'assistant') return null;
+    if (str(m.error) !== '' && str(m.content) === '' && str(m.reasoning) === '') return null;
+    if (m.thinkingOffNotAccepted === true) return 'notAccepted';
+    if (m.thinkingOffIgnored === true) return 'ignored';
+    return null;
+  }
+  function thinkingOffRepeats(messages) {
+    let prev = null;
+    return messages.map(m => {
+      if (!obj(m) || m.role !== 'assistant') return false;
+      const k = thinkingOffKind(m);
+      const repeated = k !== null && k === prev;
+      prev = k;
+      return repeated;
+    });
+  }
+  function thinkingOffText(m, repeated) {
+    const k = thinkingOffKind(m);
+    if (!k) return null;
+    let first;
+    if (k === 'notAccepted') first = 'This server did not accept “None (no thinking)”, so this reply used its default thinking.';
+    else {
+      first = 'This server or model ignored “None (no thinking)”: the reply still contains thinking.';
+      const kind = str(m.thinkingOffServerKind);
+      if (kind === 'lmStudio') first += ' LM Studio may offer a thinking switch in this model\'s settings.';
+      else if (kind === 'llamaCpp' || kind === 'vLLM') first += ' The model\'s chat template may not support turning it off.';
+    }
+    if (!repeated) return [first, first];
+    return [k === 'notAccepted' ? '“None” was not accepted again, so this reply also used the default thinking.'
+      : '“None” was ignored again: this reply also contains thinking.', first];
+  }
+  /** Trims '.' and whitespace from both ends with index loops (a `[…]+$` regex turns quadratic). */
+  const DOT_OR_SPACE_RE = /^[.\s]$/;
+  function trimDotsAndSpaces(t) {
+    let a = 0, b = t.length;
+    while (a < b && DOT_OR_SPACE_RE.test(t[a])) a++;
+    while (b > a && DOT_OR_SPACE_RE.test(t[b - 1])) b--;
+    return t.slice(a, b);
+  }
+  function toolNoteText(note) {
+    const detail = typeof note.detail === 'string' ? note.detail : null;
+    switch (note.kind) {
+      case 'toolsNotAccepted': return 'The model\'s server did not accept tools, so this reply was written without them.';
+      case 'toolsNotOffered': return 'Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata.';
+      case 'serverUnavailable': return `${trimDotsAndSpaces(detail ?? 'A server')}. Its tools were not offered.`;
+      case 'roundLimit': return `Reached the limit of ${detail ?? ''} tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP.`;
+      case 'callsNotRun': return 'The reply ended inside a tool call, so it was not run.';
+      case 'emptyAfterTools': return 'The model wrote nothing after the tool results.';
+      default: return detail ?? '';
+    }
+  }
+
+  // ---- error presentation (core of ErrorPresentation.make)
+  function serverMessage(body) {
+    try {
+      const v = JSON.parse(body);
+      if (obj(v)) {
+        const e = v.error;
+        for (const cand of [obj(e) ? e.message : null, typeof e === 'string' ? e : null, v.message, v.detail]) {
+          if (typeof cand === 'string' && cand.trim() !== '') return cand.trim();
+        }
+      }
+      return null;
+    } catch (_) {
+      return body !== '' && body.length <= 200 && !body.includes('<') && !body.includes('\n') ? body : null;
+    }
+  }
+  // ---- HTML pages in stored errors (ResponseText.isHTMLPage / htmlSummary in EdgeErrors.swift).
+  // Every scan here is one forward pass: a hostile page must not make the tab spin.
+  const WHITE_RUN_RE = /[\t\n\v\f\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+/g;
+  const HTML_ENTITIES = [['&amp;', '&'], ['&lt;', '<'], ['&gt;', '>'], ['&quot;', '"'], ['&#39;', "'"],
+    ['&#039;', "'"], ['&apos;', "'"], ['&nbsp;', ' '], ['&middot;', '·'], ['&hellip;', '…']];
+  function isJSONText(t) {
+    if (t[0] !== '{' && t[0] !== '[') return false;
+    try { JSON.parse(t); return true; } catch (_) { return false; }
+  }
+  function isHTMLPage(text) {
+    const t = text.trim();
+    if (isJSONText(t)) return false;
+    const head = t.slice(0, 512).toLowerCase();
+    return head.startsWith('<!doctype html') || head.startsWith('<html') || head.startsWith('<!' + '--')
+      || head.includes('<head') || head.includes('<body') || head.includes('<title');
+  }
+  /** plainText: tags become spaces, the common entities are decoded, whitespace collapses. */
+  function htmlPlainText(html) {
+    let out = '', i = 0;
+    for (;;) {
+      const lt = html.indexOf('<', i);
+      if (lt < 0) break;
+      const gt = html.indexOf('>', lt + 1);
+      if (gt < 0) break; // no tag can close after here
+      out += html.slice(i, lt) + ' ';
+      i = gt + 1;
+    }
+    out += html.slice(i);
+    for (const [entity, value] of HTML_ENTITIES) out = out.split(entity).join(value);
+    out = out.replace(WHITE_RUN_RE, ' ');
+    if (out.startsWith(' ')) out = out.slice(1);
+    if (out.endsWith(' ')) out = out.slice(0, -1);
+    return out;
+  }
+  /**
+   * The first match of `<NAME[^>]*>(…?)</NAME>` (case-insensitive), as NSRegularExpression finds
+   * it: the earliest opening tag that has a closing tag after it. With `sameLine`, the content may
+   * not cross a line break (the pattern's `.`). Linear: openers, `>`, closers and line breaks are
+   * each searched forward only once.
+   */
+  function firstElementText(html, name, sameLine) {
+    const open = new RegExp('<' + name, 'gi'), close = new RegExp('</' + name + '>', 'gi');
+    const lineBreak = /[\n\v\f\r\u0085\u2028\u2029]/g;
+    let closeAt = null, breakAt = null;
+    const nextFrom = (re, from, cached) => {
+      if (cached !== null && (cached < 0 || cached >= from)) return cached;
+      re.lastIndex = from;
+      const m = re.exec(html);
+      return m ? m.index : -1;
+    };
+    for (let m = open.exec(html); m; m = open.exec(html)) {
+      const gt = html.indexOf('>', m.index + m[0].length);
+      if (gt < 0) return null;
+      closeAt = nextFrom(close, gt + 1, closeAt);
+      if (closeAt < 0) return null;
+      if (sameLine) {
+        breakAt = nextFrom(lineBreak, gt + 1, breakAt);
+        // Every opener before this '>' shares it, and fails the same way: go on after it.
+        if (breakAt >= 0 && breakAt < closeAt) { open.lastIndex = gt + 1; continue; }
+      }
+      return html.slice(gt + 1, closeAt);
+    }
+    return null;
+  }
+  const first200 = t => Array.from(t).slice(0, 200).join('');
+  /** The page's title (or first heading) as one short line, "HTML page" when it has neither. */
+  function htmlSummary(html) {
+    const title = firstElementText(html, 'title', false);
+    const titleText = title === null ? '' : htmlPlainText(title);
+    if (titleText) return first200(titleText);
+    const h1 = firstElementText(html.split('\n').join(' '), 'h1', true);
+    const h1Text = h1 === null ? '' : htmlPlainText(h1);
+    if (h1Text) return first200(h1Text);
+    return 'HTML page';
+  }
+  /** splitHTTP: "HTTP <status>[:] <body>" with the body trimmed. */
+  function splitHTTP(text) {
+    const m = /^HTTP (\d+):?([\s\S]*)$/.exec(text);
+    return m ? { code: Number(m[1]), body: m[2].trim() } : null;
+  }
+  /** displayText: the stored error, safe to show in full (tooltip, Details), HTML reduced to a line. */
+  function displayText(error) {
+    const http = splitHTTP(error.trim());
+    if (!http || !isHTMLPage(http.body)) return error;
+    return `HTTP ${http.code}: ${htmlSummary(http.body)}`;
+  }
+
+  function presentError(raw, m) {
+    const text = raw.trim();
+    let title = text, detail = null, status = null, rawOut = text;
+    const http = splitHTTP(text);
+    const lower = text.toLowerCase();
+    const afterAPI = text.startsWith('API error: ') ? text.slice('API error: '.length) : text;
+    if (http) {
+      const code = http.code;
+      let body = http.body;
+      // Pages stored before Parley summarised HTML: never show the markup, not even in Details.
+      if (isHTMLPage(body)) {
+        body = htmlSummary(body);
+        rawOut = `HTTP ${code}: ${body}`;
+      }
+      status = 'HTTP ' + code;
+      const msg = serverMessage(body);
+      if (code === 401 || code === 403) { title = 'The server rejected the API key'; detail = msg ?? 'Check the API key for the server in Settings.'; }
+      else if (code === 404) { title = 'Model or endpoint not found'; detail = msg ? `Check the model ID and the base URL. The server said: ${msg}` : 'Check the model ID and the base URL (it usually ends in /v1).'; }
+      else if (code === 429) { title = 'Too many requests'; detail = msg ?? 'The server is rate limiting. Wait a moment and try again.'; }
+      else if (code >= 500 && code <= 599) { title = msg ?? 'The server had a problem'; detail = msg ? null : 'Try again in a moment.'; }
+      else if (code >= 300 && code <= 399) { title = 'The server redirected the request'; detail = 'Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.'; }
+      else title = msg ?? 'The server rejected the request';
+    } else if (afterAPI.startsWith('The connection closed before the reply finished')) {
+      const partial = str(m.content) !== '' || str(m.reasoning) !== '' || arr(m.toolRounds).length > 0;
+      const cause = text.includes(' (through Cloudflare)')
+        ? 'The connection through Cloudflare closed mid-reply: the server or the network went away.'
+        : 'The server stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN).';
+      title = 'The connection dropped before the reply finished';
+      detail = (partial ? 'The text received so far is kept. ' : '') + cause + ' Retry asks for the whole reply again.';
+    } else if (text.startsWith('API error: ')) {
+      title = afterAPI; rawOut = null;
+    } else if (['could not connect to the server', 'connection refused', 'hostname could not be found', 'network connection was lost', 'appears to be offline'].some(k => lower.includes(k))) {
+      title = 'Can\'t reach the server'; detail = 'Is the server running? ' + text; rawOut = null;
+    } else if (lower.includes('timed out')) {
+      title = 'The server took too long to respond'; detail = text; rawOut = null;
+    }
+    const defs = num(m.toolDefinitionTokens);
+    if (defs !== null && defs > 0 && lower.includes('context')) {
+      detail = (detail ? detail + ' ' : '') + `Tool definitions take about ${grouped(defs)} tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).`;
+    }
+    return { title: title || 'Error', detail, status, raw: rawOut };
+  }
+  function errorCallout(raw, m) {
+    const p = presentError(raw, m);
+    const text = h('div', { class: 'callout-text' }, h('div', { class: 'callout-title', text: p.title }));
+    if (p.detail) text.append(h('div', { class: 'callout-detail', text: p.detail }));
+    const row = h('div', { class: 'callout-row' });
+    if (p.status) row.append(h('span', { text: p.status }));
+    let rawEl = null;
+    if (p.raw && p.raw !== p.title) {
+      const toggle = h('button', { type: 'button', class: 'callout-toggle', 'aria-expanded': 'false', text: 'Details' });
+      on(toggle, 'click', () => {
+        const open = toggle.getAttribute('aria-expanded') !== 'true';
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.textContent = open ? 'Hide Details' : 'Details';
+        if (open && !rawEl) { rawEl = h('pre', { class: 'callout-raw', text: p.raw }); text.append(rawEl); }
+        if (rawEl) rawEl.hidden = !open;
+      });
+      row.append(toggle);
+    }
+    if (row.childNodes.length) text.append(row);
+    return h('div', { class: 'callout', title: displayText(raw), role: 'group', 'aria-label': `Error: ${p.title}` }, icon('triangleFill'), text);
+  }
+  function smallNote(iconName, text, tip) {
+    return h('div', { class: 'small-note', title: tip || null }, icon(iconName), h('span', { text }));
+  }
+
+  // ---- markdown to DOM (from ParleyMarkdown's plain data)
+  const linkTargets = new WeakMap();
+  /** Above this many styled runs in one block, the block is shown as plain text: laying out tens of
+   *  thousands of spans freezes the tab, and only a hostile or broken file has that many. */
+  const MAX_INLINE_RUNS = 5000;
+  /** Fills `el` with the inline runs of `text`, then sets `dir` if given. The runs go into a fragment
+   *  that is attached once, and `dir` comes last: appending into an element that already has
+   *  dir=auto makes Chromium re-resolve its direction on every append (quadratic). */
+  function inlineInto(el, text, dir) {
+    const runs = MD.inline(text);
+    if (runs.length > MAX_INLINE_RUNS) {
+      el.textContent = text;
+    } else {
+      const frag = document.createDocumentFragment();
+      for (const run of runs) {
+        if (run.placeholder) continue;
+        const classes = run.styles.filter(st => st !== 'html').map(st => 'i-' + st);
+        if (run.link) {
+          const span = h('span', { class: ['md-link', ...classes].join(' '), role: 'link', tabindex: '0', title: run.link.address, text: run.text });
+          linkTargets.set(span, run.link);
+          frag.append(span);
+        } else if (classes.length) {
+          frag.append(h('span', { class: classes.join(' '), text: run.text }));
+        } else {
+          frag.append(run.text);
+        }
+      }
+      el.append(frag);
+    }
+    if (dir) el.dir = dir;
+    return el;
+  }
+  /** Above this, a text is shown as plain text: a backstop against a huge hostile message. */
+  const MARKDOWN_LIMIT = 200000;
+  function markdown(text) {
+    const root = h('div', { class: 'md' });
+    if (text.length > MARKDOWN_LIMIT) { root.append(h('p', { class: 'md-p', dir: 'auto', text })); return root; }
+    // Text blocks lay out in their own direction (dir=auto); code blocks stay left to right.
+    for (const b of MD.parse(text)) {
+      switch (b.type) {
+        case 'paragraph': root.append(inlineInto(h('p', { class: 'md-p' }), b.text, 'auto')); break;
+        case 'heading': {
+          const lvl = Math.min(b.level, 3);
+          root.append(inlineInto(h('div', { class: `md-h md-h${lvl}`, role: 'heading', 'aria-level': Math.min(b.level + 2, 6) }), b.text, 'auto'));
+          break;
+        }
+        case 'list': {
+          const list = h('div', { class: 'md-list', role: 'list' });
+          for (const item of b.items) {
+            const li = h('div', { class: 'md-li', dir: 'auto', role: 'listitem' }, h('span', { class: 'md-marker', 'aria-hidden': 'true', text: item.marker }), inlineInto(h('span', { class: 'md-li-text' }), item.text));
+            if (item.indent) li.style.paddingInlineStart = (item.indent * 18) + 'px';
+            list.append(li);
+          }
+          root.append(list);
+          break;
+        }
+        case 'quote': root.append(inlineInto(h('blockquote', { class: 'md-quote' }), b.text, 'auto')); break;
+        case 'code': root.append(codeBlock(b.language, b.code)); break;
+        case 'rule': root.append(h('div', { class: 'md-rule', 'aria-hidden': 'true' })); break;
+        default: break;
+      }
+    }
+    return root;
+  }
+  function codeBlock(language, code) {
+    const card = h('div', { class: 'code-card' },
+      h('div', { class: 'code-head' }, h('span', { class: 'code-lang', text: language || 'code' }),
+        copyButton('code-copy', 'Copy Code', 'Copy code', () => code, 'Copied')),
+      h('pre', { class: 'code-body', dir: 'ltr', tabindex: '0' }, h('code', { text: code })));
+    addShape(card, [{ seed: 5, radius: 12, amplitude: 0.8 }], 'shadow-code');
+    return card;
+  }
+
+  // ---- disclosure (thinking, ReAct thought)
+  function disclosure(text, duration) {
+    const label = duration !== null ? `Thought for ${thoughtFor(duration)}` : 'Thoughts';
+    const btn = h('button', { type: 'button', class: 'disclosure-btn', 'aria-expanded': 'false', 'aria-label': 'Show thinking' },
+      icon('chevron', 'chev'), icon('bubble'), h('span', { text: label }));
+    const wrap = h('div', { class: 'thinking' }, btn);
+    let body = null;
+    on(btn, 'click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Hide thinking' : 'Show thinking');
+      if (open && !body) { body = h('div', { class: 'thinking-body', dir: 'auto', text }); wrap.append(body); }
+      if (body) body.hidden = !open;
+    });
+    return wrap;
+  }
+
+  // ---- tool calls
+  const STATUS = {
+    completed: ['check', 'Done', 'var(--moss)'],
+    toolError: ['triangle', 'Tool error', 'var(--danger)'],
+    failed: ['triangle', 'Failed', 'var(--danger)'],
+    timedOut: ['triangle', 'Timed out', 'var(--caution)'],
+    denied: ['hand', 'Denied', 'var(--caution)'],
+    notCalled: ['xmark', 'Not called', 'var(--inkSoft)'],
+  };
+  function statusOf(call) {
+    const result = obj(call.result);
+    if (!result) return ['stop', 'Interrupted', 'var(--inkSoft)'];
+    if (result.status === 'cancelled') return ['stop', call.startedAt == null ? 'Stopped' : 'Interrupted', 'var(--inkSoft)'];
+    // Own keys only: a status such as "constructor" must not reach Object.prototype.
+    return typeof result.status === 'string' && Object.prototype.hasOwnProperty.call(STATUS, result.status)
+      ? STATUS[result.status] : ['question', 'Finished', 'var(--inkSoft)'];
+  }
+  function toolTitle(call) {
+    const tool = MD.line(str(call.toolName) || str(call.name)) || 'Unknown tool';
+    if (typeof call.serverName !== 'string') return tool;
+    const server = Array.from(MD.line(call.serverName));
+    return (server.length > 24 ? server.slice(0, 24).join('') + '…' : server.join('')) + ' › ' + tool;
+  }
+  function sortKeysDeep(v) {
+    if (Array.isArray(v)) return v.map(sortKeysDeep);
+    // A prototype-less object, so a "__proto__" key stays a key (with {} it would vanish from the text).
+    if (v && typeof v === 'object') { const out = Object.create(null); for (const k of Object.keys(v).sort()) out[k] = sortKeysDeep(v[k]); return out; }
+    return v;
+  }
+  function prettyArguments(raw) {
+    const t = raw.trim();
+    if (t === '' || t === 'null') return '{}';
+    try {
+      const v = JSON.parse(t);
+      if (obj(v) && !Object.keys(v).length) return '{}';
+      return JSON.stringify(sortKeysDeep(v), null, 2).replace(/^(\s*"(?:[^"\\]|\\.)*"): /gm, '$1 : ');
+    } catch (_) {
+      return raw;
+    }
+  }
+  function replayResult(call) {
+    const result = obj(call.result);
+    if (result) return str(result.text) !== '' ? result.text : '(The tool returned no output.)';
+    return call.startedAt == null ? 'The tool was not run because the user stopped the reply.' : 'The call was interrupted. The tool may or may not have completed.';
+  }
+  function boardBlock(title, original) {
+    const pre = h('pre', { class: 'board-text', dir: 'auto', tabindex: '0', text: MD.visible(original) });
+    const block = h('div', { class: 'board-block' },
+      h('div', { class: 'board-head' }, h('span', { class: 'board-title', text: title }), copyButton('board-copy', `Copy ${title}`, `Copy ${title}`, () => original)),
+      pre);
+    return { block, pre };
+  }
+  /** Adds "About N lines…" under a scrolling text block once it is laid out. */
+  function noteOverflow(block, pre, max) {
+    requestAnimationFrame(() => {
+      if (!pre.isConnected) return;
+      const height = pre.scrollHeight;
+      if (height > max) block.append(h('div', { class: 'board-more', text: `About ${Math.ceil(height / 17)} lines. Scroll to see all of them.` }));
+    });
+  }
+  function toolCallRow(call) {
+    const [statusIcon, statusText, color] = statusOf(call);
+    const title = toolTitle(call);
+    const result = obj(call.result);
+    const slip = h('button', { type: 'button', class: 'slip', 'aria-expanded': 'false', 'aria-label': `${title}, ${statusText}`, 'aria-description': 'Shows the arguments and result' },
+      icon('chevron', 'chev'), icon('wrench', 'wrench'), h('span', { class: 'slip-title', text: title }), h('span', { class: 'slip-dot', text: '·', 'aria-hidden': 'true' }));
+    const st = h('span', { class: 'slip-status' }, icon(statusIcon), h('span', { text: statusText }));
+    st.style.color = color;
+    slip.append(st);
+    if (result && num(result.duration) !== null) slip.append(h('span', { class: 'slip-time', text: seconds(result.duration) }));
+    addShape(slip, [{ seed: slipSeed(call.id), radius: 9, amplitude: 1.4 }], 'shadow-paper');
+    slip.__shape.svg.firstChild.style.fill = 'var(--card)';
+    const wrap = h('div', { class: 'tool' }, slip);
+    let body = null;
+    on(slip, 'click', () => {
+      const open = slip.getAttribute('aria-expanded') !== 'true';
+      slip.setAttribute('aria-expanded', String(open));
+      slip.setAttribute('aria-description', open ? 'Hides the arguments and result' : 'Shows the arguments and result');
+      if (open && !body) {
+        body = h('div', { class: 'tool-body' });
+        const args = boardBlock('Arguments', prettyArguments(str(call.arguments)));
+        body.append(args.block);
+        const res = boardBlock('Result', replayResult(call));
+        body.append(res.block);
+        if (result) {
+          const lines = h('div', { class: 'tool-lines' });
+          const total = num(result.originalCharacters);
+          if (total !== null) {
+            const matches = str(result.text).match(/showing the first (\d+) of/g);
+            const shown = matches ? matches[matches.length - 1].replace(/\D/g, '') : null;
+            lines.append(h('div', { text: shown ? `Truncated: showing ${grouped(Number(shown))} of ${grouped(total)} characters.` : `Truncated: ${grouped(total)} characters in all.` }));
+          }
+          const omitted = arr(result.omitted).filter(x => typeof x === 'string');
+          if (omitted.length) lines.append(h('div', { text: `Not shown to the model: ${omitted.join('; ')}.` }));
+          if (lines.childNodes.length) body.append(lines);
+        }
+        wrap.append(body);
+        noteOverflow(args.block, args.pre, 240);
+        noteOverflow(res.block, res.pre, 240);
+      }
+      if (body) body.hidden = !open;
+    });
+    return wrap;
+  }
+
+  // ---- attachments
+  const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+  function attachmentStrip(entry, attachments) {
+    const strip = h('div', { class: 'strip' });
+    for (const a of attachments) {
+      if (!obj(a)) continue;
+      const filename = str(a.filename) || 'attachment';
+      if (a.kind === 'image') strip.append(imageThumb(entry, a, filename));
+      else strip.append(textChip(a, filename));
+    }
+    return strip;
+  }
+  function imageURL(entry, a) {
+    // One bad image must not take its whole message down: no picture is the worst case.
+    try {
+      const type = str(a.mimeType).toLowerCase();
+      if (!IMAGE_TYPES.has(type)) return null;
+      const bytes = Core.base64ToBytes(a.data);
+      if (!bytes || !bytes.length) return null;
+      const url = URL.createObjectURL(new Blob([bytes], { type }));
+      entry.blobs.push(url);
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+  function imageThumb(entry, a, filename) {
+    const url = imageURL(entry, a);
+    const btn = h('button', { type: 'button', class: 'thumb', title: filename, 'aria-label': `Image ${filename}` });
+    if (url) {
+      const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' });
+      img.src = url; // a blob: URL made here from validated base64, never a URL from the file
+      on(img, 'error', () => img.replaceWith(h('span', { class: 'no-image' }, icon('photo'))));
+      btn.append(img);
+      on(btn, 'click', () => showImage(url, filename));
+    } else {
+      btn.append(h('span', { class: 'no-image' }, icon('photo')));
+      btn.disabled = true;
+    }
+    addShape(btn, [{ seed: uuidSeed(a.id), radius: 7, amplitude: 1.4 }], 'shadow-paper');
+    btn.__shape.svg.firstChild.style.fill = 'var(--card)';
+    btn.append(washi('var(--marigold)', 46, 13, -2.5, 'translateX(-50%)'));
+    return btn;
+  }
+  function textChip(a, filename) {
+    const chip = h('button', { type: 'button', class: 'chip', title: 'Click to preview', 'aria-label': `Text file ${filename}, click to preview` },
+      icon('doc'), h('span', { text: middle(filename, 28) }));
+    addShape(chip, [{ seed: uuidSeed(a.id), radius: 9, amplitude: 1.4 }], 'shadow-paper');
+    chip.__shape.svg.firstChild.style.fill = 'var(--card)';
+    on(chip, 'click', () => showText(filename, str(a.text)));
+    return chip;
+  }
+
+  // ---- rows
+  function messageRow(entry, c, m, repeated) {
+    if (!obj(m)) throw new Error('bad message');
+    return m.role === 'user' ? userRow(entry, m) : assistantRow(entry, c, m, repeated);
+  }
+  function userRow(entry, m) {
+    const stack = h('div', { class: 'stack' });
+    const atts = arr(m.attachments);
+    if (atts.length) stack.append(attachmentStrip(entry, atts));
+    const content = str(m.content);
+    if (content !== '') {
+      const created = dateOf(m.createdAt);
+      const note = h('div', { class: 'note', dir: 'auto', title: created ? fmtNoteTip(created) : null, text: content });
+      paperCard(note, uuidSeed(m.id), 14);
+      note.__shape.svg.firstChild.style.fill = 'var(--peach)';
+      stack.append(note);
+    }
+    if (str(m.error) !== '') stack.append(errorCallout(m.error, m));
+    const actions = h('div', { class: 'actions' }, copyButton('paper-btn', 'Copy', 'Copy', () => str(m.content)));
+    return h('div', { class: 'msg msg-user' }, actions, stack);
+  }
+  function assistantRow(entry, c, m, repeated) {
+    const settings = obj(c.settings) || {};
+    const row = h('div', { class: 'msg msg-assistant' });
+    const created = dateOf(m.createdAt);
+    const modelName = str(m.model) || 'Assistant';
+    const time = created ? fmtTime(created) : '';
+    const headEl = h('div', { class: 'a-head', role: 'group', 'aria-label': `Assistant, ${str(m.model) || 'unknown model'}, ${time}` },
+      lantern(16), h('span', { class: 'a-model', text: modelName }), h('span', { class: 'a-time', text: time }),
+      h('div', { class: 'actions' }, copyButton('paper-btn', 'Copy', 'Copy', () => visibleText(m))));
+    row.append(headEl);
+    for (const round of arr(m.toolRounds)) {
+      if (!obj(round)) continue;
+      if (str(round.reasoning) !== '') row.append(disclosure(round.reasoning, num(round.reasoningDuration)));
+      if (str(round.content) !== '') row.append(markdown(round.content));
+      for (const call of arr(round.calls)) if (obj(call)) row.append(toolCallRow(call));
+    }
+    if (str(m.reasoning) !== '') row.append(disclosure(m.reasoning, num(m.reasoningDuration)));
+    if (str(m.reactThought) !== '') row.append(disclosure(m.reactThought, null));
+    const atts = arr(m.attachments);
+    if (atts.length) row.append(attachmentStrip(entry, atts));
+    if (str(m.content) !== '') row.append(markdown(m.content));
+    const error = str(m.error);
+    if (error === '') { const finish = finishNote(m, settings); if (finish) row.append(smallNote('scissors', finish)); }
+    const off = thinkingOffText(m, repeated);
+    if (off) row.append(smallNote('info', off[0], off[1]));
+    for (const note of arr(m.toolNotes)) if (obj(note)) { const t = toolNoteText(note); if (t) row.append(smallNote('info', t, str(note.detail))); }
+    if (error !== '') row.append(errorCallout(error, m));
+    else if (m.isComplete === false) row.append(h('div', { class: 'stopped', text: 'Stopped before the reply finished.' }));
+    const footer = footerLine(m);
+    if (footer) row.append(h('div', { class: 'footer-stats', text: footer }));
+    return row;
+  }
+
+  // ===========================================================================================
+  // Dialogs: link confirmation, image and text previews, conversation details.
+  const linkDialog = document.getElementById('link-dialog');
+  const imageDialog = document.getElementById('image-dialog');
+  const textDialog = document.getElementById('text-dialog');
+  const infoDialog = document.getElementById('info-dialog');
+  const allDialogs = [linkDialog, imageDialog, textDialog, infoDialog];
+  for (const d of allDialogs) {
+    // Clear the contents on close, so nothing from a conversation lingers in a hidden dialog.
+    on(d, 'close', () => { clearDialog(d); if (d === linkDialog) gate.cancel(); });
+    // A click on the backdrop (the dialog element itself, outside the sheet) closes it.
+    on(d, 'click', ev => { if (ev.target === d) d.close(); });
+  }
+  /** Empties a dialog, including the per-image label (a file name from the conversation). */
+  function clearDialog(d) {
+    d.replaceChildren();
+    if (d === imageDialog) d.setAttribute('aria-label', 'Image preview');
+  }
+  // 'close' fires later; Lock and Remove clear every dialog now.
+  function closeDialogs() { gate.cancel(); for (const d of allDialogs) { if (d.open) d.close(); clearDialog(d); } }
+  function showModal(d) { try { d.showModal(); } catch (_) { d.setAttribute('open', ''); } }
+
+  const gate = MD.createLinkGate(
+    url => { window.open(url, '_blank', 'noopener,noreferrer'); },
+    link => showLinkSheet(link));
+  function openLinkFrom(el) {
+    const link = linkTargets.get(el);
+    if (link) gate.requestOpen(link.url);
+  }
+  on(document, 'click', ev => {
+    const el = ev.target instanceof Element ? ev.target.closest('.md-link') : null;
+    if (el) { ev.preventDefault(); openLinkFrom(el); }
+  });
+  on(document, 'keydown', ev => {
+    const el = ev.target instanceof Element && ev.target.classList.contains('md-link') ? ev.target : null;
+    if (el && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openLinkFrom(el); }
+  });
+
+  function showLinkSheet(link) {
+    const host = link.host.length > 90 ? '…' + link.host.slice(-89) : link.host;
+    const address = boardBlock('Address', link.address);
+    address.pre.classList.add('address');
+    const card = h('div', { class: 'notice-card' },
+      h('div', { class: 'notice-head' }, h('span', { class: 'hand', 'aria-hidden': 'true' }, icon('hand')), h('h2', { id: 'link-title', text: 'Open this link in your browser?' })),
+      h('p', { text: 'Opening sends the whole address to this site, including anything a model put in it.' }),
+      h('div', { class: 'site' }, h('span', { class: 'site-label', text: 'Site' }), h('span', { class: 'site-host', text: host, title: link.host })),
+      address.block);
+    if (link.hasHiddenCharacters) card.append(h('div', { class: 'hidden-warn' }, icon('triangleFill'), h('span', { text: 'The address contains hidden or right-to-left characters, shown here as \\u{…}.' })));
+    const cancel = h('button', { type: 'button', class: 'sheet-btn soft', text: 'Cancel', autofocus: true });
+    const open = h('button', { type: 'button', class: 'sheet-btn primary', text: 'Open', disabled: true });
+    on(cancel, 'click', () => linkDialog.close());
+    on(open, 'click', () => { gate.confirm(); linkDialog.close(); });
+    // Disabled for 0.4 s, so the second click of a double-click cannot land on it.
+    setTimeout(() => { open.disabled = false; }, 400);
+    linkDialog.replaceChildren(h('div', { class: 'sheet link-sheet' }, card, h('div', { class: 'sheet-buttons' }, cancel, open)));
+    showModal(linkDialog);
+    cancel.focus();
+    noteOverflow(address.block, address.pre, 200);
+  }
+  function closeButton(dialog) {
+    const b = h('button', { type: 'button', class: 'sheet-btn soft sheet-close', text: 'Close' });
+    on(b, 'click', () => dialog.close());
+    return b;
+  }
+  function showImage(url, filename) {
+    const img = h('img', { alt: filename });
+    img.src = url;
+    imageDialog.setAttribute('aria-label', `Image ${filename}`);
+    imageDialog.replaceChildren(h('div', { class: 'sheet preview-sheet' }, img, closeButton(imageDialog)));
+    showModal(imageDialog);
+  }
+  function showText(filename, text) {
+    textDialog.replaceChildren(h('div', { class: 'sheet text-sheet' }, h('h2', { text: filename }), h('pre', { tabindex: '0', text }), closeButton(textDialog)));
+    showModal(textDialog);
+  }
+  function showInfo(entry) {
+    const c = entry.conversation;
+    if (!c) return;
+    const st = obj(c.settings) || {};
+    const rows = [];
+    const add = (k, v) => { if (v !== null && v !== undefined && v !== '') rows.push(h('dt', { text: k }), h('dd', { text: String(v) })); };
+    add('Model', str(st.model) || 'Provider default');
+    add('Temperature', num(st.temperature));
+    add('Max tokens', num(st.maxTokens) !== null ? grouped(st.maxTokens) : null);
+    const EFFORT = { low: 'Low', medium: 'Medium', high: 'High' };
+    const effort = Object.prototype.hasOwnProperty.call(EFFORT, str(st.reasoningEffort)) ? EFFORT[str(st.reasoningEffort)] : null;
+    add('Reasoning effort', st.disablesThinking === true ? 'None (no thinking)' : effort || null);
+    add('Thinking budget', num(st.reasoningBudgetTokens) !== null ? `${grouped(st.reasoningBudgetTokens)} tokens` : null);
+    add('Tool calling', st.toolMode === 'react' ? 'ReAct (text)' : 'Native');
+    const servers = arr(st.mcpServerIDs).length;
+    add('MCP servers', servers ? String(servers) : 'None');
+    if (st.builtInToolsOff === true) add('Built-in tools', 'Off');
+    const created = dateOf(c.createdAt), updated = dateOf(c.updatedAt);
+    add('Created', created ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, created) : null);
+    add('Updated', updated ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, updated) : null);
+    add('Messages', arr(c.messages).length);
+    if (obj(c.forkedFrom)) add('Fork', 'Forked from another conversation');
+    add('File', entry.name);
+    const prompt = str(st.systemPrompt);
+    infoDialog.replaceChildren(h('div', { class: 'sheet info-sheet' },
+      h('h2', { text: str(c.title).trim() || 'Untitled' }),
+      h('p', { class: 'viewer-note', text: 'Conversation settings, read-only. In Parley they live in the Conversation Settings popover.' }),
+      h('h2', { text: 'System prompt' }),
+      h('div', { class: 'info-prompt' + (prompt ? '' : ' none'), dir: prompt ? 'auto' : null, text: prompt || 'No system prompt.' }),
+      h('dl', { class: 'info-grid' }, ...rows),
+      closeButton(infoDialog)));
+    showModal(infoDialog);
+  }
+
+  // ===========================================================================================
+  // Opening files: buttons, the file input, drag and drop anywhere.
+  on(fileInput, 'change', () => { const files = fileInput.files; openFiles(files).finally(() => { fileInput.value = ''; }); });
+  const drop = document.getElementById('drop');
+  addShape(document.getElementById('drop-card'), [{ seed: 9, radius: 18, amplitude: 1.4, cls: 'fill' }, { seed: 9, radius: 13, amplitude: 0.8, inset: 5, cls: 'stitch' }], 'shadow-paper');
+  let dragDepth = 0;
+  const hasFiles = ev => !!(ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes('Files'));
+  // Always prevent the default, so a drop that misses never navigates the tab to the file.
+  on(window, 'dragenter', ev => { ev.preventDefault(); if (hasFiles(ev)) { dragDepth++; drop.hidden = false; } });
+  on(window, 'dragover', ev => { ev.preventDefault(); if (ev.dataTransfer) ev.dataTransfer.dropEffect = hasFiles(ev) ? 'copy' : 'none'; });
+  on(window, 'dragleave', ev => { ev.preventDefault(); dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) drop.hidden = true; });
+  on(window, 'drop', ev => {
+    ev.preventDefault();
+    dragDepth = 0; drop.hidden = true;
+    const files = ev.dataTransfer && ev.dataTransfer.files;
+    if (files && files.length) openFiles(files);
+  });
+
+  // Wall buttons and look controls.
+  const wallOpen = document.getElementById('wall-open');
+  wallOpen.append(icon('folder'));
+  on(wallOpen, 'click', () => fileInput.click());
+  const wallHide = document.getElementById('wall-hide');
+  wallHide.append(icon('sidebar'));
+  on(wallHide, 'click', hideWall);
+  document.getElementById('search-icon').append(icon('search'));
+  searchClear.append(icon('xcircle'));
+  const searchBox = document.getElementById('search');
+  addShape(searchBox, [{ seed: 3, radius: 9, amplitude: 1.4 }], 'shadow-paper');
+  searchBox.__shape.svg.firstChild.style.fill = 'var(--tag)';
+  const skinSelect = document.getElementById('skin-select');
+  for (const skin of SKINS) skinSelect.append(h('option', { value: skin, text: SKIN_TITLES[skin] }));
+  const appearanceSelect = document.getElementById('appearance-select');
+  for (const [value, label] of APPEARANCES) appearanceSelect.append(h('option', { value, text: label }));
+  skinSelect.value = look.skin;
+  appearanceSelect.value = look.appearance;
+  on(skinSelect, 'change', () => { if (SKINS.includes(skinSelect.value)) { look.skin = skinSelect.value; saveLook(); applyLook(); } });
+  on(appearanceSelect, 'change', () => { look.appearance = appearanceSelect.value; saveLook(); applyLook(); });
+
+  on(document, 'keydown', ev => {
+    if (ev.key === 'Escape' && narrow.matches && app.classList.contains('wall-open') && !menuEl) closeOverlayWall();
+    if ((ev.metaKey || ev.ctrlKey) && !ev.shiftKey && !ev.altKey && ev.key.toLowerCase() === 'o') { ev.preventDefault(); fileInput.click(); }
+  });
+
+  applyLook();
+  renderList();
+  renderRoom();
+})();
+</script>
+</body>
+</html>

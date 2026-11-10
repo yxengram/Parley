@@ -1,0 +1,8263 @@
+[
+{
+"input": "a <b>bold</b> c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b>"
+},
+{
+"link": null,
+"styles": [],
+"text": "bold"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</b>"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a <b>bold</b> c"
+},
+{
+"input": "x <br> y",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x "
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<br>"
+},
+{
+"link": null,
+"styles": [],
+"text": " y"
+}
+],
+"text": "x <br> y"
+},
+{
+"input": "<span style='color:red'>r</span>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<span style='color:red'>"
+},
+{
+"link": null,
+"styles": [],
+"text": "r"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</span>"
+}
+],
+"text": "<span style='color:red'>r</span>"
+},
+{
+"input": "<!-- c -->z",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<!-- c -->"
+},
+{
+"link": null,
+"styles": [],
+"text": "z"
+}
+],
+"text": "<!-- c -->z"
+},
+{
+"input": "~one~ ~~two~~",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "one"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "two"
+}
+],
+"text": "one two"
+},
+{
+"input": "*i* _i_ **b** __b__ ***bi***",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "i"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "i"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "bi"
+}
+],
+"text": "i i b b bi"
+},
+{
+"input": "snake_case_name and 2*3*4",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "snake_case_name and 2"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "3"
+},
+{
+"link": null,
+"styles": [],
+"text": "4"
+}
+],
+"text": "snake_case_name and 234"
+},
+{
+"input": "see http://x.com/a. end",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "see "
+},
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": ". end"
+}
+],
+"text": "see http://x.com/a. end"
+},
+{
+"input": "https://example.com/a)",
+"runs": [
+{
+"link": {
+"address": "https://example.com/a",
+"hasHiddenCharacters": false,
+"host": "example.com",
+"url": "https://example.com/a"
+},
+"styles": [],
+"text": "https://example.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "https://example.com/a)"
+},
+{
+"input": "(https://example.com/a)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "("
+},
+{
+"link": {
+"address": "https://example.com/a",
+"hasHiddenCharacters": false,
+"host": "example.com",
+"url": "https://example.com/a"
+},
+"styles": [],
+"text": "https://example.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "(https://example.com/a)"
+},
+{
+"input": "https://example.com/a?b=1&c=2.",
+"runs": [
+{
+"link": {
+"address": "https://example.com/a?b=1&c=2",
+"hasHiddenCharacters": false,
+"host": "example.com",
+"url": "https://example.com/a?b=1&c=2"
+},
+"styles": [],
+"text": "https://example.com/a?b=1&c=2"
+},
+{
+"link": null,
+"styles": [],
+"text": "."
+}
+],
+"text": "https://example.com/a?b=1&c=2."
+},
+{
+"input": "&amp; &lt; &copy; &#65; &nbsp;x",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "& < © A  x"
+}
+],
+"text": "& < © A  x"
+},
+{
+"input": "\\*not\\* \\` \\[",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*not* ` ["
+}
+],
+"text": "*not* ` ["
+},
+{
+"input": "line1  \nline2\\\nline3\nline4",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "line1  \nline2"
+},
+{
+"link": null,
+"styles": [],
+"text": "\n"
+},
+{
+"link": null,
+"styles": [],
+"text": "line3\nline4"
+}
+],
+"text": "line1  \nline2\nline3\nline4"
+},
+{
+"input": "  lead  spaces",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "  lead  spaces"
+}
+],
+"text": "  lead  spaces"
+},
+{
+"input": "`a  b`  ``x`y``",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a  b"
+},
+{
+"link": null,
+"styles": [],
+"text": "  "
+},
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "x`y"
+}
+],
+"text": "a  b  x`y"
+},
+{
+"input": "![alt](https://i.example/p.png) after",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "alt"
+},
+{
+"link": null,
+"styles": [],
+"text": " after"
+}
+],
+"text": "alt after"
+},
+{
+"input": "[t](https://e.com/a b)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[t]("
+},
+{
+"link": {
+"address": "https://e.com/a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a"
+},
+"styles": [],
+"text": "https://e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": " b)"
+}
+],
+"text": "[t](https://e.com/a b)"
+},
+{
+"input": "[t]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[t]"
+}
+],
+"text": "[t]"
+},
+{
+"input": "**unclosed",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "**unclosed"
+}
+],
+"text": "**unclosed"
+},
+{
+"input": "`unclosed",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "`unclosed"
+}
+],
+"text": "`unclosed"
+},
+{
+"input": "[unclosed](https://x",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[unclosed]("
+},
+{
+"link": {
+"address": "https://x",
+"hasHiddenCharacters": false,
+"host": "x",
+"url": "https://x"
+},
+"styles": [],
+"text": "https://x"
+}
+],
+"text": "[unclosed](https://x"
+},
+{
+"input": "$x^2$",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "$x^2$"
+}
+],
+"text": "$x^2$"
+},
+{
+"input": "footnote[^1]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "footnote[^1]"
+}
+],
+"text": "footnote[^1]"
+},
+{
+"input": "| a | b |\n|---|---|\n| 1 | 2 |",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "| a | b |\n|---|---|\n| 1 | 2 |"
+}
+],
+"text": "| a | b |\n|---|---|\n| 1 | 2 |"
+},
+{
+"input": "[**bold** link](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "bold link"
+}
+],
+"text": "bold link"
+},
+{
+"input": "`[x](https://e.com)`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "[x](https://e.com)"
+}
+],
+"text": "[x](https://e.com)"
+},
+{
+"input": "^[x](y)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "😀 *é*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "😀 "
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "é"
+}
+],
+"text": "😀 é"
+},
+{
+"input": "<a@b.com>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a@b.com"
+}
+],
+"text": "a@b.com"
+},
+{
+"input": "H~2~O",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "H"
+},
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "2"
+},
+{
+"link": null,
+"styles": [],
+"text": "O"
+}
+],
+"text": "H2O"
+},
+{
+"input": "foo~bar~baz",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [],
+"text": "baz"
+}
+],
+"text": "foobarbaz"
+},
+{
+"input": "a b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "[a](https://e.com/(x))",
+"runs": [
+{
+"link": {
+"address": "https://e.com/(x)",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/(x)"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[t](/rel)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "t"
+}
+],
+"text": "t"
+},
+{
+"input": "[t](#frag)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "t"
+}
+],
+"text": "t"
+},
+{
+"input": "[r]: https://example.com/a",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[r]: "
+},
+{
+"link": {
+"address": "https://example.com/a",
+"hasHiddenCharacters": false,
+"host": "example.com",
+"url": "https://example.com/a"
+},
+"styles": [],
+"text": "https://example.com/a"
+}
+],
+"text": "[r]: https://example.com/a"
+},
+{
+"input": "a\ttab",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\ttab"
+}
+],
+"text": "a\ttab"
+},
+{
+"input": "*a**b*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a**b"
+}
+],
+"text": "a**b"
+},
+{
+"input": "**a*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a"
+}
+],
+"text": "*a"
+},
+{
+"input": "*a**",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "a*"
+},
+{
+"input": "_a_b_",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a_b"
+}
+],
+"text": "a_b"
+},
+{
+"input": "__a__b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "__a__b"
+}
+],
+"text": "__a__b"
+},
+{
+"input": "a*b*c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": "c"
+}
+],
+"text": "abc"
+},
+{
+"input": "a_b_c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a_b_c"
+}
+],
+"text": "a_b_c"
+},
+{
+"input": "*a *b* c*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "**a **b** c**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "*a **b** c*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "***x** y*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "x"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " y"
+}
+],
+"text": "x y"
+},
+{
+"input": "***x* y**",
+"runs": [
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "x"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": " y"
+}
+],
+"text": "x y"
+},
+{
+"input": "*foo**bar**baz*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "baz"
+}
+],
+"text": "foobarbaz"
+},
+{
+"input": "*foo**bar*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "foo**bar"
+}
+],
+"text": "foo**bar"
+},
+{
+"input": "**foo*bar*baz**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "baz"
+}
+],
+"text": "foobarbaz"
+},
+{
+"input": "foo***bar***baz",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [],
+"text": "baz"
+}
+],
+"text": "foobarbaz"
+},
+{
+"input": "foo******bar*********baz",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [],
+"text": "***baz"
+}
+],
+"text": "foobar***baz"
+},
+{
+"input": "*(*foo*)*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "(foo"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "(foo)"
+},
+{
+"input": "_(_foo_)_",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "(foo"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "(foo)"
+},
+{
+"input": "**foo \"*bar*\" foo**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "foo \""
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "bar"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "\" foo"
+}
+],
+"text": "foo \"bar\" foo"
+},
+{
+"input": "*foo [bar](/url)*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "foo bar"
+}
+],
+"text": "foo bar"
+},
+{
+"input": "_foo_bar_baz_",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "foo_bar_baz"
+}
+],
+"text": "foo_bar_baz"
+},
+{
+"input": "__foo, __bar__, baz__",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "foo, bar"
+},
+{
+"link": null,
+"styles": [],
+"text": ", baz"
+}
+],
+"text": "foo, bar, baz"
+},
+{
+"input": "* a *",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "* a *"
+}
+],
+"text": "* a *"
+},
+{
+"input": "* a*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "* a*"
+}
+],
+"text": "* a*"
+},
+{
+"input": "a * b * c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a * b * c"
+}
+],
+"text": "a * b * c"
+},
+{
+"input": "пр_и_вет",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "пр_и_вет"
+}
+],
+"text": "пр_и_вет"
+},
+{
+"input": "*привет*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "привет"
+}
+],
+"text": "привет"
+},
+{
+"input": "_привет_",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "привет"
+}
+],
+"text": "привет"
+},
+{
+"input": "**",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "**"
+}
+],
+"text": "**"
+},
+{
+"input": "****",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "****"
+}
+],
+"text": "****"
+},
+{
+"input": "*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "*"
+},
+{
+"input": "_ _",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "_ _"
+}
+],
+"text": "_ _"
+},
+{
+"input": "*a\nb*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a\nb"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "_a\n_b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "_a\n_b"
+}
+],
+"text": "_a\n_b"
+},
+{
+"input": "**a\n\nb**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "a\n\nb"
+}
+],
+"text": "a\n\nb"
+},
+{
+"input": "*$*alpha.",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*$*alpha."
+}
+],
+"text": "*$*alpha."
+},
+{
+"input": "*£*bravo.",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "£"
+},
+{
+"link": null,
+"styles": [],
+"text": "bravo."
+}
+],
+"text": "£bravo."
+},
+{
+"input": "*€*charlie.",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "€"
+},
+{
+"link": null,
+"styles": [],
+"text": "charlie."
+}
+],
+"text": "€charlie."
+},
+{
+"input": "x*、*y",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x*、*y"
+}
+],
+"text": "x*、*y"
+},
+{
+"input": "a**\"foo\"**",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a**\"foo\"**"
+}
+],
+"text": "a**\"foo\"**"
+},
+{
+"input": "**foo**bar",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "foo"
+},
+{
+"link": null,
+"styles": [],
+"text": "bar"
+}
+],
+"text": "foobar"
+},
+{
+"input": "__foo__bar",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "__foo__bar"
+}
+],
+"text": "__foo__bar"
+},
+{
+"input": "~~~x~~~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~~~x~~~"
+}
+],
+"text": "~~~x~~~"
+},
+{
+"input": "~a~~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~a~~"
+}
+],
+"text": "~a~~"
+},
+{
+"input": "~~a~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~~a~"
+}
+],
+"text": "~~a~"
+},
+{
+"input": "~~a~~b",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": "b"
+}
+],
+"text": "ab"
+},
+{
+"input": "a~~b~~c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+},
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": "c"
+}
+],
+"text": "abc"
+},
+{
+"input": "~ a ~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~ a ~"
+}
+],
+"text": "~ a ~"
+},
+{
+"input": "~~ a ~~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~~ a ~~"
+}
+],
+"text": "~~ a ~~"
+},
+{
+"input": "~a ~b~ c~",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "~~*a*~~",
+"runs": [
+{
+"link": null,
+"styles": [
+"em",
+"strike"
+],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "*~~a~~*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em",
+"strike"
+],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "~~~~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~~~~"
+}
+],
+"text": "~~~~"
+},
+{
+"input": "~x",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~x"
+}
+],
+"text": "~x"
+},
+{
+"input": "x~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x~"
+}
+],
+"text": "x~"
+},
+{
+"input": "``a` b``",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a` b"
+}
+],
+"text": "a` b"
+},
+{
+"input": "`a``b`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a``b"
+}
+],
+"text": "a``b"
+},
+{
+"input": "```a``",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "```a``"
+}
+],
+"text": "```a``"
+},
+{
+"input": "`` ` ``",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "`"
+}
+],
+"text": "`"
+},
+{
+"input": "` a `",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "`  a  `",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": " a "
+}
+],
+"text": " a "
+},
+{
+"input": "` `",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": " "
+}
+],
+"text": " "
+},
+{
+"input": "`a\nb`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "`a\\`b",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a\\"
+},
+{
+"link": null,
+"styles": [],
+"text": "b"
+}
+],
+"text": "a\\b"
+},
+{
+"input": "x `` y",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x `` y"
+}
+],
+"text": "x `` y"
+},
+{
+"input": "`a`b`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": "b`"
+}
+],
+"text": "ab`"
+},
+{
+"input": "``foo`bar``",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "foo`bar"
+}
+],
+"text": "foo`bar"
+},
+{
+"input": "`*a*`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "*a*"
+}
+],
+"text": "*a*"
+},
+{
+"input": "*`a*`",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*"
+},
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a*"
+}
+],
+"text": "*a*"
+},
+{
+"input": "[`x`](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[*x* `y`](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "x y"
+}
+],
+"text": "x y"
+},
+{
+"input": "![*a* `b`](https://i.example/x.png)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "[x](https://e.com)`code`",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "x"
+},
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "code"
+}
+],
+"text": "xcode"
+},
+{
+"input": "`\t`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "\t"
+}
+],
+"text": "\t"
+},
+{
+"input": "\\!",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "!"
+}
+],
+"text": "!"
+},
+{
+"input": "\\\"",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\""
+}
+],
+"text": "\""
+},
+{
+"input": "\\#",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "#"
+}
+],
+"text": "#"
+},
+{
+"input": "\\$",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "$"
+}
+],
+"text": "$"
+},
+{
+"input": "\\%",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "%"
+}
+],
+"text": "%"
+},
+{
+"input": "\\&",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&"
+}
+],
+"text": "&"
+},
+{
+"input": "\\'",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "'"
+}
+],
+"text": "'"
+},
+{
+"input": "\\(",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "("
+}
+],
+"text": "("
+},
+{
+"input": "\\)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": ")"
+},
+{
+"input": "\\*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "*"
+},
+{
+"input": "\\+",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "+"
+}
+],
+"text": "+"
+},
+{
+"input": "\\,",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ","
+}
+],
+"text": ","
+},
+{
+"input": "\\-",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "-"
+}
+],
+"text": "-"
+},
+{
+"input": "\\.",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "."
+}
+],
+"text": "."
+},
+{
+"input": "\\/",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "/"
+}
+],
+"text": "/"
+},
+{
+"input": "\\:",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ":"
+}
+],
+"text": ":"
+},
+{
+"input": "\\;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ";"
+}
+],
+"text": ";"
+},
+{
+"input": "\\<",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<"
+}
+],
+"text": "<"
+},
+{
+"input": "\\=",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "="
+}
+],
+"text": "="
+},
+{
+"input": "\\>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ">"
+}
+],
+"text": ">"
+},
+{
+"input": "\\?",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "?"
+}
+],
+"text": "?"
+},
+{
+"input": "\\@",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "@"
+}
+],
+"text": "@"
+},
+{
+"input": "\\[",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "["
+}
+],
+"text": "["
+},
+{
+"input": "\\\\",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\\"
+}
+],
+"text": "\\"
+},
+{
+"input": "\\]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "]"
+}
+],
+"text": "]"
+},
+{
+"input": "\\^",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "^"
+}
+],
+"text": "^"
+},
+{
+"input": "\\_",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "_"
+}
+],
+"text": "_"
+},
+{
+"input": "\\`",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "`"
+}
+],
+"text": "`"
+},
+{
+"input": "\\{",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "{"
+}
+],
+"text": "{"
+},
+{
+"input": "\\|",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "|"
+}
+],
+"text": "|"
+},
+{
+"input": "\\}",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "}"
+}
+],
+"text": "}"
+},
+{
+"input": "\\~",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "~"
+}
+],
+"text": "~"
+},
+{
+"input": "\\a \\1 \\é",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\\a \\1 \\é"
+}
+],
+"text": "\\a \\1 \\é"
+},
+{
+"input": "trailing\\",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "trailing\\"
+}
+],
+"text": "trailing\\"
+},
+{
+"input": "a\\\\b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\\b"
+}
+],
+"text": "a\\b"
+},
+{
+"input": "\\\\*x*",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\\"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "x"
+}
+],
+"text": "\\x"
+},
+{
+"input": "line\\\n",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "line"
+},
+{
+"link": null,
+"styles": [],
+"text": "\n"
+}
+],
+"text": "line\n"
+},
+{
+"input": "\\\n",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\n"
+}
+],
+"text": "\n"
+},
+{
+"input": "&foo;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&foo;"
+}
+],
+"text": "&foo;"
+},
+{
+"input": "&#0;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#x110000;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#xD800;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#x41;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "A"
+}
+],
+"text": "A"
+},
+{
+"input": "&#X41;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "A"
+}
+],
+"text": "A"
+},
+{
+"input": "&#99999999;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&amp",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&amp"
+}
+],
+"text": "&amp"
+},
+{
+"input": "&AMP;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&"
+}
+],
+"text": "&"
+},
+{
+"input": "&ngE;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "≧̸"
+}
+],
+"text": "≧̸"
+},
+{
+"input": "&nbsp",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&nbsp"
+}
+],
+"text": "&nbsp"
+},
+{
+"input": "&#;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&#;"
+}
+],
+"text": "&#;"
+},
+{
+"input": "&#x;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&#x;"
+}
+],
+"text": "&#x;"
+},
+{
+"input": "&ThickSpace;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "  "
+}
+],
+"text": "  "
+},
+{
+"input": "&CounterClockwiseContourIntegral;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "∳"
+}
+],
+"text": "∳"
+},
+{
+"input": "[a](https://e.com/&amp;x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/&x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/&x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "&lt;b&gt;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<b>"
+}
+],
+"text": "<b>"
+},
+{
+"input": "a & b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a & b"
+}
+],
+"text": "a & b"
+},
+{
+"input": "&#65",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&#65"
+}
+],
+"text": "&#65"
+},
+{
+"input": "[a [b] c](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a [b] c"
+}
+],
+"text": "a [b] c"
+},
+{
+"input": "[a [b](https://x.com) c](https://e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a "
+},
+{
+"link": {
+"address": "https://x.com",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com"
+},
+"styles": [],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c]("
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "[a b c](https://e.com)"
+},
+{
+"input": "[a](https://e.com/(x)y)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/(x)y",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/(x)y"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/(x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]("
+},
+{
+"link": {
+"address": "https://e.com/(x)",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/(x)"
+},
+"styles": [],
+"text": "https://e.com/(x)"
+}
+],
+"text": "[a](https://e.com/(x)"
+},
+{
+"input": "[a](<https://e.com/a b> \"t\")",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%20b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%20b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com 't')",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com (t))",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com \"t\" x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]("
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": " \"t\" x)"
+}
+],
+"text": "[a](https://e.com \"t\" x)"
+},
+{
+"input": "[a]( https://e.com )",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](\nhttps://e.com\n)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](<>)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a]()",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[](https://e.com)",
+"runs": [],
+"text": ""
+},
+{
+"input": "[a](<https://e.com>)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com\\(x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com(x",
+"hasHiddenCharacters": false,
+"host": "e.com(x",
+"url": "https://e.com(x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a\\]b](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a]b"
+}
+],
+"text": "a]b"
+},
+{
+"input": "[a](https://e.com \"t\\\"q\")",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a] (https://e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a] ("
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "[a] (https://e.com)"
+},
+{
+"input": "[a]\n(https://e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]\n("
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "[a]\n(https://e.com)"
+},
+{
+"input": "^[x]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "^[x]"
+}
+],
+"text": "^[x]"
+},
+{
+"input": "^[x]y",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "^[x]y"
+}
+],
+"text": "^[x]y"
+},
+{
+"input": "^[x](y z)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "a^[x](y)b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "axb"
+}
+],
+"text": "axb"
+},
+{
+"input": "^[*x*](y)",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "^[x](https://e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "![a](b)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "![](x.png)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "￼"
+}
+],
+"text": "￼"
+},
+{
+"input": "!x",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "!x"
+}
+],
+"text": "!x"
+},
+{
+"input": "![a]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "![a]"
+}
+],
+"text": "![a]"
+},
+{
+"input": "[![i](https://img.example/x.png) j](https://example.com/a)",
+"runs": [
+{
+"link": {
+"address": "https://example.com/a",
+"hasHiddenCharacters": false,
+"host": "example.com",
+"url": "https://example.com/a"
+},
+"styles": [],
+"text": "i j"
+}
+],
+"text": "i j"
+},
+{
+"input": "![[a](https://e.com)](p.png)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com)[b](https://f.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+},
+{
+"link": {
+"address": "https://f.com",
+"hasHiddenCharacters": false,
+"host": "f.com",
+"url": "https://f.com"
+},
+"styles": [],
+"text": "b"
+}
+],
+"text": "ab"
+},
+{
+"input": "[a](mailto:a@b.com) [b](https://f.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a "
+},
+{
+"link": {
+"address": "https://f.com",
+"hasHiddenCharacters": false,
+"host": "f.com",
+"url": "https://f.com"
+},
+"styles": [],
+"text": "b"
+}
+],
+"text": "a b"
+},
+{
+"input": "[**b**](javascript:x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "b"
+}
+],
+"text": "b"
+},
+{
+"input": "[*a* b](foo)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "[x](https://e.com/a\"b<c>d[e]f)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%22b%3Cc%3Ed%5Be%5Df",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%22b%3Cc%3Ed%5Be%5Df"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a#b#c)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a#b%23c",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a#b%23c"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a?b?c#d?e)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a?b?c#d?e",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a?b?c#d?e"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a%41%4g%)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%41%254g%25",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%41%254g%25"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com:abc/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com:/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com:/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com:/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://[evil]/)",
+"runs": [
+{
+"link": {
+"address": "https://[evil]/",
+"hasHiddenCharacters": false,
+"host": "evil",
+"url": "https://[evil]/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://[::1/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e\\\\x.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://a@b@c.com/)",
+"runs": [
+{
+"link": {
+"address": "https://a%40b@c.com/",
+"hasHiddenCharacters": false,
+"host": "c.com",
+"url": "https://a%40b@c.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://u ser@c.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[x]("
+},
+{
+"link": {
+"address": "https://u",
+"hasHiddenCharacters": false,
+"host": "u",
+"url": "https://u"
+},
+"styles": [],
+"text": "https://u"
+},
+{
+"link": null,
+"styles": [],
+"text": " ser@c.com/)"
+}
+],
+"text": "[x](https://u ser@c.com/)"
+},
+{
+"input": "[x](https://ex.com/​x)",
+"runs": [
+{
+"link": {
+"address": "https://ex.com/%E2%80%8Bx",
+"hasHiddenCharacters": false,
+"host": "ex.com",
+"url": "https://ex.com/%E2%80%8Bx"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://ex.com/‎x)",
+"runs": [
+{
+"link": {
+"address": "https://ex.com/x",
+"hasHiddenCharacters": false,
+"host": "ex.com",
+"url": "https://ex.com/x"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://ex.com/­x)",
+"runs": [
+{
+"link": {
+"address": "https://ex.com/%C2%ADx",
+"hasHiddenCharacters": false,
+"host": "ex.com",
+"url": "https://ex.com/%C2%ADx"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e​.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e­.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://ex.com/a　b)",
+"runs": [
+{
+"link": {
+"address": "https://ex.com/a%E3%80%80b",
+"hasHiddenCharacters": false,
+"host": "ex.com",
+"url": "https://ex.com/a%E3%80%80b"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://BÜCHER.example/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--bcher-kva.example/",
+"hasHiddenCharacters": false,
+"host": "xn--bcher-kva.example",
+"url": "https://xn--bcher-kva.example/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com?q)",
+"runs": [
+{
+"link": {
+"address": "https://e.com?q",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com?q"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com#f)",
+"runs": [
+{
+"link": {
+"address": "https://e.com#f",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com#f"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https:/e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a\\b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%5Cb",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%5Cb"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e_x.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e_x.com/",
+"hasHiddenCharacters": false,
+"host": "e_x.com",
+"url": "https://e_x.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://*.com/)",
+"runs": [
+{
+"link": {
+"address": "https://*.com/",
+"hasHiddenCharacters": false,
+"host": "*.com",
+"url": "https://*.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e!.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e!.com/",
+"hasHiddenCharacters": false,
+"host": "e!.com",
+"url": "https://e!.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a b)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[x]("
+},
+{
+"link": {
+"address": "https://e.com/a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a"
+},
+"styles": [],
+"text": "https://e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": " b)"
+}
+],
+"text": "[x](https://e.com/a b)"
+},
+{
+"input": "[x](<https://e.com/a\tb>)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%09b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%09b"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://0/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://1.2.3.4/)",
+"runs": [
+{
+"link": {
+"address": "http://1.2.3.4/",
+"hasHiddenCharacters": false,
+"host": "1.2.3.4",
+"url": "http://1.2.3.4/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://256.1.1.1/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://1.2.3.4.5/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://0x/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://a.0x1F/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://a.0xg/)",
+"runs": [
+{
+"link": {
+"address": "http://a.0xg/",
+"hasHiddenCharacters": false,
+"host": "a.0xg",
+"url": "http://a.0xg/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://1e1/)",
+"runs": [
+{
+"link": {
+"address": "http://1e1/",
+"hasHiddenCharacters": false,
+"host": "1e1",
+"url": "http://1e1/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](http://a.123/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/~user)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/~user",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/~user"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/a'b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a'b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a'b"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](ftp://e.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](HtTpS://e.com/)",
+"runs": [
+{
+"link": {
+"address": "HtTpS://e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "HtTpS://e.com/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com/ä)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%C3%A4",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%C3%A4"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://e.com:8080)",
+"runs": [
+{
+"link": {
+"address": "https://e.com:8080",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com:8080"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://user@)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://[::1]x/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://[::1]:x/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "[x](https://[v1.a]/)",
+"runs": [
+{
+"link": {
+"address": "https://[v1.a]/",
+"hasHiddenCharacters": false,
+"host": "v1.a",
+"url": "https://[v1.a]/"
+},
+"styles": [],
+"text": "x"
+}
+],
+"text": "x"
+},
+{
+"input": "<https://e.com/a b>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<"
+},
+{
+"link": {
+"address": "https://e.com/a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a"
+},
+"styles": [],
+"text": "https://e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": " b>"
+}
+],
+"text": "<https://e.com/a b>"
+},
+{
+"input": "<https://e.com/a>b",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a"
+},
+"styles": [],
+"text": "https://e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "b"
+}
+],
+"text": "https://e.com/ab"
+},
+{
+"input": "<HTTPS://E.COM>",
+"runs": [
+{
+"link": {
+"address": "HTTPS://E.COM",
+"hasHiddenCharacters": false,
+"host": "E.COM",
+"url": "HTTPS://E.COM"
+},
+"styles": [],
+"text": "HTTPS://E.COM"
+}
+],
+"text": "HTTPS://E.COM"
+},
+{
+"input": "<ftp://e.com>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "ftp://e.com"
+}
+],
+"text": "ftp://e.com"
+},
+{
+"input": "<javascript:alert(1)>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "javascript:alert(1)"
+}
+],
+"text": "javascript:alert(1)"
+},
+{
+"input": "<irc://foo.bar:2233/baz>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "irc://foo.bar:2233/baz"
+}
+],
+"text": "irc://foo.bar:2233/baz"
+},
+{
+"input": "<a+b@c.d>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a+b@c.d"
+}
+],
+"text": "a+b@c.d"
+},
+{
+"input": "<made-up-scheme://foo,bar>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "made-up-scheme://foo,bar"
+}
+],
+"text": "made-up-scheme://foo,bar"
+},
+{
+"input": "<localhost:5001/foo>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "localhost:5001/foo"
+}
+],
+"text": "localhost:5001/foo"
+},
+{
+"input": "< https://e.com>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "< https://e.com>"
+}
+],
+"text": "< https://e.com>"
+},
+{
+"input": "http://x.com/a.",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "."
+}
+],
+"text": "http://x.com/a."
+},
+{
+"input": "http://x.com/a)",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "http://x.com/a)"
+},
+{
+"input": "http://x.com/(a)",
+"runs": [
+{
+"link": {
+"address": "http://x.com/(a)",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/(a)"
+},
+"styles": [],
+"text": "http://x.com/(a)"
+}
+],
+"text": "http://x.com/(a)"
+},
+{
+"input": "http://x.com/((a)",
+"runs": [
+{
+"link": {
+"address": "http://x.com/((a)",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/((a)"
+},
+"styles": [],
+"text": "http://x.com/((a)"
+}
+],
+"text": "http://x.com/((a)"
+},
+{
+"input": "http://x.com/a&amp;",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "&"
+}
+],
+"text": "http://x.com/a&"
+},
+{
+"input": "http://x.com/a&b;",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "&b;"
+}
+],
+"text": "http://x.com/a&b;"
+},
+{
+"input": "http://x.com/a?",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "?"
+}
+],
+"text": "http://x.com/a?"
+},
+{
+"input": "http://x.com/a!",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "!"
+}
+],
+"text": "http://x.com/a!"
+},
+{
+"input": "http://x.com/a:",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": ":"
+}
+],
+"text": "http://x.com/a:"
+},
+{
+"input": "http://x.com/a*",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "http://x.com/a*"
+},
+{
+"input": "http://x.com/a_",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "_"
+}
+],
+"text": "http://x.com/a_"
+},
+{
+"input": "http://x.com/a~",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "~"
+}
+],
+"text": "http://x.com/a~"
+},
+{
+"input": "http://x.com/a'",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "'"
+}
+],
+"text": "http://x.com/a'"
+},
+{
+"input": "http://x.com/a\"",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "\""
+}
+],
+"text": "http://x.com/a\""
+},
+{
+"input": "http://x.com/a<b",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a"
+},
+"styles": [],
+"text": "http://x.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "<b"
+}
+],
+"text": "http://x.com/a<b"
+},
+{
+"input": "http://localhost/x",
+"runs": [
+{
+"link": {
+"address": "http://localhost/x",
+"hasHiddenCharacters": false,
+"host": "localhost",
+"url": "http://localhost/x"
+},
+"styles": [],
+"text": "http://localhost/x"
+}
+],
+"text": "http://localhost/x"
+},
+{
+"input": "http://localhost:3000/x",
+"runs": [
+{
+"link": {
+"address": "http://localhost:3000/x",
+"hasHiddenCharacters": false,
+"host": "localhost",
+"url": "http://localhost:3000/x"
+},
+"styles": [],
+"text": "http://localhost:3000/x"
+}
+],
+"text": "http://localhost:3000/x"
+},
+{
+"input": "http://x",
+"runs": [
+{
+"link": {
+"address": "http://x",
+"hasHiddenCharacters": false,
+"host": "x",
+"url": "http://x"
+},
+"styles": [],
+"text": "http://x"
+}
+],
+"text": "http://x"
+},
+{
+"input": "http://",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://"
+}
+],
+"text": "http://"
+},
+{
+"input": "http://_x.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://_x.com"
+}
+],
+"text": "http://_x.com"
+},
+{
+"input": "http://a.b_c.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://a.b_c.com"
+}
+],
+"text": "http://a.b_c.com"
+},
+{
+"input": "http://a_b.c.com",
+"runs": [
+{
+"link": {
+"address": "http://a_b.c.com",
+"hasHiddenCharacters": false,
+"host": "a_b.c.com",
+"url": "http://a_b.c.com"
+},
+"styles": [],
+"text": "http://a_b.c.com"
+}
+],
+"text": "http://a_b.c.com"
+},
+{
+"input": "xhttp://a.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "xhttp://a.com"
+}
+],
+"text": "xhttp://a.com"
+},
+{
+"input": "Http://a.com",
+"runs": [
+{
+"link": {
+"address": "Http://a.com",
+"hasHiddenCharacters": false,
+"host": "a.com",
+"url": "Http://a.com"
+},
+"styles": [],
+"text": "Http://a.com"
+}
+],
+"text": "Http://a.com"
+},
+{
+"input": "HTTPS://A.COM/X",
+"runs": [
+{
+"link": {
+"address": "HTTPS://A.COM/X",
+"hasHiddenCharacters": false,
+"host": "A.COM",
+"url": "HTTPS://A.COM/X"
+},
+"styles": [],
+"text": "HTTPS://A.COM/X"
+}
+],
+"text": "HTTPS://A.COM/X"
+},
+{
+"input": "ftp://a.com/x",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "ftp://a.com/x"
+}
+],
+"text": "ftp://a.com/x"
+},
+{
+"input": "mailto:x@y.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "mailto:x@y.com"
+}
+],
+"text": "mailto:x@y.com"
+},
+{
+"input": "https://a.com/ä",
+"runs": [
+{
+"link": {
+"address": "https://a.com/%C3%A4",
+"hasHiddenCharacters": false,
+"host": "a.com",
+"url": "https://a.com/%C3%A4"
+},
+"styles": [],
+"text": "https://a.com/ä"
+}
+],
+"text": "https://a.com/ä"
+},
+{
+"input": "https://ä.com/x",
+"runs": [
+{
+"link": {
+"address": "https://xn--4ca.com/x",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.com",
+"url": "https://xn--4ca.com/x"
+},
+"styles": [],
+"text": "https://ä.com/x"
+}
+],
+"text": "https://ä.com/x"
+},
+{
+"input": "www.e.com",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [],
+"text": "www.e.com"
+}
+],
+"text": "www.e.com"
+},
+{
+"input": "www.e",
+"runs": [
+{
+"link": {
+"address": "http://www.e",
+"hasHiddenCharacters": false,
+"host": "www.e",
+"url": "http://www.e"
+},
+"styles": [],
+"text": "www.e"
+}
+],
+"text": "www.e"
+},
+{
+"input": "awww.e.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "awww.e.com"
+}
+],
+"text": "awww.e.com"
+},
+{
+"input": "(www.e.com)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "("
+},
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [],
+"text": "www.e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "(www.e.com)"
+},
+{
+"input": "*www.e.com*",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [
+"em"
+],
+"text": "www.e.com"
+}
+],
+"text": "www.e.com"
+},
+{
+"input": "_www.e.com_",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [
+"em"
+],
+"text": "www.e.com"
+}
+],
+"text": "www.e.com"
+},
+{
+"input": "~www.e.com~",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [
+"strike"
+],
+"text": "www.e.com"
+}
+],
+"text": "www.e.com"
+},
+{
+"input": "www.e.com/a.",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com/a",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com/a"
+},
+"styles": [],
+"text": "www.e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "."
+}
+],
+"text": "www.e.com/a."
+},
+{
+"input": "WWW.e.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "WWW.e.com"
+}
+],
+"text": "WWW.e.com"
+},
+{
+"input": "www.e_x.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "www.e_x.com"
+}
+],
+"text": "www.e_x.com"
+},
+{
+"input": "x www.e.com/a?b=c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x "
+},
+{
+"link": {
+"address": "http://www.e.com/a?b=c",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com/a?b=c"
+},
+"styles": [],
+"text": "www.e.com/a?b=c"
+}
+],
+"text": "x www.e.com/a?b=c"
+},
+{
+"input": "[www.e.com](https://f.com)",
+"runs": [
+{
+"link": {
+"address": "https://f.com",
+"hasHiddenCharacters": false,
+"host": "f.com",
+"url": "https://f.com"
+},
+"styles": [],
+"text": "www.e.com"
+}
+],
+"text": "www.e.com"
+},
+{
+"input": "[see http://x.com](https://f.com)",
+"runs": [
+{
+"link": {
+"address": "https://f.com",
+"hasHiddenCharacters": false,
+"host": "f.com",
+"url": "https://f.com"
+},
+"styles": [],
+"text": "see http://x.com"
+}
+],
+"text": "see http://x.com"
+},
+{
+"input": "`http://x.com`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "http://x.com"
+}
+],
+"text": "http://x.com"
+},
+{
+"input": "**http://x.com**",
+"runs": [
+{
+"link": {
+"address": "http://x.com",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com"
+},
+"styles": [
+"strong"
+],
+"text": "http://x.com"
+}
+],
+"text": "http://x.com"
+},
+{
+"input": "*http://x.com*",
+"runs": [
+{
+"link": {
+"address": "http://x.com",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com"
+},
+"styles": [
+"em"
+],
+"text": "http://x.com"
+}
+],
+"text": "http://x.com"
+},
+{
+"input": "http://x.com*",
+"runs": [
+{
+"link": {
+"address": "http://x.com",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com"
+},
+"styles": [],
+"text": "http://x.com"
+},
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "http://x.com*"
+},
+{
+"input": "http://x.com/a*b*",
+"runs": [
+{
+"link": {
+"address": "http://x.com/a*b",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "http://x.com/a*b"
+},
+"styles": [],
+"text": "http://x.com/a*b"
+},
+{
+"link": null,
+"styles": [],
+"text": "*"
+}
+],
+"text": "http://x.com/a*b*"
+},
+{
+"input": "https://e.com/a\nb",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a"
+},
+"styles": [],
+"text": "https://e.com/a"
+},
+{
+"link": null,
+"styles": [],
+"text": "\nb"
+}
+],
+"text": "https://e.com/a\nb"
+},
+{
+"input": "https://e.com/a b",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%C2%A0b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%C2%A0b"
+},
+"styles": [],
+"text": "https://e.com/a b"
+}
+],
+"text": "https://e.com/a b"
+},
+{
+"input": "https://e.com/a　b",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%E3%80%80b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%E3%80%80b"
+},
+"styles": [],
+"text": "https://e.com/a　b"
+}
+],
+"text": "https://e.com/a　b"
+},
+{
+"input": "https://e.com/​",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%80%8B",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%80%8B"
+},
+"styles": [],
+"text": "https://e.com/​"
+}
+],
+"text": "https://e.com/​"
+},
+{
+"input": "https://e.com/a‮b",
+"runs": [
+{
+"link": {
+"address": "https://e.com/ab",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/ab"
+},
+"styles": [],
+"text": "https://e.com/a‮b"
+}
+],
+"text": "https://e.com/a‮b"
+},
+{
+"input": "foo@bar.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "foo@bar.com"
+}
+],
+"text": "foo@bar.com"
+},
+{
+"input": "a.b@c.d.e",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a.b@c.d.e"
+}
+],
+"text": "a.b@c.d.e"
+},
+{
+"input": "https://x.com:8080/a",
+"runs": [
+{
+"link": {
+"address": "https://x.com:8080/a",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com:8080/a"
+},
+"styles": [],
+"text": "https://x.com:8080/a"
+}
+],
+"text": "https://x.com:8080/a"
+},
+{
+"input": "https://user:pw@x.com/",
+"runs": [
+{
+"link": {
+"address": "https://user:pw@x.com/",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://user:pw@x.com/"
+},
+"styles": [],
+"text": "https://user:pw@x.com/"
+}
+],
+"text": "https://user:pw@x.com/"
+},
+{
+"input": "https://x.com/a#b",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a#b",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a#b"
+},
+"styles": [],
+"text": "https://x.com/a#b"
+}
+],
+"text": "https://x.com/a#b"
+},
+{
+"input": "https://x.com/a%20b",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a%20b",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a%20b"
+},
+"styles": [],
+"text": "https://x.com/a%20b"
+}
+],
+"text": "https://x.com/a%20b"
+},
+{
+"input": "https://x.com/a|b",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a%7Cb",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a%7Cb"
+},
+"styles": [],
+"text": "https://x.com/a|b"
+}
+],
+"text": "https://x.com/a|b"
+},
+{
+"input": "https://x.com/a{b}",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a%7Bb%7D",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a%7Bb%7D"
+},
+"styles": [],
+"text": "https://x.com/a{b}"
+}
+],
+"text": "https://x.com/a{b}"
+},
+{
+"input": "https://x.com/a`b`",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a%60b%60",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a%60b%60"
+},
+"styles": [],
+"text": "https://x.com/a`b`"
+}
+],
+"text": "https://x.com/a`b`"
+},
+{
+"input": "https://x.com/a\\b",
+"runs": [
+{
+"link": {
+"address": "https://x.com/a%5Cb",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/a%5Cb"
+},
+"styles": [],
+"text": "https://x.com/a\\b"
+}
+],
+"text": "https://x.com/a\\b"
+},
+{
+"input": "https://x.com/[a]",
+"runs": [
+{
+"link": {
+"address": "https://x.com/%5Ba%5D",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/%5Ba%5D"
+},
+"styles": [],
+"text": "https://x.com/[a]"
+}
+],
+"text": "https://x.com/[a]"
+},
+{
+"input": "https://x.com/<a>",
+"runs": [
+{
+"link": {
+"address": "https://x.com/",
+"hasHiddenCharacters": false,
+"host": "x.com",
+"url": "https://x.com/"
+},
+"styles": [],
+"text": "https://x.com/"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<a>"
+}
+],
+"text": "https://x.com/<a>"
+},
+{
+"input": "http://www.e.com",
+"runs": [
+{
+"link": {
+"address": "http://www.e.com",
+"hasHiddenCharacters": false,
+"host": "www.e.com",
+"url": "http://www.e.com"
+},
+"styles": [],
+"text": "http://www.e.com"
+}
+],
+"text": "http://www.e.com"
+},
+{
+"input": "https://e.com.",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": "."
+}
+],
+"text": "https://e.com."
+},
+{
+"input": "https://e.com,x",
+"runs": [
+{
+"link": {
+"address": "https://e.com,x",
+"hasHiddenCharacters": false,
+"host": "e.com,x",
+"url": "https://e.com,x"
+},
+"styles": [],
+"text": "https://e.com,x"
+}
+],
+"text": "https://e.com,x"
+},
+{
+"input": "https://e..com",
+"runs": [
+{
+"link": {
+"address": "https://e..com",
+"hasHiddenCharacters": false,
+"host": "e..com",
+"url": "https://e..com"
+},
+"styles": [],
+"text": "https://e..com"
+}
+],
+"text": "https://e..com"
+},
+{
+"input": "<a href=\"*x*\">*y*</a>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<a href=\"*x*\">"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "y"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</a>"
+}
+],
+"text": "<a href=\"*x*\">y</a>"
+},
+{
+"input": "<b>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b>"
+}
+],
+"text": "<b>"
+},
+{
+"input": "</b>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</b>"
+}
+],
+"text": "</b>"
+},
+{
+"input": "<b/>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b/>"
+}
+],
+"text": "<b/>"
+},
+{
+"input": "<b x=1>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b x=1>"
+}
+],
+"text": "<b x=1>"
+},
+{
+"input": "<b x='a>b'>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b x='a>b'>"
+}
+],
+"text": "<b x='a>b'>"
+},
+{
+"input": "<1b>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<1b>"
+}
+],
+"text": "<1b>"
+},
+{
+"input": "<b\nx=1>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b\nx=1>"
+}
+],
+"text": "<b\nx=1>"
+},
+{
+"input": "<!---->",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<!---->"
+}
+],
+"text": "<!---->"
+},
+{
+"input": "<!-- a -- b -->",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<!-- a -- b -->"
+}
+],
+"text": "<!-- a -- b -->"
+},
+{
+"input": "<?php x ?>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<?php x ?>"
+}
+],
+"text": "<?php x ?>"
+},
+{
+"input": "<!DOCTYPE html>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<!DOCTYPE html>"
+}
+],
+"text": "<!DOCTYPE html>"
+},
+{
+"input": "<![CDATA[x]]>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<![CDATA[x]]>"
+}
+],
+"text": "<![CDATA[x]]>"
+},
+{
+"input": "<img src=x onerror=alert(1)>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<img src=x onerror=alert(1)>"
+}
+],
+"text": "<img src=x onerror=alert(1)>"
+},
+{
+"input": "a <3 b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a <3 b"
+}
+],
+"text": "a <3 b"
+},
+{
+"input": "a < b > c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a < b > c"
+}
+],
+"text": "a < b > c"
+},
+{
+"input": "<a href='https://e.com'>x</a>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<a href='https://e.com'>"
+},
+{
+"link": null,
+"styles": [],
+"text": "x"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</a>"
+}
+],
+"text": "<a href='https://e.com'>x</a>"
+},
+{
+"input": "<b>*x*</b>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b>"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "x"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "</b>"
+}
+],
+"text": "<b>x</b>"
+},
+{
+"input": "<_b>",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<_b>"
+}
+],
+"text": "<_b>"
+},
+{
+"input": "<b-c>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b-c>"
+}
+],
+"text": "<b-c>"
+},
+{
+"input": "<b data-x>",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b data-x>"
+}
+],
+"text": "<b data-x>"
+},
+{
+"input": "<b x=\"\">",
+"runs": [
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<b x=\"\">"
+}
+],
+"text": "<b x=\"\">"
+},
+{
+"input": "a\n  b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\n  b"
+}
+],
+"text": "a\n  b"
+},
+{
+"input": "a \nb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a \nb"
+}
+],
+"text": "a \nb"
+},
+{
+"input": "a\n\n\nb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\n\n\nb"
+}
+],
+"text": "a\n\n\nb"
+},
+{
+"input": "  \n  ",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "  \n  "
+}
+],
+"text": "  \n  "
+},
+{
+"input": "a\t\tb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\t\tb"
+}
+],
+"text": "a\t\tb"
+},
+{
+"input": " a",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": " a"
+}
+],
+"text": " a"
+},
+{
+"input": "a ",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a "
+}
+],
+"text": "a "
+},
+{
+"input": "a  ",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a  "
+}
+],
+"text": "a  "
+},
+{
+"input": "\na",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "\na"
+}
+],
+"text": "\na"
+},
+{
+"input": "a\n",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\n"
+}
+],
+"text": "a\n"
+},
+{
+"input": "*a*\n*b*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": "\n"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "a\r\nb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\nb"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "a\rb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\nb"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "　a　",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "　a　"
+}
+],
+"text": "　a　"
+},
+{
+"input": "~a ~b~ c~ d",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c d"
+}
+],
+"text": "a b c d"
+},
+{
+"input": "~~a ~~b~~ c~~",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "*a *b* c* d",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c d"
+}
+],
+"text": "a b c d"
+},
+{
+"input": "_a _b_ c_",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "**a *b* c**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em",
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "*a ~~b~~ c*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em",
+"strike"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "~~a *b* c~~",
+"runs": [
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em",
+"strike"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"strike"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "*a [b](https://e.com) c*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a "
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [
+"em"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "*a [b *c* d](https://e.com) e*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a "
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [
+"em"
+],
+"text": "b c d"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " e"
+}
+],
+"text": "a b c d e"
+},
+{
+"input": "**a [b](https://e.com) c**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "a "
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "[a\nb](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a\nb"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "[a\\\nb](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "ab"
+}
+],
+"text": "ab"
+},
+{
+"input": "[![](x.png)](https://e.com)",
+"runs": [],
+"text": ""
+},
+{
+"input": "[a ![](x.png)](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a "
+}
+],
+"text": "a "
+},
+{
+"input": "x ![](a) y",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x "
+},
+{
+"link": null,
+"styles": [],
+"text": "￼"
+},
+{
+"link": null,
+"styles": [],
+"text": " y"
+}
+],
+"text": "x ￼ y"
+},
+{
+"input": "![a\nb](x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\nb"
+}
+],
+"text": "a\nb"
+},
+{
+"input": "![&amp;](x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&"
+}
+],
+"text": "&"
+},
+{
+"input": "[&amp;](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "&"
+}
+],
+"text": "&"
+},
+{
+"input": "*a `b` c*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em",
+"code"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": " c"
+}
+],
+"text": "a b c"
+},
+{
+"input": "**`a`**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong",
+"code"
+],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "~~`a`~~",
+"runs": [
+{
+"link": null,
+"styles": [
+"code",
+"strike"
+],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com) *b*",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+}
+],
+"text": "a b"
+},
+{
+"input": "^[a *b* c](y) d",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a "
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": " c d"
+}
+],
+"text": "a b c d"
+},
+{
+"input": "*^[a](y) b*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "^[a](y)^[b](z)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "ab"
+}
+],
+"text": "ab"
+},
+{
+"input": "^[[a](https://e.com)](y)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[^[a](y)](https://e.com)",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "^[a]",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "^[a]"
+}
+],
+"text": "^[a]"
+},
+{
+"input": "^[a](",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "^[a]("
+}
+],
+"text": "^[a]("
+},
+{
+"input": "[a](https://e.com/⁦x⁩)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/؜x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/‏x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/‪x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/﻿x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%EF%BB%BFx",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%EF%BB%BFx"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/ x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%80%A8x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%80%A8x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/\u0007x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%07x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%07x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%7Fx",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%7Fx"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/?q=‮)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/?q=",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/?q="
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/#‮)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/#",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/#"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://us‮er@e.com/)",
+"runs": [
+{
+"link": {
+"address": "https://user@e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://user@e.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/‍x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%80%8Dx",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%80%8Dx"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/‌x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%80%8Cx",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%80%8Cx"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/⁠x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%81%A0x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%81%A0x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/󠁁x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%F3%A0%81%81x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%F3%A0%81%81x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e‮.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://а‮.com/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--80a.com/",
+"hasHiddenCharacters": false,
+"host": "xn--80a.com",
+"url": "https://xn--80a.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/ )",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%C2%A0",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%C2%A0"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/%)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%25",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%25"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/%4)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%254",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%254"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/%c3%a4)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%c3%a4",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%c3%a4"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://E.com/A?B#C)",
+"runs": [
+{
+"link": {
+"address": "https://E.com/A?B#C",
+"hasHiddenCharacters": false,
+"host": "E.com",
+"url": "https://E.com/A?B#C"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a\"b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%22b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%22b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/?a=<b>)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/?a=%3Cb%3E",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/?a=%3Cb%3E"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/#a b)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]("
+},
+{
+"link": {
+"address": "https://e.com/#a",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/#a"
+},
+"styles": [],
+"text": "https://e.com/#a"
+},
+{
+"link": null,
+"styles": [],
+"text": " b)"
+}
+],
+"text": "[a](https://e.com/#a b)"
+},
+{
+"input": "[a](<https://e.com/#a b>)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/#a%20b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/#a%20b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://us\"er@e.com/)",
+"runs": [
+{
+"link": {
+"address": "https://us%22er@e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://us%22er@e.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://us|er@e.com/)",
+"runs": [
+{
+"link": {
+"address": "https://us%7Cer@e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://us%7Cer@e.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://u:p:q@e.com/)",
+"runs": [
+{
+"link": {
+"address": "https://u:p%3Aq@e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://u:p%3Aq@e.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com:80:80/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com:0080/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com:0080/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com:0080/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://:80/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com\\x/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com\\@f.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e.com@f.com/",
+"hasHiddenCharacters": false,
+"host": "f.com",
+"url": "https://e.com@f.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e%41.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com%/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e<.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e^.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e{.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e\".com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e`.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e|.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e~.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e~.com/",
+"hasHiddenCharacters": false,
+"host": "e~.com",
+"url": "https://e~.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.c$m/)",
+"runs": [
+{
+"link": {
+"address": "https://e.c$m/",
+"hasHiddenCharacters": false,
+"host": "e.c$m",
+"url": "https://e.c$m/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e&b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e&b.com/",
+"hasHiddenCharacters": false,
+"host": "e&b.com",
+"url": "https://e&b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e=b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e=b.com/",
+"hasHiddenCharacters": false,
+"host": "e=b.com",
+"url": "https://e=b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e+b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e+b.com/",
+"hasHiddenCharacters": false,
+"host": "e+b.com",
+"url": "https://e+b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e'b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e'b.com/",
+"hasHiddenCharacters": false,
+"host": "e'b.com",
+"url": "https://e'b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e(b).com/)",
+"runs": [
+{
+"link": {
+"address": "https://e(b).com/",
+"hasHiddenCharacters": false,
+"host": "e(b).com",
+"url": "https://e(b).com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e,b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e,b.com/",
+"hasHiddenCharacters": false,
+"host": "e,b.com",
+"url": "https://e,b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e;b.com/)",
+"runs": [
+{
+"link": {
+"address": "https://e;b.com/",
+"hasHiddenCharacters": false,
+"host": "e;b.com",
+"url": "https://e;b.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[::1]/)",
+"runs": [
+{
+"link": {
+"address": "https://[::1]/",
+"hasHiddenCharacters": false,
+"host": "::1",
+"url": "https://[::1]/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[::g]/)",
+"runs": [
+{
+"link": {
+"address": "https://[::g]/",
+"hasHiddenCharacters": false,
+"host": "::g",
+"url": "https://[::g]/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[1.2.3.4]/)",
+"runs": [
+{
+"link": {
+"address": "https://[1.2.3.4]/",
+"hasHiddenCharacters": false,
+"host": "1.2.3.4",
+"url": "https://[1.2.3.4]/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[a b]/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a](https://[a b]/)"
+}
+],
+"text": "[a](https://[a b]/)"
+},
+{
+"input": "[a](https://[::1%25en0]/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[::1]]/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[[::1]/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[::1]:/)",
+"runs": [
+{
+"link": {
+"address": "https://[::1]:/",
+"hasHiddenCharacters": false,
+"host": "::1",
+"url": "https://[::1]:/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://[]/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](http://e.com?a#b?c#d)",
+"runs": [
+{
+"link": {
+"address": "http://e.com?a#b?c%23d",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "http://e.com?a#b?c%23d"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com//x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com//x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com//x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/./../x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/./../x",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/./../x"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https:///)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com　/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://xn--.com/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--.com/",
+"hasHiddenCharacters": false,
+"host": "xn--.com",
+"url": "https://xn--.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://ä.ä/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--4ca.xn--4ca/",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.xn--4ca",
+"url": "https://xn--4ca.xn--4ca/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://ä..com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://.ä/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://ä%41.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://Ä.com/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--4ca.com/",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.com",
+"url": "https://xn--4ca.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://١٢.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://Ａ.com/)",
+"runs": [
+{
+"link": {
+"address": "https://a.com/",
+"hasHiddenCharacters": false,
+"host": "a.com",
+"url": "https://a.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://a．b/)",
+"runs": [
+{
+"link": {
+"address": "https://a.b/",
+"hasHiddenCharacters": false,
+"host": "a.b",
+"url": "https://a.b/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://a。b/)",
+"runs": [
+{
+"link": {
+"address": "https://a.b/",
+"hasHiddenCharacters": false,
+"host": "a.b",
+"url": "https://a.b/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://①.com/)",
+"runs": [
+{
+"link": {
+"address": "https://1.com/",
+"hasHiddenCharacters": false,
+"host": "1.com",
+"url": "https://1.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/😀)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%F0%9F%98%80",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%F0%9F%98%80"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://😀.com/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--e28h.com/",
+"hasHiddenCharacters": false,
+"host": "xn--e28h.com",
+"url": "https://xn--e28h.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://1.2.3.٤/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](HTTPS://ä.com/)",
+"runs": [
+{
+"link": {
+"address": "HTTPS://xn--4ca.com/",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.com",
+"url": "HTTPS://xn--4ca.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](hättps://e.com/)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/\\\\x)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%5Cx",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%5Cx"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a\\_b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a_b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a_b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a\\nb)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%5Cnb",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%5Cnb"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a&#32;b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%20b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%20b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a&#10;b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%0Ab",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%0Ab"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a&#0;b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%EF%BF%BDb",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%EF%BF%BDb"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/a&nbsp;b)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%C2%A0b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%C2%A0b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com \"a\nb\")",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com\n\"t\")",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com\"t\")",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com'x')",
+"runs": [
+{
+"link": {
+"address": "https://e.com'x'",
+"hasHiddenCharacters": false,
+"host": "e.com'x'",
+"url": "https://e.com'x'"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](  <https://e.com>  )",
+"runs": [
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](<https://e.com>x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]("
+},
+{
+"link": {
+"address": "https://e.com",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com"
+},
+"styles": [],
+"text": "https://e.com"
+},
+{
+"link": null,
+"styles": [],
+"text": "x)"
+}
+],
+"text": "[a](https://e.comx)"
+},
+{
+"input": "[a](<https://e.com\\>>)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](<https://e.com/<x>)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a](<"
+},
+{
+"link": {
+"address": "https://e.com/",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/"
+},
+"styles": [],
+"text": "https://e.com/"
+},
+{
+"link": null,
+"styles": [
+"html"
+],
+"text": "<x>"
+},
+{
+"link": null,
+"styles": [],
+"text": ")"
+}
+],
+"text": "[a](<https://e.com/<x>)"
+},
+{
+"input": "[a](https://e.com/\\))",
+"runs": [
+{
+"link": {
+"address": "https://e.com/)",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/)"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/((x)))",
+"runs": [
+{
+"link": {
+"address": "https://e.com/((x))",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/((x))"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://e.com/((((((((((((((((((((((((((((((((x))))))))))))))))))))))))))))))))",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "[a]("
+},
+{
+"link": {
+"address": "https://e.com/((((((((((((((((((((((((((((((((x))))))))))))))))))))))))))))))))",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/((((((((((((((((((((((((((((((((x))))))))))))))))))))))))))))))))"
+},
+"styles": [],
+"text": "https://e.com/((((((((((((((((((((((((((((((((x))))))))))))))))))))))))))))))))"
+}
+],
+"text": "[a](https://e.com/((((((((((((((((((((((((((((((((x))))))))))))))))))))))))))))))))"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9ldmlsLmV4YW1wbGUveA)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9ldmlsLmV4YW1wbGUveA=)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](PARLEY-LINK:aHR0cHM6Ly9ldmlsLmV4YW1wbGUveA==)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9ldmlsLmV4YW1wbGUveA==%0A)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly/ldmlsLmV4YW1wbGUveA==)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9lIGQuY29tLw==)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9lLmNvbS/DpA==)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%C3%A4",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%C3%A4"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly/DpC5jb20v)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cDovLzAxMC4xLjEuMS8=)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link://x)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9lLmNvbS8g)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%20",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%20"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "a b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a b"
+}
+],
+"text": "a b"
+},
+{
+"input": "a\u000bb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\u000bb"
+}
+],
+"text": "a\u000bb"
+},
+{
+"input": "a\fb",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a\fb"
+}
+],
+"text": "a\fb"
+},
+{
+"input": "a\u0000b",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a�b"
+}
+],
+"text": "a�b"
+},
+{
+"input": "**a** **b**",
+"runs": [
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "b"
+}
+],
+"text": "a b"
+},
+{
+"input": "a**b**c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": "c"
+}
+],
+"text": "abc"
+},
+{
+"input": "é**b**é",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "é"
+},
+{
+"link": null,
+"styles": [
+"strong"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": "é"
+}
+],
+"text": "ébé"
+},
+{
+"input": "*a*　*b*",
+"runs": [
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": "　"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+}
+],
+"text": "a　b"
+},
+{
+"input": "a　*b*　c",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a　"
+},
+{
+"link": null,
+"styles": [
+"em"
+],
+"text": "b"
+},
+{
+"link": null,
+"styles": [],
+"text": "　c"
+}
+],
+"text": "a　b　c"
+},
+{
+"input": "`a` `b`",
+"runs": [
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "a"
+},
+{
+"link": null,
+"styles": [],
+"text": " "
+},
+{
+"link": null,
+"styles": [
+"code"
+],
+"text": "b"
+}
+],
+"text": "a b"
+},
+{
+"input": "&#x1F600;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "😀"
+}
+],
+"text": "😀"
+},
+{
+"input": "&#128512;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "😀"
+}
+],
+"text": "😀"
+},
+{
+"input": "&#x0;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#xFFFE;",
+"runs": [],
+"text": ""
+},
+{
+"input": "&#xFFFF;",
+"runs": [],
+"text": ""
+},
+{
+"input": "&#x80;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": ""
+}
+],
+"text": ""
+},
+{
+"input": "&#1234567;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#12345678;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&#x12345678;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "�"
+}
+],
+"text": "�"
+},
+{
+"input": "&Amacr;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "Ā"
+}
+],
+"text": "Ā"
+},
+{
+"input": "&amp;amp;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&amp;"
+}
+],
+"text": "&amp;"
+},
+{
+"input": "\\&amp;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&amp;"
+}
+],
+"text": "&amp;"
+},
+{
+"input": "&\\amp;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&\\amp;"
+}
+],
+"text": "&\\amp;"
+},
+{
+"input": "&a1;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&a1;"
+}
+],
+"text": "&a1;"
+},
+{
+"input": "&quot",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&quot"
+}
+],
+"text": "&quot"
+},
+{
+"input": "&lt",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "&lt"
+}
+],
+"text": "&lt"
+},
+{
+"input": "&lt;&gt;&quot;&apos;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "<>\"'"
+}
+],
+"text": "<>\"'"
+},
+{
+"input": "&nbsp;&nbsp;",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "  "
+}
+],
+"text": "  "
+},
+{
+"input": "http://ä",
+"runs": [
+{
+"link": {
+"address": "http://xn--4ca",
+"hasHiddenCharacters": false,
+"host": "xn--4ca",
+"url": "http://xn--4ca"
+},
+"styles": [],
+"text": "http://ä"
+}
+],
+"text": "http://ä"
+},
+{
+"input": "http://äx.com/",
+"runs": [
+{
+"link": {
+"address": "http://xn--x-zfa.com/",
+"hasHiddenCharacters": false,
+"host": "xn--x-zfa.com",
+"url": "http://xn--x-zfa.com/"
+},
+"styles": [],
+"text": "http://äx.com/"
+}
+],
+"text": "http://äx.com/"
+},
+{
+"input": "http://-a.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://-a.com"
+}
+],
+"text": "http://-a.com"
+},
+{
+"input": "http://.a.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://.a.com"
+}
+],
+"text": "http://.a.com"
+},
+{
+"input": "http://[::1]/",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://[::1]/"
+}
+],
+"text": "http://[::1]/"
+},
+{
+"input": "http://%41.com",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "http://%41.com"
+}
+],
+"text": "http://%41.com"
+},
+{
+"input": "http://éx.com",
+"runs": [
+{
+"link": {
+"address": "http://xn--x-9fa.com",
+"hasHiddenCharacters": false,
+"host": "xn--x-9fa.com",
+"url": "http://xn--x-9fa.com"
+},
+"styles": [],
+"text": "http://éx.com"
+}
+],
+"text": "http://éx.com"
+},
+{
+"input": "x http://日本.jp/a",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "x "
+},
+{
+"link": {
+"address": "http://xn--wgv71a.jp/a",
+"hasHiddenCharacters": false,
+"host": "xn--wgv71a.jp",
+"url": "http://xn--wgv71a.jp/a"
+},
+"styles": [],
+"text": "http://日本.jp/a"
+}
+],
+"text": "x http://日本.jp/a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly94bi0tNGNhLmNvbS8=)",
+"runs": [
+{
+"link": {
+"address": "https://xn--4ca.com/",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.com",
+"url": "https://xn--4ca.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](https://ä.com/)",
+"runs": [
+{
+"link": {
+"address": "https://xn--4ca.com/",
+"hasHiddenCharacters": false,
+"host": "xn--4ca.com",
+"url": "https://xn--4ca.com/"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9lLmNvbS9hIGI=)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/a%20b",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/a%20b"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly/DhC5jb20v)",
+"runs": [
+{
+"link": null,
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+},
+{
+"input": "[a](parley-link:aHR0cHM6Ly9lLmNvbS/igK4=)",
+"runs": [
+{
+"link": {
+"address": "https://e.com/%E2%80%AE",
+"hasHiddenCharacters": false,
+"host": "e.com",
+"url": "https://e.com/%E2%80%AE"
+},
+"styles": [],
+"text": "a"
+}
+],
+"text": "a"
+}
+]
