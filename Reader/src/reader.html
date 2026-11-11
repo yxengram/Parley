@@ -885,24 +885,32 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   };
   const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   /**
-   * The browser's first language decides, as in the app: Chinese in any script or region gives
-   * Simplified Chinese, anything else English (also when Chinese only comes later in the list).
-   * Returns the UI language and the tag for dates and numbers (Simplified Chinese ones for a
-   * Traditional Chinese tag, so the page stays in one script).
+   * The same choice macOS makes for the app: the first browser language the page has wins, English
+   * when none matches. English in any region is English; Chinese counts as Simplified unless it is
+   * Traditional (Hant script, or Taiwan, Hong Kong or Macau without a script), which the page does
+   * not have, so it is skipped like any other language: (zh-TW, en) is English, (zh-TW, zh-CN) and
+   * (ja, zh-Hans) Chinese. Returns the UI language and the matched tag for dates and numbers.
    */
   function pickLanguage(list) {
-    const first = Array.isArray(list) ? list.find(raw => typeof raw === 'string' && raw.trim()) : undefined;
-    if (first === undefined) return { lang: 'en', locale: 'en' };
-    const tag = first.trim().replace(/_/g, '-');
-    const parts = tag.toLowerCase().split('-');
-    if (parts[0] !== 'en' && parts[0] !== 'zh') return { lang: 'en', locale: 'en' };
-    const lang = parts[0] === 'zh' ? 'zh-Hans' : 'en';
-    const script = parts.slice(1).find(p => /^[a-z]{4}$/.test(p));
-    const traditional = lang === 'zh-Hans' && (script ? script === 'hant' : parts.slice(1).some(p => p === 'tw' || p === 'hk' || p === 'mo'));
-    if (traditional) return { lang, locale: 'zh-Hans' };
-    let locale = lang;
-    try { locale = Intl.getCanonicalLocales(tag)[0] || lang; } catch (_) { /* odd tag: the language alone */ }
-    return { lang, locale };
+    const tags = Array.isArray(list) ? list : [];
+    for (const raw of tags) {
+      if (typeof raw !== 'string' || !raw.trim()) continue;
+      const tag = raw.trim().replace(/_/g, '-');
+      const parts = tag.toLowerCase().split('-');
+      let lang = null;
+      if (parts[0] === 'en') {
+        lang = 'en';
+      } else if (parts[0] === 'zh') {
+        const script = parts.slice(1).find(p => /^[a-z]{4}$/.test(p));
+        const traditional = script ? script === 'hant' : parts.slice(1).some(p => p === 'tw' || p === 'hk' || p === 'mo');
+        if (!traditional) lang = 'zh-Hans';
+      }
+      if (!lang) continue;
+      let locale = lang;
+      try { locale = Intl.getCanonicalLocales(tag)[0] || lang; } catch (_) { /* odd tag: the language alone */ }
+      return { lang, locale };
+    }
+    return { lang: 'en', locale: 'en' };
   }
   /** The text for key in the page's language (English, then the key, if missing), {name} filled in once. */
   function t(key, params) {

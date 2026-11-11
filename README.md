@@ -58,8 +58,9 @@ has a light and a dark version that follows your Mac's appearance.
 
 ![Pillow Fort, Cardboard Fort at night, and Treehouse at night](docs/images/en/skins.jpg)
 
-**English and Chinese.** Parley uses Simplified Chinese when your Mac's main language is
-Chinese, and English otherwise.
+**English and Chinese.** Parley follows the language list in System Settings → General →
+Language & Region: it uses whichever of English or Simplified Chinese comes first there, and
+English if neither is in the list.
 
 ## Parley Reader: your chats on any device
 

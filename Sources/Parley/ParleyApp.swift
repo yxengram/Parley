@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import ParleyCore
 
-/// Started by `ParleyMain` (InterfaceLanguage.swift), which settles the interface language first.
+@main
 struct ParleyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private var appState: AppState { AppState.shared }

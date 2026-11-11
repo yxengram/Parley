@@ -332,21 +332,24 @@ test('the markup is translated at startup; the static lang stays for browsers wi
   for (const call of ['new Intl.DateTimeFormat(LOCALE, opts)', 'toLocaleString(LOCALE)', 'new Intl.RelativeTimeFormat(LOCALE,']) assert.ok(page.includes(call), call);
 });
 
-test('the language follows the first browser language: Chinese, else English (L10N)', () => {
+test('the language is the first browser language the page has, as macOS chooses for the app (L10N)', () => {
   const pick = list => pickLanguage(list).lang;
-  for (const list of [['zh-CN'], ['zh'], ['zh-SG'], ['zh-Hans-HK'], ['zh_CN'], ['zh-TW', 'zh-CN'], ['zh-TW'], ['zh-HK'], ['zh-MO'],
-    ['zh-Hant'], ['zh-Hant-CN'], ['zh-TW', 'en-US'], ['  zh-CN ', 'en']]) {
+  // The same cases as macOSPicksTheFirstPreferredLanguageTheAppHas in Tests/ParleyAppTests/LocalizationTests.swift.
+  for (const list of [['zh-Hans'], ['zh-CN'], ['zh'], ['zh-SG'], ['zh-Hans-HK'], ['zh_CN'], ['ja', 'zh-Hans'], ['fr', 'zh-Hans-CN', 'en'],
+    ['zh-TW', 'zh-CN'], ['zh-HK', 'ja', 'zh-Hans'], ['  zh-CN ', 'en'], ['zh-Hant', 'zh-Hans']]) {
     assert.equal(pick(list), 'zh-Hans', JSON.stringify(list));
   }
-  // Japanese or French first is English, even with Chinese later in the list (the app does the same).
-  for (const list of [['ja', 'fr'], ['ja', 'zh-Hans'], ['fr', 'zh-Hans-CN', 'en'], ['en-GB', 'zh-CN'], [], [42, null], 'zh-CN']) {
+  // Traditional Chinese is skipped like any language the page does not have.
+  for (const list of [['zh-Hant'], ['zh-TW'], ['zh-HK'], ['zh-MO'], ['zh-Hant-CN'], ['zh-TW', 'en'], ['ja'], ['ja', 'fr'],
+    ['en-GB', 'zh-CN'], ['de', 'en'], [], [42, null], 'zh-CN']) {
     assert.equal(pick(list), 'en', JSON.stringify(list));
   }
   assert.deepEqual(same(pickLanguage(['en-GB', 'zh-CN'])), { lang: 'en', locale: 'en-GB' });
   assert.deepEqual(same(pickLanguage(['zh-Hans-CN', 'ja'])), { lang: 'zh-Hans', locale: 'zh-Hans-CN' });
-  assert.deepEqual(same(pickLanguage(['zh-TW'])), { lang: 'zh-Hans', locale: 'zh-Hans' }, 'one script on the page');
-  assert.deepEqual(same(pickLanguage(['ja', 'zh-Hans-CN'])), { lang: 'en', locale: 'en' });
-  assert.deepEqual(same(pickLanguage(['ja', 'fr'])), { lang: 'en', locale: 'en' }, 'English dates with the English fallback');
+  assert.deepEqual(same(pickLanguage(['ja', 'zh-CN'])), { lang: 'zh-Hans', locale: 'zh-CN' }, 'dates from the matched tag');
+  assert.deepEqual(same(pickLanguage(['zh-TW', 'fr', 'en-US'])), { lang: 'en', locale: 'en-US' });
+  assert.deepEqual(same(pickLanguage(['zh-TW'])), { lang: 'en', locale: 'en' }, 'English dates with the English fallback');
+  assert.deepEqual(same(pickLanguage(['ja', 'fr'])), { lang: 'en', locale: 'en' });
 });
 
 test('t() fills each placeholder once, never from file text, and falls back to English (L10N)', () => {
