@@ -37,6 +37,8 @@ button { cursor: pointer; }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lettered { font-family: var(--lettered); font-weight: 700; }
+/* Noteworthy has no Chinese: in Chinese the hand lettering is the rounded bold system font, as in the app. */
+:root:lang(zh) { --lettered: var(--rounded); }
 
 /* ---- shapes: an SVG behind the content, redrawn on resize */
 .has-shape { position: relative; isolation: isolate; }
@@ -413,26 +415,26 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 </style>
 </head>
 <body>
-<noscript><p style="padding:20px">Parley Reader needs JavaScript to open conversation files. It runs entirely in this tab.</p></noscript>
+<noscript><p style="padding:20px">Parley Reader needs JavaScript to open conversation files. It runs entirely in this tab.</p><p style="padding:0 20px 20px" lang="zh-Hans">Parley Reader 需要 JavaScript 才能打开对话文件。它完全在这个标签页中运行。</p></noscript>
 <div class="app" id="app">
-  <aside class="wall" id="wall" aria-label="Conversations">
+  <aside class="wall" id="wall" aria-label="Conversations" data-i18n-aria-label="conversations">
     <div class="wall-top">
       <svg class="bunting" id="bunting" aria-hidden="true" focusable="false"></svg>
       <div class="wall-buttons">
-        <button class="round-btn" type="button" id="wall-open" title="Open conversation files" aria-label="Open…"></button>
-        <button class="round-btn" type="button" id="wall-hide" title="Hide Sidebar" aria-label="Hide Sidebar"></button>
+        <button class="round-btn" type="button" id="wall-open" title="Open conversation files" aria-label="Open…" data-i18n-title="openFiles" data-i18n-aria-label="openEllipsis"></button>
+        <button class="round-btn" type="button" id="wall-hide" title="Hide Sidebar" aria-label="Hide Sidebar" data-i18n-title="hideSidebar" data-i18n-aria-label="hideSidebar"></button>
       </div>
     </div>
     <div class="wordmark lettered">Parley</div>
     <div class="search" id="search">
       <span id="search-icon"></span>
-      <input id="search-input" type="search" placeholder="Search" aria-label="Search conversation titles" autocomplete="off" spellcheck="false">
-      <button class="clear-btn" type="button" id="search-clear" aria-label="Clear Search" title="Clear Search" hidden></button>
+      <input id="search-input" type="search" placeholder="Search" aria-label="Search conversation titles" data-i18n-placeholder="search" data-i18n-aria-label="searchTitles" autocomplete="off" spellcheck="false">
+      <button class="clear-btn" type="button" id="search-clear" aria-label="Clear Search" title="Clear Search" data-i18n-aria-label="clearSearch" data-i18n-title="clearSearch" hidden></button>
     </div>
-    <nav class="list" id="list" aria-label="Opened conversations"></nav>
+    <nav class="list" id="list" aria-label="Opened conversations" data-i18n-aria-label="openedConversations"></nav>
     <div class="wall-foot">
-      <label>Skin <select id="skin-select" aria-label="Skin"></select></label>
-      <label>Light <select id="appearance-select" aria-label="Appearance"></select></label>
+      <label><span data-i18n="skin">Skin</span> <select id="skin-select" aria-label="Skin" data-i18n-aria-label="skin"></select></label>
+      <label><span data-i18n="light">Light</span> <select id="appearance-select" aria-label="Appearance" data-i18n-aria-label="appearance"></select></label>
     </div>
     <div class="seam" id="seam" aria-hidden="true"></div>
   </aside>
@@ -442,11 +444,11 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 <input type="file" id="file-input" multiple accept=".json,application/json" hidden>
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <div class="sr-only" id="announcer" role="status" aria-live="polite"></div>
-<div class="drop" id="drop" hidden><div class="drop-card lettered" id="drop-card">Drop Parley files to open them</div></div>
+<div class="drop" id="drop" hidden><div class="drop-card lettered" id="drop-card" data-i18n="dropFiles">Drop Parley files to open them</div></div>
 <dialog id="link-dialog" aria-labelledby="link-title"></dialog>
-<dialog id="image-dialog" aria-label="Image preview"></dialog>
-<dialog id="text-dialog" aria-label="Text file preview"></dialog>
-<dialog id="info-dialog" aria-label="Conversation details"></dialog>
+<dialog id="image-dialog" aria-label="Image preview" data-i18n-aria-label="imagePreview"></dialog>
+<dialog id="text-dialog" aria-label="Text file preview" data-i18n-aria-label="textPreview"></dialog>
+<dialog id="info-dialog" aria-label="Conversation details" data-i18n-aria-label="conversationDetails"></dialog>
 
 <script>/*@@PARLEY_ART@@*/</script>
 <script>/*@@PARLEY_CORE@@*/</script>
@@ -461,10 +463,478 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const LOOK_KEY = 'parley-reader.look';
 
   // ===========================================================================================
+  // Language: English or Simplified Chinese, picked once at load from the browser's languages.
+  // Every text the page writes itself goes through t(); text from a file never does. Placeholders
+  // are {name}; both tables must have the same keys and the same placeholders (test_reader_page).
+  // Codes the page matches (stored errors, tool results, damage details) stay in English.
+  const STRINGS = {
+    en: {
+      pageTitle: 'Parley Reader',
+      conversations: 'Conversations',
+      openFiles: 'Open conversation files',
+      openEllipsis: 'Open…',
+      hideSidebar: 'Hide Sidebar',
+      showSidebar: 'Show Sidebar',
+      search: 'Search',
+      searchTitles: 'Search conversation titles',
+      clearSearch: 'Clear Search',
+      openedConversations: 'Opened conversations',
+      skin: 'Skin',
+      light: 'Light',
+      appearance: 'Appearance',
+      dropFiles: 'Drop Parley files to open them',
+      imagePreview: 'Image preview',
+      textPreview: 'Text file preview',
+      conversationDetails: 'Conversation details',
+      skinCardboard: 'Cardboard Fort',
+      skinPillow: 'Pillow Fort',
+      skinTreehouse: 'Treehouse',
+      appearanceAuto: 'Auto',
+      appearanceLight: 'Afternoon',
+      appearanceDark: 'Lights-out',
+      copy: 'Copy',
+      copyCode: 'Copy Code',
+      copyCodeTip: 'Copy code',
+      copyBlock: 'Copy {title}',
+      copied: 'Copied',
+      copyFailed: 'Could not copy',
+      errNotParley: 'This file is not a Parley conversation.',
+      errCorrupt: 'The conversation file is damaged.',
+      errCorruptDetail: 'The conversation file is damaged: {detail}',
+      errVersion: 'Unsupported conversation file version {version}.',
+      errVersionUnknown: 'Unsupported conversation file version.',
+      errNoWebCrypto: 'This browser can\'t decrypt files here (Web Crypto is missing). Try a current Safari, Chrome or Firefox.',
+      errUnreadable: 'The file couldn\'t be read.',
+      errWrongPassword: 'Wrong password, or the file has been tampered with.',
+      untitledFile: 'Untitled file',
+      cantOpenMany: 'Can\'t open {count} files',
+      cantOpenManyList: '{names} and {more} more.',
+      cantOpenOne: 'Can\'t open “{name}”',
+      quoted: '“{text}”',
+      listSeparator: ', ',
+      dismiss: 'Dismiss',
+      untitled: 'Untitled',
+      locked: 'Locked',
+      unlocked: 'Unlocked',
+      removedFromList: 'Removed from the list',
+      groupToday: 'Today',
+      groupYesterday: 'Yesterday',
+      groupWeek: 'Previous 7 Days',
+      groupOlder: 'Older',
+      wallBare: 'The wall is bare',
+      wallBareHint: 'Open or drop Parley .json files here.',
+      notOnWall: 'Not on this wall',
+      noMatch: 'No conversation matches “{query}”.',
+      encryptedRow: 'Encrypted conversation',
+      encryptedLocked: 'Encrypted, locked',
+      encryptedUnlocked: 'Encrypted, unlocked',
+      removeFromList: 'Remove from List',
+      lock: 'Lock',
+      removeTitle: 'Remove “{title}” from the list',
+      failedConversation: 'This conversation could not be shown.',
+      emptyTitle: 'Nobody here but us',
+      emptyHint: 'Pick a note from the wall, or open a Parley conversation file.',
+      privacyNote: 'Files you open stay in this browser tab. Nothing is uploaded.',
+      password: 'Password',
+      unlock: 'Unlock',
+      decrypting: 'Decrypting',
+      unlockWhere: '“{name}” · modified {time}',
+      forgottenPasswords: 'Forgotten passwords can\'t be recovered.',
+      encryptedTitle: 'Encrypted Conversation',
+      unlockHint: 'Enter the password to decrypt it in memory.',
+      lockedTitle: 'Locked Conversation',
+      encryptedSub: 'Encrypted · {name}',
+      detailsTip: 'Conversation details: system prompt and settings (read-only)',
+      lockTip: 'Lock: remove the decrypted conversation from memory',
+      forkedFrom: 'Forked from another conversation',
+      messageFailed: 'This message could not be shown.',
+      scrollToBottom: 'Scroll to Bottom',
+      scrollToLatest: 'Scroll to the latest message',
+      modelLabel: 'Model: {model}',
+      lanternOn: 'The lantern\'s on',
+      noMessagesYet: 'This conversation has no messages yet.',
+      usagePrompt: '{n} prompt',
+      usageCompletion: '{n} completion',
+      usageTotal: '{n} total',
+      usageTokens: '{parts} tokens',
+      tokensCount: '{n} tokens',
+      tokensPerSecond: '{rate} tok/s',
+      firstToken: '{time} to first token',
+      toolRoundOne: '1 tool round',
+      toolRounds: '{n} tool rounds',
+      secondsShort: '{n} s',
+      lessThanSecond: 'less than a second',
+      minutesSeconds: '{m} min {s} s',
+      finishThinkingContext: 'The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer.',
+      finishThinkingTokens: 'The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate.',
+      finishContext: 'The reply was cut off at the end of the context (or the server\'s own output limit). Start a new chat, fork from an earlier message or roll back to make room.',
+      finishTokens: 'The reply was cut off at the token limit (Max tokens).',
+      thinkingNotAccepted: 'This server did not accept “None (no thinking)”, so this reply used its default thinking.',
+      thinkingIgnored: 'This server or model ignored “None (no thinking)”: the reply still contains thinking.',
+      thinkingIgnoredLMStudio: 'This server or model ignored “None (no thinking)”: the reply still contains thinking. LM Studio may offer a thinking switch in this model\'s settings.',
+      thinkingIgnoredTemplate: 'This server or model ignored “None (no thinking)”: the reply still contains thinking. The model\'s chat template may not support turning it off.',
+      thinkingNotAcceptedAgain: '“None” was not accepted again, so this reply also used the default thinking.',
+      thinkingIgnoredAgain: '“None” was ignored again: this reply also contains thinking.',
+      noteToolsNotAccepted: 'The model\'s server did not accept tools, so this reply was written without them.',
+      noteToolsNotOffered: 'Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata.',
+      noteServerUnavailable: '{server}. Its tools were not offered.',
+      noteSomeServer: 'A server',
+      noteRoundLimit: 'Reached the limit of {n} tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP.',
+      noteCallsNotRun: 'The reply ended inside a tool call, so it was not run.',
+      noteEmptyAfterTools: 'The model wrote nothing after the tool results.',
+      errApiKeyTitle: 'The server rejected the API key',
+      errApiKeyDetail: 'Check the API key for the server in Settings.',
+      errNotFoundTitle: 'Model or endpoint not found',
+      errNotFoundSaid: 'Check the model ID and the base URL. The server said: {message}',
+      errNotFoundDetail: 'Check the model ID and the base URL (it usually ends in /v1).',
+      errTooManyTitle: 'Too many requests',
+      errTooManyDetail: 'The server is rate limiting. Wait a moment and try again.',
+      errServerProblem: 'The server had a problem',
+      errTryAgain: 'Try again in a moment.',
+      errRedirectTitle: 'The server redirected the request',
+      errRedirectDetail: 'Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.',
+      errRejected: 'The server rejected the request',
+      errDropCloudflare: 'The connection through Cloudflare closed mid-reply: the server or the network went away.',
+      errDropNetwork: 'The server stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN).',
+      errDropTitle: 'The connection dropped before the reply finished',
+      errDropDetail: '{cause} Retry asks for the whole reply again.',
+      errDropDetailPartial: 'The text received so far is kept. {cause} Retry asks for the whole reply again.',
+      errUnreachableTitle: 'Can\'t reach the server',
+      errUnreachableDetail: 'Is the server running? {error}',
+      errTimeoutTitle: 'The server took too long to respond',
+      errToolDefs: 'Tool definitions take about {n} tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).',
+      errToolDefsAfter: '{detail} Tool definitions take about {n} tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).',
+      errGeneric: 'Error',
+      errorLabel: 'Error: {title}',
+      htmlPage: 'HTML page',
+      details: 'Details',
+      hideDetails: 'Hide Details',
+      codeDefault: 'code',
+      thoughtFor: 'Thought for {duration}',
+      thoughts: 'Thoughts',
+      showThinking: 'Show thinking',
+      hideThinking: 'Hide thinking',
+      statusDone: 'Done',
+      statusToolError: 'Tool error',
+      statusFailed: 'Failed',
+      statusTimedOut: 'Timed out',
+      statusDenied: 'Denied',
+      statusNotCalled: 'Not called',
+      statusInterrupted: 'Interrupted',
+      statusStopped: 'Stopped',
+      statusFinished: 'Finished',
+      unknownTool: 'Unknown tool',
+      slipLabel: '{title}, {status}',
+      showsArgs: 'Shows the arguments and result',
+      hidesArgs: 'Hides the arguments and result',
+      arguments: 'Arguments',
+      result: 'Result',
+      address: 'Address',
+      aboutLines: 'About {n} lines. Scroll to see all of them.',
+      truncatedShowing: 'Truncated: showing {shown} of {total} characters.',
+      truncatedTotal: 'Truncated: {total} characters in all.',
+      notShownToModel: 'Not shown to the model: {items}.',
+      attachmentDefault: 'attachment',
+      imageLabel: 'Image {name}',
+      clickToPreview: 'Click to preview',
+      textFileLabel: 'Text file {name}, click to preview',
+      assistant: 'Assistant',
+      unknownModel: 'unknown model',
+      assistantLabel: 'Assistant, {model}, {time}',
+      stoppedBeforeFinish: 'Stopped before the reply finished.',
+      linkTitle: 'Open this link in your browser?',
+      linkWarning: 'Opening sends the whole address to this site, including anything a model put in it.',
+      site: 'Site',
+      hiddenChars: 'The address contains hidden or right-to-left characters, shown here as \\u{…}.',
+      cancel: 'Cancel',
+      open: 'Open',
+      close: 'Close',
+      infoModel: 'Model',
+      providerDefault: 'Provider default',
+      temperature: 'Temperature',
+      maxTokens: 'Max tokens',
+      effortLow: 'Low',
+      effortMedium: 'Medium',
+      effortHigh: 'High',
+      reasoningEffort: 'Reasoning effort',
+      effortNone: 'None (no thinking)',
+      thinkingBudget: 'Thinking budget',
+      toolCalling: 'Tool calling',
+      toolModeReact: 'ReAct (text)',
+      toolModeNative: 'Native',
+      mcpServers: 'MCP servers',
+      none: 'None',
+      builtInTools: 'Built-in tools',
+      off: 'Off',
+      created: 'Created',
+      updated: 'Updated',
+      messages: 'Messages',
+      fork: 'Fork',
+      file: 'File',
+      viewerNote: 'Conversation settings, read-only. In Parley they live in the Conversation Settings popover.',
+      systemPrompt: 'System prompt',
+      noSystemPrompt: 'No system prompt.',
+    },
+    'zh-Hans': {
+      pageTitle: 'Parley Reader',
+      conversations: '对话',
+      openFiles: '打开对话文件',
+      openEllipsis: '打开…',
+      hideSidebar: '隐藏边栏',
+      showSidebar: '显示边栏',
+      search: '搜索',
+      searchTitles: '搜索对话标题',
+      clearSearch: '清除搜索',
+      openedConversations: '已打开的对话',
+      skin: '皮肤',
+      light: '光线',
+      appearance: '外观',
+      dropFiles: '拖入 Parley 文件即可打开',
+      imagePreview: '图像预览',
+      textPreview: '文本文件预览',
+      conversationDetails: '对话详情',
+      skinCardboard: '纸箱堡垒',
+      skinPillow: '枕头堡垒',
+      skinTreehouse: '树屋',
+      appearanceAuto: '自动',
+      appearanceLight: '午后',
+      appearanceDark: '熄灯',
+      copy: '拷贝',
+      copyCode: '拷贝代码',
+      copyCodeTip: '拷贝代码',
+      copyBlock: '拷贝{title}',
+      copied: '已拷贝',
+      copyFailed: '无法拷贝',
+      errNotParley: '此文件不是 Parley 对话。',
+      errCorrupt: '对话文件已损坏。',
+      errCorruptDetail: '对话文件已损坏：{detail}',
+      errVersion: '不支持的对话文件版本 {version}。',
+      errVersionUnknown: '不支持的对话文件版本。',
+      errNoWebCrypto: '此浏览器无法在这里解密文件（缺少 Web Crypto）。请使用新版 Safari、Chrome 或 Firefox。',
+      errUnreadable: '无法读取此文件。',
+      errWrongPassword: '密码错误，或文件已被篡改。',
+      untitledFile: '未命名文件',
+      cantOpenMany: '无法打开 {count} 个文件',
+      cantOpenManyList: '{names}，以及另外 {more} 个。',
+      cantOpenOne: '无法打开“{name}”',
+      quoted: '“{text}”',
+      listSeparator: '、',
+      dismiss: '关闭',
+      untitled: '未命名',
+      locked: '已锁定',
+      unlocked: '已解锁',
+      removedFromList: '已从列表中移除',
+      groupToday: '今天',
+      groupYesterday: '昨天',
+      groupWeek: '过去 7 天',
+      groupOlder: '更早',
+      wallBare: '墙上空空如也',
+      wallBareHint: '在这里打开或拖入 Parley .json 文件。',
+      notOnWall: '墙上没有找到',
+      noMatch: '没有与“{query}”匹配的对话。',
+      encryptedRow: '已加密的对话',
+      encryptedLocked: '已加密，已锁定',
+      encryptedUnlocked: '已加密，已解锁',
+      removeFromList: '从列表中移除',
+      lock: '锁定',
+      removeTitle: '从列表中移除“{title}”',
+      failedConversation: '无法显示此对话。',
+      emptyTitle: '这里只有我们',
+      emptyHint: '从墙上挑一张便条，或打开一个 Parley 对话文件。',
+      privacyNote: '你打开的文件只留在这个浏览器标签页中，不会上传任何内容。',
+      password: '密码',
+      unlock: '解锁',
+      decrypting: '正在解密',
+      unlockWhere: '“{name}” · {time}修改',
+      forgottenPasswords: '忘记的密码无法找回。',
+      encryptedTitle: '已加密的对话',
+      unlockHint: '输入密码，在内存中解密此对话。',
+      lockedTitle: '已锁定的对话',
+      encryptedSub: '已加密 · {name}',
+      detailsTip: '对话详情：系统提示词和设置（只读）',
+      lockTip: '锁定：从内存中移除已解密的对话',
+      forkedFrom: '从另一个对话分叉而来',
+      messageFailed: '无法显示此消息。',
+      scrollToBottom: '滚动到底部',
+      scrollToLatest: '滚动到最新消息',
+      modelLabel: '模型：{model}',
+      lanternOn: '灯笼已点亮',
+      noMessagesYet: '此对话还没有消息。',
+      usagePrompt: '提示词 {n}',
+      usageCompletion: '生成 {n}',
+      usageTotal: '合计 {n}',
+      usageTokens: '{parts} token',
+      tokensCount: '{n} 个 token',
+      tokensPerSecond: '{rate} tok/s',
+      firstToken: '首个 token 用时 {time}',
+      toolRoundOne: '1 轮工具调用',
+      toolRounds: '{n} 轮工具调用',
+      secondsShort: '{n} 秒',
+      lessThanSecond: '不到 1 秒',
+      minutesSeconds: '{m} 分 {s} 秒',
+      finishThinkingContext: '回复在思考时用完了上下文空间。请开始新对话、从较早的消息分叉或回退；设置思考预算（对话设置，⌘I）可以为回答留出空间。',
+      finishThinkingTokens: '回复在思考时用完了 token。请提高最大 token 数、降低推理强度（或选择“无”），或在 Strata 上设置思考预算（对话设置，⌘I），然后重新生成。',
+      finishContext: '回复在上下文末尾（或服务器自身的输出上限处）被截断。请开始新对话、从较早的消息分叉或回退以腾出空间。',
+      finishTokens: '回复在 token 上限（最大 token 数）处被截断。',
+      thinkingNotAccepted: '此服务器不接受“无（不思考）”，因此这条回复使用了默认的思考设置。',
+      thinkingIgnored: '此服务器或模型忽略了“无（不思考）”：回复中仍包含思考内容。',
+      thinkingIgnoredLMStudio: '此服务器或模型忽略了“无（不思考）”：回复中仍包含思考内容。LM Studio 可能在此模型的设置中提供思考开关。',
+      thinkingIgnoredTemplate: '此服务器或模型忽略了“无（不思考）”：回复中仍包含思考内容。该模型的聊天模板可能不支持关闭思考。',
+      thinkingNotAcceptedAgain: '“无”再次未被接受，因此这条回复也使用了默认的思考设置。',
+      thinkingIgnoredAgain: '“无”再次被忽略：这条回复也包含思考内容。',
+      noteToolsNotAccepted: '模型的服务器不接受工具，因此这条回复是在没有工具的情况下写成的。',
+      noteToolsNotOffered: '未提供工具：Strata 以运行时模式运行此模型，该模式会忽略工具。请在 Strata 中使用原生模型。',
+      noteServerUnavailable: '{server}。它的工具未提供给模型。',
+      noteSomeServer: '某个服务器',
+      noteRoundLimit: '已达到 {n} 轮工具调用的上限，因此模型被要求不再使用工具直接回答。可在“设置”>“MCP”中更改上限。',
+      noteCallsNotRun: '回复在工具调用中途结束，因此该调用没有运行。',
+      noteEmptyAfterTools: '模型在工具结果之后没有写任何内容。',
+      errApiKeyTitle: '服务器拒绝了 API 密钥',
+      errApiKeyDetail: '请在设置中检查该服务器的 API 密钥。',
+      errNotFoundTitle: '找不到模型或端点',
+      errNotFoundSaid: '请检查模型 ID 和基础 URL。服务器返回：{message}',
+      errNotFoundDetail: '请检查模型 ID 和基础 URL（通常以 /v1 结尾）。',
+      errTooManyTitle: '请求过多',
+      errTooManyDetail: '服务器正在限制请求频率。请稍候再试。',
+      errServerProblem: '服务器出现问题',
+      errTryAgain: '请稍后再试。',
+      errRedirectTitle: '服务器重定向了请求',
+      errRedirectDetail: 'Parley 不跟随重定向，因此没有向那里发送任何内容。如果那是正确的地址，请在设置中把它填为基础 URL。',
+      errRejected: '服务器拒绝了请求',
+      errDropCloudflare: '经由 Cloudflare 的连接在回复中途关闭：服务器或网络已断开。',
+      errDropNetwork: '服务器在回复中途停止响应，或网络发生了变化（睡眠、Wi-Fi、VPN）。',
+      errDropTitle: '回复完成前连接已断开',
+      errDropDetail: '{cause}重试会重新请求完整的回复。',
+      errDropDetailPartial: '已收到的文本会保留。{cause}重试会重新请求完整的回复。',
+      errUnreachableTitle: '无法连接到服务器',
+      errUnreachableDetail: '服务器是否正在运行？{error}',
+      errTimeoutTitle: '服务器响应超时',
+      errToolDefs: '工具定义大约占用其中 {n} 个 token。请用扳手按钮（⇧⌘T）关闭不需要的服务器或工具。',
+      errToolDefsAfter: '{detail}工具定义大约占用其中 {n} 个 token。请用扳手按钮（⇧⌘T）关闭不需要的服务器或工具。',
+      errGeneric: '错误',
+      errorLabel: '错误：{title}',
+      htmlPage: 'HTML 页面',
+      details: '详细信息',
+      hideDetails: '隐藏详细信息',
+      codeDefault: '代码',
+      thoughtFor: '思考用时：{duration}',
+      thoughts: '思考内容',
+      showThinking: '显示思考内容',
+      hideThinking: '隐藏思考内容',
+      statusDone: '完成',
+      statusToolError: '工具错误',
+      statusFailed: '失败',
+      statusTimedOut: '超时',
+      statusDenied: '已拒绝',
+      statusNotCalled: '未调用',
+      statusInterrupted: '已中断',
+      statusStopped: '已停止',
+      statusFinished: '已结束',
+      unknownTool: '未知工具',
+      slipLabel: '{title}，{status}',
+      showsArgs: '显示参数和结果',
+      hidesArgs: '隐藏参数和结果',
+      arguments: '参数',
+      result: '结果',
+      address: '地址',
+      aboutLines: '约 {n} 行。滚动可查看全部。',
+      truncatedShowing: '已截断：显示了 {total} 个字符中的 {shown} 个。',
+      truncatedTotal: '已截断：共 {total} 个字符。',
+      notShownToModel: '未向模型显示：{items}。',
+      attachmentDefault: '附件',
+      imageLabel: '图像 {name}',
+      clickToPreview: '点按以预览',
+      textFileLabel: '文本文件 {name}，点按以预览',
+      assistant: '助手',
+      unknownModel: '未知模型',
+      assistantLabel: '助手，{model}，{time}',
+      stoppedBeforeFinish: '回复在完成前已停止。',
+      linkTitle: '要在浏览器中打开此链接吗？',
+      linkWarning: '打开后，完整地址会发送给该网站，包括模型放入其中的任何内容。',
+      site: '网站',
+      hiddenChars: '地址中包含隐藏字符或从右到左的字符，在此显示为 \\u{…}。',
+      cancel: '取消',
+      open: '打开',
+      close: '关闭',
+      infoModel: '模型',
+      providerDefault: '提供商默认',
+      temperature: '温度',
+      maxTokens: '最大 token 数',
+      effortLow: '低',
+      effortMedium: '中',
+      effortHigh: '高',
+      reasoningEffort: '推理强度',
+      effortNone: '无（不思考）',
+      thinkingBudget: '思考预算',
+      toolCalling: '工具调用方式',
+      toolModeReact: 'ReAct（文本）',
+      toolModeNative: '原生',
+      mcpServers: 'MCP 服务器',
+      none: '无',
+      builtInTools: '内置工具',
+      off: '关',
+      created: '创建时间',
+      updated: '更新时间',
+      messages: '消息',
+      fork: '分叉',
+      file: '文件',
+      viewerNote: '对话设置，只读。在 Parley 中，它们位于“对话设置”弹出窗口中。',
+      systemPrompt: '系统提示词',
+      noSystemPrompt: '没有系统提示词。',
+    },
+  };
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  /**
+   * The browser's first language decides, as in the app: Chinese in any script or region gives
+   * Simplified Chinese, anything else English (also when Chinese only comes later in the list).
+   * Returns the UI language and the tag for dates and numbers (Simplified Chinese ones for a
+   * Traditional Chinese tag, so the page stays in one script).
+   */
+  function pickLanguage(list) {
+    const first = Array.isArray(list) ? list.find(raw => typeof raw === 'string' && raw.trim()) : undefined;
+    if (first === undefined) return { lang: 'en', locale: 'en' };
+    const tag = first.trim().replace(/_/g, '-');
+    const parts = tag.toLowerCase().split('-');
+    if (parts[0] !== 'en' && parts[0] !== 'zh') return { lang: 'en', locale: 'en' };
+    const lang = parts[0] === 'zh' ? 'zh-Hans' : 'en';
+    const script = parts.slice(1).find(p => /^[a-z]{4}$/.test(p));
+    const traditional = lang === 'zh-Hans' && (script ? script === 'hant' : parts.slice(1).some(p => p === 'tw' || p === 'hk' || p === 'mo'));
+    if (traditional) return { lang, locale: 'zh-Hans' };
+    let locale = lang;
+    try { locale = Intl.getCanonicalLocales(tag)[0] || lang; } catch (_) { /* odd tag: the language alone */ }
+    return { lang, locale };
+  }
+  /** The text for key in the page's language (English, then the key, if missing), {name} filled in once. */
+  function t(key, params) {
+    const table = hasOwn(STRINGS, LANG) ? STRINGS[LANG] : STRINGS.en;
+    const text = hasOwn(table, key) ? table[key] : hasOwn(STRINGS.en, key) ? STRINGS.en[key] : key;
+    if (!params) return text;
+    return text.replace(/\{(\w+)\}/g, (whole, name) => (hasOwn(params, name) ? String(params[name]) : whole));
+  }
+  function browserLanguages() {
+    try {
+      if (navigator.languages && navigator.languages.length) return Array.from(navigator.languages);
+      if (navigator.language) return [navigator.language];
+    } catch (_) { /* no navigator: English */ }
+    return [];
+  }
+  const PICKED = pickLanguage(browserLanguages());
+  const LANG = PICKED.lang;
+  const LOCALE = PICKED.locale;
+  // The fixed text in the markup: <title>, labels, tooltips, placeholders. Runs before any shape
+  // or icon is added, so setting textContent replaces only the English text.
+  document.documentElement.lang = LANG;
+  document.title = t('pageTitle');
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.getAttribute('data-i18n'));
+  for (const attr of ['title', 'aria-label', 'placeholder']) {
+    for (const el of document.querySelectorAll(`[data-i18n-${attr}]`)) el.setAttribute(attr, t(el.getAttribute(`data-i18n-${attr}`)));
+  }
+
+  // ===========================================================================================
   // Design tokens: [cardboard light, cardboard dark, pillow light, pillow dark, treehouse light, treehouse dark]
   const SKINS = ['cardboard', 'pillow', 'treehouse'];
-  const SKIN_TITLES = { cardboard: 'Cardboard Fort', pillow: 'Pillow Fort', treehouse: 'Treehouse' };
-  const APPEARANCES = [['auto', 'Auto'], ['light', 'Afternoon'], ['dark', 'Lights-out']];
+  const SKIN_TITLES = { cardboard: t('skinCardboard'), pillow: t('skinPillow'), treehouse: t('skinTreehouse') };
+  const APPEARANCES = [['auto', t('appearanceAuto')], ['light', t('appearanceLight')], ['dark', t('appearanceDark')]];
   const TOKENS = {
     paper: ['#FBF1DF', '#241713', '#FFF1F3', '#26121C', '#F8F8DE', '#1A2012'],
     paperDeep: ['#F4E3C6', '#2F1F19', '#FBE0E7', '#331A26', '#EDEFC2', '#242C18'],
@@ -803,18 +1273,18 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
   const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   const dateOf = v => { if (typeof v !== 'string') return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; };
-  const fmt = (opts, d) => { try { return new Intl.DateTimeFormat(undefined, opts).format(d); } catch (_) { return ''; } };
+  const fmt = (opts, d) => { try { return new Intl.DateTimeFormat(LOCALE, opts).format(d); } catch (_) { return ''; } };
   const fmtTime = d => fmt({ hour: 'numeric', minute: '2-digit' }, d);
   const fmtWeekday = d => fmt({ weekday: 'long' }, d);
   const fmtDate = d => fmt({ day: 'numeric', month: 'short', year: 'numeric' }, d);
   const fmtNoteTip = d => fmt({ weekday: 'short', hour: 'numeric', minute: '2-digit' }, d);
-  const grouped = n => { try { return Number(n).toLocaleString(); } catch (_) { return String(n); } };
+  const grouped = n => { try { return Number(n).toLocaleString(LOCALE); } catch (_) { return String(n); } };
   const rate = r => (r >= 100 ? String(Math.round(r)) : r.toFixed(1));
-  const seconds = t => (t < 10 ? t.toFixed(2) + ' s' : t.toFixed(1) + ' s');
+  const seconds = v => t('secondsShort', { n: v < 10 ? v.toFixed(2) : v.toFixed(1) });
   function thoughtFor(sec) {
-    if (sec < 1) return 'less than a second';
-    if (sec < 60) return `${Math.round(sec)} s`;
-    return `${Math.floor(sec / 60)} min ${Math.floor(sec) % 60} s`;
+    if (sec < 1) return t('lessThanSecond');
+    if (sec < 60) return t('secondsShort', { n: Math.round(sec) });
+    return t('minutesSeconds', { m: Math.floor(sec / 60), s: Math.floor(sec) % 60 });
   }
   function middle(text, max) {
     const chars = Array.from(text);
@@ -826,7 +1296,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const diff = (ms - Date.now()) / 1000;
     const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
     try {
-      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+      const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' });
       for (const [unit, size] of units) if (Math.abs(diff) >= size || unit === 'second') return rtf.format(Math.round(diff / size), unit);
     } catch (_) { /* fall through */ }
     return fmtDate(new Date(ms));
@@ -870,8 +1340,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     on(btn, 'click', async ev => {
       ev.stopPropagation();
       const ok = await copyText(getText());
-      if (!ok) { announce('Could not copy'); return; }
-      announce('Copied');
+      if (!ok) { announce(t('copyFailed')); return; }
+      announce(t('copied'));
       btn.replaceChildren(icon('check'));
       if (copiedTip) btn.title = copiedTip;
       clearTimeout(timer);
@@ -889,12 +1359,12 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const room = document.getElementById('room');
   const fileInput = document.getElementById('file-input');
 
-  // The app's ParleyError texts where they exist; the last three are the viewer's own.
+  // The app's ParleyError texts where they exist; the last two are the viewer's own.
   const ERROR_TEXT = {
-    notParley: 'This file is not a Parley conversation.',
-    corrupt: 'The conversation file is damaged.',
-    noWebCrypto: 'This browser can\'t decrypt files here (Web Crypto is missing). Try a current Safari, Chrome or Firefox.',
-    unreadable: 'The file couldn\'t be read.',
+    notParley: t('errNotParley'),
+    corrupt: t('errCorrupt'),
+    noWebCrypto: t('errNoWebCrypto'),
+    unreadable: t('errUnreadable'),
   };
   const DAMAGE_DETAILS = new Set(['invalid JSON', 'missing version', 'missing encryption flag', 'invalid conversation data',
     'invalid encrypted header', 'invalid conversation id', 'unsupported key derivation function', 'unsupported cipher',
@@ -915,9 +1385,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function errorText(e) {
     if (!e || e.name !== 'ReaderError') return ERROR_TEXT.unreadable;
     if (e.code === 'unsupportedVersion') {
-      return /^-?\d{1,20}$/.test(e.detail) ? `Unsupported conversation file version ${e.detail}.` : 'Unsupported conversation file version.';
+      return /^-?\d{1,20}$/.test(e.detail) ? t('errVersion', { version: e.detail }) : t('errVersionUnknown');
     }
-    if (e.code === 'corrupt') return DAMAGE_DETAILS.has(e.detail) ? `The conversation file is damaged: ${e.detail}` : ERROR_TEXT.corrupt;
+    // The damage details stay in English: they are fixed codes, as in the app.
+    if (e.code === 'corrupt') return DAMAGE_DETAILS.has(e.detail) ? t('errCorruptDetail', { detail: e.detail }) : ERROR_TEXT.corrupt;
     return Object.prototype.hasOwnProperty.call(ERROR_TEXT, e.code) ? ERROR_TEXT[e.code] : ERROR_TEXT.unreadable;
   }
 
@@ -926,7 +1397,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     let first = null;
     const failed = [];
     for (const file of files) {
-      const name = str(file.name) || 'Untitled file';
+      const name = str(file.name) || t('untitledFile');
       let parsed;
       try {
         parsed = Core.parseFile(await readText(file));
@@ -953,10 +1424,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     }
     // A few failures get a toast each; more than that get one summary, so the stack stays small.
     if (failed.length > 3) {
-      const names = failed.slice(0, 3).map(([name]) => `“${middle(name, 40)}”`).join(', ');
-      toast(`Can't open ${failed.length} files`, `${names} and ${failed.length - 3} more.`);
+      const names = failed.slice(0, 3).map(([name]) => t('quoted', { text: middle(name, 40) })).join(t('listSeparator'));
+      toast(t('cantOpenMany', { count: failed.length }), t('cantOpenManyList', { names, more: failed.length - 3 }));
     } else {
-      for (const [name, message] of failed) toast(`Can't open “${middle(name, 60)}”`, message);
+      for (const [name, message] of failed) toast(t('cantOpenOne', { name: middle(name, 60) }), message);
     }
     renderList();
     if (first) select(first.key);
@@ -965,8 +1436,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const entryOf = key => entries.find(e => e.key === key) || null;
   const titleOf = entry => {
     if (!entry.conversation) return null;
-    const t = str(entry.conversation.title).trim();
-    return t || 'Untitled';
+    const title = str(entry.conversation.title).trim();
+    return title || t('untitled');
   };
   function sortDate(entry) {
     if (entry.conversation) {
@@ -992,7 +1463,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     dropView(entry);
     renderList();
     if (selectedKey === entry.key) renderRoom();
-    announce('Locked');
+    announce(t('locked'));
   }
   function removeEntry(entry) {
     entry.decrypting = null;
@@ -1004,7 +1475,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     if (i >= 0) entries.splice(i, 1);
     if (selectedKey === entry.key) { selectedKey = null; renderRoom(); }
     renderList();
-    announce('Removed from the list');
+    announce(t('removedFromList'));
   }
   function select(key) {
     selectedKey = key;
@@ -1017,7 +1488,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   // Toasts for files that cannot be opened (file names only, never their content).
   const toasts = document.getElementById('toasts');
   function toast(title, message) {
-    const close = h('button', { type: 'button', 'aria-label': 'Dismiss', title: 'Dismiss' }, icon('xmark'));
+    const close = h('button', { type: 'button', 'aria-label': t('dismiss'), title: t('dismiss') }, icon('xmark'));
     const el = h('div', { class: 'toast' }, icon('triangleFill'), h('div', { class: 'toast-text' }, h('strong', { text: title }), message), close);
     on(close, 'click', () => el.remove());
     toasts.append(el);
@@ -1031,6 +1502,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const searchClear = document.getElementById('search-clear');
   const fold = t => t.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
 
+  const GROUP_TITLES = { Today: 'groupToday', Yesterday: 'groupYesterday', 'Previous 7 Days': 'groupWeek', Older: 'groupOlder' };
   function groupOf(date) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1049,15 +1521,15 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const query = fold(searchInput.value.trim());
     searchClear.hidden = searchInput.value === '';
     if (!entries.length) {
-      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: 'The wall is bare' }), h('p', { text: 'Open or drop Parley .json files here.' })));
+      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: t('wallBare') }), h('p', { text: t('wallBareHint') })));
       return;
     }
     const shown = entries.filter(e => !query || (e.conversation && fold(titleOf(e)).includes(query)))
       .map(e => ({ e, date: sortDate(e) }))
       .sort((a, b) => b.date - a.date);
     if (!shown.length) {
-      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: 'Not on this wall' }),
-        h('p', { text: `No conversation matches “${searchInput.value.trim()}”.` })));
+      listEl.append(h('div', { class: 'wall-empty' }, h('div', { class: 'lettered', text: t('notOnWall') }),
+        h('p', { text: t('noMatch', { query: searchInput.value.trim() }) })));
       return;
     }
     const groups = new Map();
@@ -1070,7 +1542,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       const items = groups.get(name);
       if (!items) continue;
       const headId = 'group-' + name.replace(/\W/g, '');
-      listEl.append(h('h2', { class: 'group-title', id: headId, text: name }));
+      listEl.append(h('h2', { class: 'group-title', id: headId, text: t(GROUP_TITLES[name]) }));
       const ul = h('ul', { class: 'rows', 'aria-labelledby': headId });
       for (const { e, label } of items) ul.append(rowFor(e, label));
       listEl.append(ul);
@@ -1081,13 +1553,13 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function rowFor(entry, dateLabel) {
     const locked = entry.encrypted && !entry.conversation;
     const selected = entry.key === selectedKey;
-    const title = locked ? 'Encrypted conversation' : titleOf(entry);
+    const title = locked ? t('encryptedRow') : titleOf(entry);
     const li = h('li', { class: 'row' + (selected ? ' selected' : '') + (locked ? ' locked' : '') });
     const sub = locked ? `${dateLabel} · ${entry.name}` : dateLabel;
     const main = h('button', { type: 'button', class: 'row-main', title: entry.name, 'data-key': entry.key, 'aria-current': selected ? 'true' : null },
       h('span', { class: 'row-text' }, h('span', { class: 'row-title', dir: locked ? null : 'auto', text: title }), h('span', { class: 'row-sub', text: sub })));
     if (entry.encrypted) {
-      const lockIcon = h('span', { class: 'row-lock', title: locked ? 'Encrypted, locked' : 'Encrypted, unlocked', 'aria-label': locked ? 'Locked' : 'Unlocked', role: 'img' }, icon(locked ? 'lockFill' : 'lockOpen'));
+      const lockIcon = h('span', { class: 'row-lock', title: locked ? t('encryptedLocked') : t('encryptedUnlocked'), 'aria-label': locked ? t('locked') : t('unlocked'), role: 'img' }, icon(locked ? 'lockFill' : 'lockOpen'));
       main.append(lockIcon);
     }
     on(main, 'click', () => select(entry.key));
@@ -1102,11 +1574,11 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     });
     on(li, 'contextmenu', ev => {
       ev.preventDefault();
-      const items = [['Remove from List', () => removeAndRefocus(entry, main)]];
-      if (entry.encrypted && entry.conversation) items.unshift(['Lock', () => lock(entry)]);
+      const items = [[t('removeFromList'), () => removeAndRefocus(entry, main)]];
+      if (entry.encrypted && entry.conversation) items.unshift([t('lock'), () => lock(entry)]);
       openMenu(ev.clientX, ev.clientY, items, main);
     });
-    const remove = h('button', { type: 'button', class: 'row-remove', 'aria-label': `Remove “${title}” from the list`, title: 'Remove from List' }, icon('xmark'));
+    const remove = h('button', { type: 'button', class: 'row-remove', 'aria-label': t('removeTitle', { title }), title: t('removeFromList') }, icon('xmark'));
     on(remove, 'click', ev => { ev.stopPropagation(); removeAndRefocus(entry, main); });
     li.append(main, remove);
     addShape(li, [{ seed: uuidSeed(locked ? entry.header && entry.header.id : entry.conversation && entry.conversation.id), radius: 8, amplitude: 1.4 }]);
@@ -1185,7 +1657,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function renderHeaderToggle() {
     if (!headerToggleSlot || !headerToggleSlot.isConnected) return;
     headerToggleSlot.replaceChildren();
-    if (!wallVisible()) headerToggleSlot.append(roundButton('sidebar', 'Show Sidebar', 'Show Sidebar', showWall));
+    if (!wallVisible()) headerToggleSlot.append(roundButton('sidebar', t('showSidebar'), t('showSidebar'), showWall));
   }
   function header(titleText, subText, trailing, titleIsFixed) {
     headerToggleSlot = h('div', { style: 'display:contents' });
@@ -1237,7 +1709,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     }
   }
   function failedScreen() {
-    return h('div', { class: 'room-body' }, h('div', { class: 'centred' }, h('p', { text: 'This conversation could not be shown.' })));
+    return h('div', { class: 'room-body' }, h('div', { class: 'centred' }, h('p', { text: t('failedConversation') })));
   }
 
   function emptyScreen() {
@@ -1245,10 +1717,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     // (Only the skin and light choice is saved, in this browser's storage; files never are.)
     const body = h('div', { class: 'scroller' }, h('div', { class: 'empty-detail' },
       tapedPicture('fort', 340, 1.5),
-      h('h1', { class: 'lettered big', text: 'Nobody here but us' }),
-      h('p', { text: 'Pick a note from the wall, or open a Parley conversation file.' }),
-      openButton('Open…'),
-      h('div', { class: 'privacy' }, lock, h('span', { text: 'Files you open stay in this browser tab. Nothing is uploaded.' }))));
+      h('h1', { class: 'lettered big', text: t('emptyTitle') }),
+      h('p', { text: t('emptyHint') }),
+      openButton(t('openEllipsis')),
+      h('div', { class: 'privacy' }, lock, h('span', { text: t('privacyNote') }))));
     return h('div', { class: 'room-body', style: 'flex:1' }, header(null, null), body);
   }
 
@@ -1256,10 +1728,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   // A decrypt attempt's state lives on the entry (decrypting, unlockError, unlockShake), not in the
   // screen: selecting another row and coming back builds a new screen that shows the same state.
   function unlockScreen(entry) {
-    const input = h('input', { type: 'password', placeholder: 'Password', 'aria-label': 'Password', autocomplete: 'off', spellcheck: 'false' });
+    const input = h('input', { type: 'password', placeholder: t('password'), 'aria-label': t('password'), autocomplete: 'off', spellcheck: 'false' });
     const field = h('div', { class: 'pw-field' }, input);
     addShape(field, [{ seed: 19, radius: 9, amplitude: 1.4, inset: 0.5 }]);
-    const unlockBtn = h('button', { type: 'button', class: 'tag-btn', disabled: true, text: 'Unlock' });
+    const unlockBtn = h('button', { type: 'button', class: 'tag-btn', disabled: true, text: t('unlock') });
     addShape(unlockBtn, [{ seed: 11, radius: 10, amplitude: 0.8 }], 'shadow-btn');
     const status = h('div', { class: 'status-slot', role: 'status', 'aria-live': 'polite' });
     const working = () => entry.decrypting !== null;
@@ -1269,7 +1741,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     on(unlockBtn, 'click', attempt);
 
     // The spinner alone, as in the app (with words for screen readers only).
-    if (working()) status.append(h('span', { class: 'spinner-line' }, spinner(), h('span', { class: 'sr-only', text: 'Decrypting' })));
+    if (working()) status.append(h('span', { class: 'spinner-line' }, spinner(), h('span', { class: 'sr-only', text: t('decrypting') })));
     else if (entry.unlockError) status.append(h('span', { class: 'notice danger' }, icon('xcircle'), h('span', { text: entry.unlockError })));
     refresh();
     if (!working() && entry.unlockShake) {
@@ -1307,26 +1779,26 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
           renderRoom();
           if (ours && entry.view) entry.view.scroller.focus({ preventScroll: true });
         }
-        announce('Unlocked');
+        announce(t('unlocked'));
         return;
       }
       entry.unlockError = error && (error.code === 'corrupt' || error.code === 'noWebCrypto') ? errorText(error)
-        : 'Wrong password, or the file has been tampered with.';
+        : t('errWrongPassword');
       entry.unlockShake = true;
       // The screen is rebuilt, so its status region is new: say the error through the announcer.
       if (selectedKey === entry.key) { renderRoom(); announce(entry.unlockError); }
     }
 
     const meta = h('div', { class: 'unlock-meta' },
-      h('div', { class: 'where', text: `“${entry.name}” · modified ${relative(entry.lastModified)}`, title: entry.name }),
-      h('div', { class: 'warn', text: 'Forgotten passwords can\'t be recovered.' }));
+      h('div', { class: 'where', text: t('unlockWhere', { name: entry.name, time: relative(entry.lastModified) }), title: entry.name }),
+      h('div', { class: 'warn', text: t('forgottenPasswords') }));
     const body = h('div', { class: 'scroller' }, h('div', { class: 'centred', style: 'padding:30px 40px' },
       tapedPicture('door', 220, 1),
-      h('h1', { class: 'lettered big', text: 'Encrypted Conversation', style: 'margin-top:8px' }),
-      h('p', { text: 'Enter the password to decrypt it in memory.', style: 'font-size:13px' }),
+      h('h1', { class: 'lettered big', text: t('encryptedTitle'), style: 'margin-top:8px' }),
+      h('p', { text: t('unlockHint'), style: 'font-size:13px' }),
       h('div', { class: 'pw-row' }, field, unlockBtn),
       status, meta));
-    const root = h('div', { class: 'room-body', style: 'flex:1' }, header('Locked Conversation', null, null, true), body);
+    const root = h('div', { class: 'room-body', style: 'flex:1' }, header(t('lockedTitle'), null, null, true), body);
     setTimeout(() => { if (input.isConnected && !input.disabled) input.focus(); }, 0);
     return root;
   }
@@ -1342,31 +1814,31 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function chatView(entry) {
     const c = entry.conversation;
     const settings = obj(c.settings) || {};
-    const title = str(c.title).trim() || 'Untitled';
+    const title = str(c.title).trim() || t('untitled');
     // No subtitle for a plain file (the app shows none for one in its default folder).
-    const sub = entry.encrypted ? `Encrypted · ${entry.name}` : '';
+    const sub = entry.encrypted ? t('encryptedSub', { name: entry.name }) : '';
     const trailing = [];
     const model = str(settings.model);
     if (model) trailing.push(parcelTag(model));
-    trailing.push(roundButton('info', 'Conversation details', 'Conversation details: system prompt and settings (read-only)', () => showInfo(entry)));
-    if (entry.encrypted) trailing.push(roundButton('lock', 'Lock', 'Lock: remove the decrypted conversation from memory', () => lock(entry)));
+    trailing.push(roundButton('info', t('conversationDetails'), t('detailsTip'), () => showInfo(entry)));
+    if (entry.encrypted) trailing.push(roundButton('lock', t('lock'), t('lockTip'), () => lock(entry)));
     const head = header(title, sub, trailing);
     const toggleSlot = headerToggleSlot;
 
     const column = h('div', { class: 'column' });
     const messages = arr(c.messages);
-    if (obj(c.forkedFrom)) column.append(h('div', { class: 'forked', text: 'Forked from another conversation' }));
+    if (obj(c.forkedFrom)) column.append(h('div', { class: 'forked', text: t('forkedFrom') }));
     if (!messages.length) column.append(invitation(model));
     const notes = thinkingOffRepeats(messages);
     messages.forEach((m, i) => {
       let row;
-      try { row = messageRow(entry, c, m, notes[i]); } catch (_) { row = h('div', { class: 'msg' }, h('div', { class: 'row-failed', text: 'This message could not be shown.' })); }
+      try { row = messageRow(entry, c, m, notes[i]); } catch (_) { row = h('div', { class: 'msg' }, h('div', { class: 'row-failed', text: t('messageFailed') })); }
       column.append(row);
     });
     const sentinel = h('div', { 'aria-hidden': 'true', style: 'height:1px' });
     column.append(sentinel);
     const scroller = h('div', { class: 'scroller' + (messages.length ? '' : ' no-messages'), tabindex: '-1' }, column);
-    const toBottom = h('button', { type: 'button', class: 'to-bottom', 'aria-label': 'Scroll to Bottom', title: 'Scroll to the latest message', tabindex: '-1' }, icon('arrowDown'));
+    const toBottom = h('button', { type: 'button', class: 'to-bottom', 'aria-label': t('scrollToBottom'), title: t('scrollToLatest'), tabindex: '-1' }, icon('arrowDown'));
     on(toBottom, 'click', () => scrollToEnd(scroller, true));
     const io = new IntersectionObserver(list => {
       const visible = list[list.length - 1].isIntersecting;
@@ -1390,7 +1862,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   }
 
   function parcelTag(model) {
-    const tag = h('div', { class: 'parcel', title: model, role: 'img', 'aria-label': `Model: ${model}` }, icon('cpu'), h('span', { class: 'parcel-text', text: middle(model, 36) }));
+    const tag = h('div', { class: 'parcel', title: model, role: 'img', 'aria-label': t('modelLabel', { model }) }, icon('cpu'), h('span', { class: 'parcel-text', text: middle(model, 36) }));
     const svg = s('svg', { class: 'shape', 'aria-hidden': 'true', focusable: 'false' });
     const path = s('path', { class: 'tag' }), hole = s('circle', { r: 3.5 }), string = s('path', { class: 'string' });
     svg.append(path, hole, string);
@@ -1410,8 +1882,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function invitation(model) {
     const card = h('div', { class: 'invite' },
       lantern(46),
-      h('div', { class: 'lettered', style: 'font-size:28px;margin-top:2px', text: 'The lantern\'s on' }),
-      h('div', { style: 'color:var(--inkSoft)', text: 'This conversation has no messages yet.' }));
+      h('div', { class: 'lettered', style: 'font-size:28px;margin-top:2px', text: t('lanternOn') }),
+      h('div', { style: 'color:var(--inkSoft)', text: t('noMessagesYet') }));
     if (model) card.append(h('div', { style: 'font-size:14px;font-weight:600;margin-top:8px', text: middle(model, 48) }));
     addShape(card, [{ seed: 4, radius: 18, amplitude: 1.4, cls: 'fill' }, { seed: 4, radius: 13, amplitude: 0.8, inset: 5, cls: 'stitch' }], 'shadow-paper');
     card.append(washi('var(--rose)', 84, 20, -2.5, 'translateX(-50%)'));
@@ -1441,19 +1913,19 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const usage = footerUsage(m), stats = latestStats(m);
     if (usage) {
       const parts = [];
-      if (num(usage.promptTokens) !== null) parts.push(`${usage.promptTokens} prompt`);
-      if (num(usage.completionTokens) !== null) parts.push(`${usage.completionTokens} completion`);
-      if (num(usage.totalTokens) !== null) parts.push(`${usage.totalTokens} total`);
-      if (parts.length) groups.push(parts.join(' · ') + ' tokens');
+      if (num(usage.promptTokens) !== null) parts.push(t('usagePrompt', { n: usage.promptTokens }));
+      if (num(usage.completionTokens) !== null) parts.push(t('usageCompletion', { n: usage.completionTokens }));
+      if (num(usage.totalTokens) !== null) parts.push(t('usageTotal', { n: usage.totalTokens }));
+      if (parts.length) groups.push(t('usageTokens', { parts: parts.join(' · ') }));
     }
     if (stats) {
       const approx = stats.isEstimated === true ? '≈' : '';
-      if (!groups.length && num(stats.completionTokens) !== null) groups.push(`${approx}${stats.completionTokens} tokens`);
-      if (num(stats.tokensPerSecond) !== null) groups.push(approx + rate(stats.tokensPerSecond) + ' tok/s');
-      if (num(stats.timeToFirstToken) !== null) groups.push(seconds(stats.timeToFirstToken) + ' to first token');
+      if (!groups.length && num(stats.completionTokens) !== null) groups.push(t('tokensCount', { n: approx + stats.completionTokens }));
+      if (num(stats.tokensPerSecond) !== null) groups.push(t('tokensPerSecond', { rate: approx + rate(stats.tokensPerSecond) }));
+      if (num(stats.timeToFirstToken) !== null) groups.push(t('firstToken', { time: seconds(stats.timeToFirstToken) }));
     }
     const n = arr(m.toolRounds).length;
-    if (n > 0) groups.push(n === 1 ? '1 tool round' : `${n} tool rounds`);
+    if (n > 0) groups.push(n === 1 ? t('toolRoundOne') : t('toolRounds', { n }));
     return groups.join(' · ');
   }
   function finishNote(m, settings) {
@@ -1465,12 +1937,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const maxTokens = num(settings.maxTokens);
     const contextFull = maxTokens === null ? true : (completion !== null && completion < maxTokens);
     const emptyButThought = str(m.content).trim() === '' && str(m.reasoning) !== '';
-    if (emptyButThought) return contextFull
-      ? 'The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer.'
-      : 'The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate.';
-    return contextFull
-      ? 'The reply was cut off at the end of the context (or the server\'s own output limit). Start a new chat, fork from an earlier message or roll back to make room.'
-      : 'The reply was cut off at the token limit (Max tokens).';
+    if (emptyButThought) return contextFull ? t('finishThinkingContext') : t('finishThinkingTokens');
+    return contextFull ? t('finishContext') : t('finishTokens');
   }
   function thinkingOffKind(m) {
     if (m.role !== 'assistant') return null;
@@ -1493,16 +1961,14 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const k = thinkingOffKind(m);
     if (!k) return null;
     let first;
-    if (k === 'notAccepted') first = 'This server did not accept “None (no thinking)”, so this reply used its default thinking.';
+    if (k === 'notAccepted') first = t('thinkingNotAccepted');
     else {
-      first = 'This server or model ignored “None (no thinking)”: the reply still contains thinking.';
       const kind = str(m.thinkingOffServerKind);
-      if (kind === 'lmStudio') first += ' LM Studio may offer a thinking switch in this model\'s settings.';
-      else if (kind === 'llamaCpp' || kind === 'vLLM') first += ' The model\'s chat template may not support turning it off.';
+      first = kind === 'lmStudio' ? t('thinkingIgnoredLMStudio')
+        : kind === 'llamaCpp' || kind === 'vLLM' ? t('thinkingIgnoredTemplate') : t('thinkingIgnored');
     }
     if (!repeated) return [first, first];
-    return [k === 'notAccepted' ? '“None” was not accepted again, so this reply also used the default thinking.'
-      : '“None” was ignored again: this reply also contains thinking.', first];
+    return [k === 'notAccepted' ? t('thinkingNotAcceptedAgain') : t('thinkingIgnoredAgain'), first];
   }
   /** Trims '.' and whitespace from both ends with index loops (a `[…]+$` regex turns quadratic). */
   const DOT_OR_SPACE_RE = /^[.\s]$/;
@@ -1515,12 +1981,12 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function toolNoteText(note) {
     const detail = typeof note.detail === 'string' ? note.detail : null;
     switch (note.kind) {
-      case 'toolsNotAccepted': return 'The model\'s server did not accept tools, so this reply was written without them.';
-      case 'toolsNotOffered': return 'Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata.';
-      case 'serverUnavailable': return `${trimDotsAndSpaces(detail ?? 'A server')}. Its tools were not offered.`;
-      case 'roundLimit': return `Reached the limit of ${detail ?? ''} tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP.`;
-      case 'callsNotRun': return 'The reply ended inside a tool call, so it was not run.';
-      case 'emptyAfterTools': return 'The model wrote nothing after the tool results.';
+      case 'toolsNotAccepted': return t('noteToolsNotAccepted');
+      case 'toolsNotOffered': return t('noteToolsNotOffered');
+      case 'serverUnavailable': return t('noteServerUnavailable', { server: trimDotsAndSpaces(detail ?? t('noteSomeServer')) });
+      case 'roundLimit': return t('noteRoundLimit', { n: detail ?? '' });
+      case 'callsNotRun': return t('noteCallsNotRun');
+      case 'emptyAfterTools': return t('noteEmptyAfterTools');
       default: return detail ?? '';
     }
   }
@@ -1613,7 +2079,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const h1 = firstElementText(html.split('\n').join(' '), 'h1', true);
     const h1Text = h1 === null ? '' : htmlPlainText(h1);
     if (h1Text) return first200(h1Text);
-    return 'HTML page';
+    return t('htmlPage');
   }
   /** splitHTTP: "HTTP <status>[:] <body>" with the body trimmed. */
   function splitHTTP(text) {
@@ -1643,31 +2109,29 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       }
       status = 'HTTP ' + code;
       const msg = serverMessage(body);
-      if (code === 401 || code === 403) { title = 'The server rejected the API key'; detail = msg ?? 'Check the API key for the server in Settings.'; }
-      else if (code === 404) { title = 'Model or endpoint not found'; detail = msg ? `Check the model ID and the base URL. The server said: ${msg}` : 'Check the model ID and the base URL (it usually ends in /v1).'; }
-      else if (code === 429) { title = 'Too many requests'; detail = msg ?? 'The server is rate limiting. Wait a moment and try again.'; }
-      else if (code >= 500 && code <= 599) { title = msg ?? 'The server had a problem'; detail = msg ? null : 'Try again in a moment.'; }
-      else if (code >= 300 && code <= 399) { title = 'The server redirected the request'; detail = 'Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.'; }
-      else title = msg ?? 'The server rejected the request';
+      if (code === 401 || code === 403) { title = t('errApiKeyTitle'); detail = msg ?? t('errApiKeyDetail'); }
+      else if (code === 404) { title = t('errNotFoundTitle'); detail = msg ? t('errNotFoundSaid', { message: msg }) : t('errNotFoundDetail'); }
+      else if (code === 429) { title = t('errTooManyTitle'); detail = msg ?? t('errTooManyDetail'); }
+      else if (code >= 500 && code <= 599) { title = msg ?? t('errServerProblem'); detail = msg ? null : t('errTryAgain'); }
+      else if (code >= 300 && code <= 399) { title = t('errRedirectTitle'); detail = t('errRedirectDetail'); }
+      else title = msg ?? t('errRejected');
     } else if (afterAPI.startsWith('The connection closed before the reply finished')) {
       const partial = str(m.content) !== '' || str(m.reasoning) !== '' || arr(m.toolRounds).length > 0;
-      const cause = text.includes(' (through Cloudflare)')
-        ? 'The connection through Cloudflare closed mid-reply: the server or the network went away.'
-        : 'The server stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN).';
-      title = 'The connection dropped before the reply finished';
-      detail = (partial ? 'The text received so far is kept. ' : '') + cause + ' Retry asks for the whole reply again.';
+      const cause = text.includes(' (through Cloudflare)') ? t('errDropCloudflare') : t('errDropNetwork');
+      title = t('errDropTitle');
+      detail = t(partial ? 'errDropDetailPartial' : 'errDropDetail', { cause });
     } else if (text.startsWith('API error: ')) {
       title = afterAPI; rawOut = null;
     } else if (['could not connect to the server', 'connection refused', 'hostname could not be found', 'network connection was lost', 'appears to be offline'].some(k => lower.includes(k))) {
-      title = 'Can\'t reach the server'; detail = 'Is the server running? ' + text; rawOut = null;
+      title = t('errUnreachableTitle'); detail = t('errUnreachableDetail', { error: text }); rawOut = null;
     } else if (lower.includes('timed out')) {
-      title = 'The server took too long to respond'; detail = text; rawOut = null;
+      title = t('errTimeoutTitle'); detail = text; rawOut = null;
     }
     const defs = num(m.toolDefinitionTokens);
     if (defs !== null && defs > 0 && lower.includes('context')) {
-      detail = (detail ? detail + ' ' : '') + `Tool definitions take about ${grouped(defs)} tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).`;
+      detail = detail ? t('errToolDefsAfter', { detail, n: grouped(defs) }) : t('errToolDefs', { n: grouped(defs) });
     }
-    return { title: title || 'Error', detail, status, raw: rawOut };
+    return { title: title || t('errGeneric'), detail, status, raw: rawOut };
   }
   function errorCallout(raw, m) {
     const p = presentError(raw, m);
@@ -1677,18 +2141,18 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     if (p.status) row.append(h('span', { text: p.status }));
     let rawEl = null;
     if (p.raw && p.raw !== p.title) {
-      const toggle = h('button', { type: 'button', class: 'callout-toggle', 'aria-expanded': 'false', text: 'Details' });
+      const toggle = h('button', { type: 'button', class: 'callout-toggle', 'aria-expanded': 'false', text: t('details') });
       on(toggle, 'click', () => {
         const open = toggle.getAttribute('aria-expanded') !== 'true';
         toggle.setAttribute('aria-expanded', String(open));
-        toggle.textContent = open ? 'Hide Details' : 'Details';
+        toggle.textContent = open ? t('hideDetails') : t('details');
         if (open && !rawEl) { rawEl = h('pre', { class: 'callout-raw', text: p.raw }); text.append(rawEl); }
         if (rawEl) rawEl.hidden = !open;
       });
       row.append(toggle);
     }
     if (row.childNodes.length) text.append(row);
-    return h('div', { class: 'callout', title: displayText(raw), role: 'group', 'aria-label': `Error: ${p.title}` }, icon('triangleFill'), text);
+    return h('div', { class: 'callout', title: displayText(raw), role: 'group', 'aria-label': t('errorLabel', { title: p.title }) }, icon('triangleFill'), text);
   }
   function smallNote(iconName, text, tip) {
     return h('div', { class: 'small-note', title: tip || null }, icon(iconName), h('span', { text }));
@@ -1760,8 +2224,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   }
   function codeBlock(language, code) {
     const card = h('div', { class: 'code-card' },
-      h('div', { class: 'code-head' }, h('span', { class: 'code-lang', text: language || 'code' }),
-        copyButton('code-copy', 'Copy Code', 'Copy code', () => code, 'Copied')),
+      h('div', { class: 'code-head' }, h('span', { class: 'code-lang', text: language || t('codeDefault') }),
+        copyButton('code-copy', t('copyCode'), t('copyCodeTip'), () => code, t('copied'))),
       h('pre', { class: 'code-body', dir: 'ltr', tabindex: '0' }, h('code', { text: code })));
     addShape(card, [{ seed: 5, radius: 12, amplitude: 0.8 }], 'shadow-code');
     return card;
@@ -1769,15 +2233,15 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   // ---- disclosure (thinking, ReAct thought)
   function disclosure(text, duration) {
-    const label = duration !== null ? `Thought for ${thoughtFor(duration)}` : 'Thoughts';
-    const btn = h('button', { type: 'button', class: 'disclosure-btn', 'aria-expanded': 'false', 'aria-label': 'Show thinking' },
+    const label = duration !== null ? t('thoughtFor', { duration: thoughtFor(duration) }) : t('thoughts');
+    const btn = h('button', { type: 'button', class: 'disclosure-btn', 'aria-expanded': 'false', 'aria-label': t('showThinking') },
       icon('chevron', 'chev'), icon('bubble'), h('span', { text: label }));
     const wrap = h('div', { class: 'thinking' }, btn);
     let body = null;
     on(btn, 'click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
       btn.setAttribute('aria-expanded', String(open));
-      btn.setAttribute('aria-label', open ? 'Hide thinking' : 'Show thinking');
+      btn.setAttribute('aria-label', open ? t('hideThinking') : t('showThinking'));
       if (open && !body) { body = h('div', { class: 'thinking-body', dir: 'auto', text }); wrap.append(body); }
       if (body) body.hidden = !open;
     });
@@ -1786,23 +2250,23 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   // ---- tool calls
   const STATUS = {
-    completed: ['check', 'Done', 'var(--moss)'],
-    toolError: ['triangle', 'Tool error', 'var(--danger)'],
-    failed: ['triangle', 'Failed', 'var(--danger)'],
-    timedOut: ['triangle', 'Timed out', 'var(--caution)'],
-    denied: ['hand', 'Denied', 'var(--caution)'],
-    notCalled: ['xmark', 'Not called', 'var(--inkSoft)'],
+    completed: ['check', t('statusDone'), 'var(--moss)'],
+    toolError: ['triangle', t('statusToolError'), 'var(--danger)'],
+    failed: ['triangle', t('statusFailed'), 'var(--danger)'],
+    timedOut: ['triangle', t('statusTimedOut'), 'var(--caution)'],
+    denied: ['hand', t('statusDenied'), 'var(--caution)'],
+    notCalled: ['xmark', t('statusNotCalled'), 'var(--inkSoft)'],
   };
   function statusOf(call) {
     const result = obj(call.result);
-    if (!result) return ['stop', 'Interrupted', 'var(--inkSoft)'];
-    if (result.status === 'cancelled') return ['stop', call.startedAt == null ? 'Stopped' : 'Interrupted', 'var(--inkSoft)'];
+    if (!result) return ['stop', t('statusInterrupted'), 'var(--inkSoft)'];
+    if (result.status === 'cancelled') return ['stop', call.startedAt == null ? t('statusStopped') : t('statusInterrupted'), 'var(--inkSoft)'];
     // Own keys only: a status such as "constructor" must not reach Object.prototype.
     return typeof result.status === 'string' && Object.prototype.hasOwnProperty.call(STATUS, result.status)
-      ? STATUS[result.status] : ['question', 'Finished', 'var(--inkSoft)'];
+      ? STATUS[result.status] : ['question', t('statusFinished'), 'var(--inkSoft)'];
   }
   function toolTitle(call) {
-    const tool = MD.line(str(call.toolName) || str(call.name)) || 'Unknown tool';
+    const tool = MD.line(str(call.toolName) || str(call.name)) || t('unknownTool');
     if (typeof call.serverName !== 'string') return tool;
     const server = Array.from(MD.line(call.serverName));
     return (server.length > 24 ? server.slice(0, 24).join('') + '…' : server.join('')) + ' › ' + tool;
@@ -1824,6 +2288,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       return raw;
     }
   }
+  /** The fixed texts the model was sent (ToolResultText in the app): kept in English, like the stored results. */
   function replayResult(call) {
     const result = obj(call.result);
     if (result) return str(result.text) !== '' ? result.text : '(The tool returned no output.)';
@@ -1832,7 +2297,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function boardBlock(title, original) {
     const pre = h('pre', { class: 'board-text', dir: 'auto', tabindex: '0', text: MD.visible(original) });
     const block = h('div', { class: 'board-block' },
-      h('div', { class: 'board-head' }, h('span', { class: 'board-title', text: title }), copyButton('board-copy', `Copy ${title}`, `Copy ${title}`, () => original)),
+      h('div', { class: 'board-head' }, h('span', { class: 'board-title', text: title }), copyButton('board-copy', t('copyBlock', { title }), t('copyBlock', { title }), () => original)),
       pre);
     return { block, pre };
   }
@@ -1841,14 +2306,14 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     requestAnimationFrame(() => {
       if (!pre.isConnected) return;
       const height = pre.scrollHeight;
-      if (height > max) block.append(h('div', { class: 'board-more', text: `About ${Math.ceil(height / 17)} lines. Scroll to see all of them.` }));
+      if (height > max) block.append(h('div', { class: 'board-more', text: t('aboutLines', { n: grouped(Math.ceil(height / 17)) }) }));
     });
   }
   function toolCallRow(call) {
     const [statusIcon, statusText, color] = statusOf(call);
     const title = toolTitle(call);
     const result = obj(call.result);
-    const slip = h('button', { type: 'button', class: 'slip', 'aria-expanded': 'false', 'aria-label': `${title}, ${statusText}`, 'aria-description': 'Shows the arguments and result' },
+    const slip = h('button', { type: 'button', class: 'slip', 'aria-expanded': 'false', 'aria-label': t('slipLabel', { title, status: statusText }), 'aria-description': t('showsArgs') },
       icon('chevron', 'chev'), icon('wrench', 'wrench'), h('span', { class: 'slip-title', text: title }), h('span', { class: 'slip-dot', text: '·', 'aria-hidden': 'true' }));
     const st = h('span', { class: 'slip-status' }, icon(statusIcon), h('span', { text: statusText }));
     st.style.color = color;
@@ -1861,12 +2326,12 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     on(slip, 'click', () => {
       const open = slip.getAttribute('aria-expanded') !== 'true';
       slip.setAttribute('aria-expanded', String(open));
-      slip.setAttribute('aria-description', open ? 'Hides the arguments and result' : 'Shows the arguments and result');
+      slip.setAttribute('aria-description', open ? t('hidesArgs') : t('showsArgs'));
       if (open && !body) {
         body = h('div', { class: 'tool-body' });
-        const args = boardBlock('Arguments', prettyArguments(str(call.arguments)));
+        const args = boardBlock(t('arguments'), prettyArguments(str(call.arguments)));
         body.append(args.block);
-        const res = boardBlock('Result', replayResult(call));
+        const res = boardBlock(t('result'), replayResult(call));
         body.append(res.block);
         if (result) {
           const lines = h('div', { class: 'tool-lines' });
@@ -1874,10 +2339,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
           if (total !== null) {
             const matches = str(result.text).match(/showing the first (\d+) of/g);
             const shown = matches ? matches[matches.length - 1].replace(/\D/g, '') : null;
-            lines.append(h('div', { text: shown ? `Truncated: showing ${grouped(Number(shown))} of ${grouped(total)} characters.` : `Truncated: ${grouped(total)} characters in all.` }));
+            lines.append(h('div', { text: shown ? t('truncatedShowing', { shown: grouped(Number(shown)), total: grouped(total) }) : t('truncatedTotal', { total: grouped(total) }) }));
           }
           const omitted = arr(result.omitted).filter(x => typeof x === 'string');
-          if (omitted.length) lines.append(h('div', { text: `Not shown to the model: ${omitted.join('; ')}.` }));
+          if (omitted.length) lines.append(h('div', { text: t('notShownToModel', { items: omitted.join('; ') }) }));
           if (lines.childNodes.length) body.append(lines);
         }
         wrap.append(body);
@@ -1895,7 +2360,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const strip = h('div', { class: 'strip' });
     for (const a of attachments) {
       if (!obj(a)) continue;
-      const filename = str(a.filename) || 'attachment';
+      const filename = str(a.filename) || t('attachmentDefault');
       if (a.kind === 'image') strip.append(imageThumb(entry, a, filename));
       else strip.append(textChip(a, filename));
     }
@@ -1917,7 +2382,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   }
   function imageThumb(entry, a, filename) {
     const url = imageURL(entry, a);
-    const btn = h('button', { type: 'button', class: 'thumb', title: filename, 'aria-label': `Image ${filename}` });
+    const btn = h('button', { type: 'button', class: 'thumb', title: filename, 'aria-label': t('imageLabel', { name: filename }) });
     if (url) {
       const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' });
       img.src = url; // a blob: URL made here from validated base64, never a URL from the file
@@ -1934,7 +2399,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     return btn;
   }
   function textChip(a, filename) {
-    const chip = h('button', { type: 'button', class: 'chip', title: 'Click to preview', 'aria-label': `Text file ${filename}, click to preview` },
+    const chip = h('button', { type: 'button', class: 'chip', title: t('clickToPreview'), 'aria-label': t('textFileLabel', { name: filename }) },
       icon('doc'), h('span', { text: middle(filename, 28) }));
     addShape(chip, [{ seed: uuidSeed(a.id), radius: 9, amplitude: 1.4 }], 'shadow-paper');
     chip.__shape.svg.firstChild.style.fill = 'var(--card)';
@@ -1960,18 +2425,18 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       stack.append(note);
     }
     if (str(m.error) !== '') stack.append(errorCallout(m.error, m));
-    const actions = h('div', { class: 'actions' }, copyButton('paper-btn', 'Copy', 'Copy', () => str(m.content)));
+    const actions = h('div', { class: 'actions' }, copyButton('paper-btn', t('copy'), t('copy'), () => str(m.content)));
     return h('div', { class: 'msg msg-user' }, actions, stack);
   }
   function assistantRow(entry, c, m, repeated) {
     const settings = obj(c.settings) || {};
     const row = h('div', { class: 'msg msg-assistant' });
     const created = dateOf(m.createdAt);
-    const modelName = str(m.model) || 'Assistant';
+    const modelName = str(m.model) || t('assistant');
     const time = created ? fmtTime(created) : '';
-    const headEl = h('div', { class: 'a-head', role: 'group', 'aria-label': `Assistant, ${str(m.model) || 'unknown model'}, ${time}` },
+    const headEl = h('div', { class: 'a-head', role: 'group', 'aria-label': t('assistantLabel', { model: str(m.model) || t('unknownModel'), time }) },
       lantern(16), h('span', { class: 'a-model', text: modelName }), h('span', { class: 'a-time', text: time }),
-      h('div', { class: 'actions' }, copyButton('paper-btn', 'Copy', 'Copy', () => visibleText(m))));
+      h('div', { class: 'actions' }, copyButton('paper-btn', t('copy'), t('copy'), () => visibleText(m))));
     row.append(headEl);
     for (const round of arr(m.toolRounds)) {
       if (!obj(round)) continue;
@@ -1988,9 +2453,9 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     if (error === '') { const finish = finishNote(m, settings); if (finish) row.append(smallNote('scissors', finish)); }
     const off = thinkingOffText(m, repeated);
     if (off) row.append(smallNote('info', off[0], off[1]));
-    for (const note of arr(m.toolNotes)) if (obj(note)) { const t = toolNoteText(note); if (t) row.append(smallNote('info', t, str(note.detail))); }
+    for (const note of arr(m.toolNotes)) if (obj(note)) { const noteText = toolNoteText(note); if (noteText) row.append(smallNote('info', noteText, str(note.detail))); }
     if (error !== '') row.append(errorCallout(error, m));
-    else if (m.isComplete === false) row.append(h('div', { class: 'stopped', text: 'Stopped before the reply finished.' }));
+    else if (m.isComplete === false) row.append(h('div', { class: 'stopped', text: t('stoppedBeforeFinish') }));
     const footer = footerLine(m);
     if (footer) row.append(h('div', { class: 'footer-stats', text: footer }));
     return row;
@@ -2012,7 +2477,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   /** Empties a dialog, including the per-image label (a file name from the conversation). */
   function clearDialog(d) {
     d.replaceChildren();
-    if (d === imageDialog) d.setAttribute('aria-label', 'Image preview');
+    if (d === imageDialog) d.setAttribute('aria-label', t('imagePreview'));
   }
   // 'close' fires later; Lock and Remove clear every dialog now.
   function closeDialogs() { gate.cancel(); for (const d of allDialogs) { if (d.open) d.close(); clearDialog(d); } }
@@ -2036,16 +2501,16 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   function showLinkSheet(link) {
     const host = link.host.length > 90 ? '…' + link.host.slice(-89) : link.host;
-    const address = boardBlock('Address', link.address);
+    const address = boardBlock(t('address'), link.address);
     address.pre.classList.add('address');
     const card = h('div', { class: 'notice-card' },
-      h('div', { class: 'notice-head' }, h('span', { class: 'hand', 'aria-hidden': 'true' }, icon('hand')), h('h2', { id: 'link-title', text: 'Open this link in your browser?' })),
-      h('p', { text: 'Opening sends the whole address to this site, including anything a model put in it.' }),
-      h('div', { class: 'site' }, h('span', { class: 'site-label', text: 'Site' }), h('span', { class: 'site-host', text: host, title: link.host })),
+      h('div', { class: 'notice-head' }, h('span', { class: 'hand', 'aria-hidden': 'true' }, icon('hand')), h('h2', { id: 'link-title', text: t('linkTitle') })),
+      h('p', { text: t('linkWarning') }),
+      h('div', { class: 'site' }, h('span', { class: 'site-label', text: t('site') }), h('span', { class: 'site-host', text: host, title: link.host })),
       address.block);
-    if (link.hasHiddenCharacters) card.append(h('div', { class: 'hidden-warn' }, icon('triangleFill'), h('span', { text: 'The address contains hidden or right-to-left characters, shown here as \\u{…}.' })));
-    const cancel = h('button', { type: 'button', class: 'sheet-btn soft', text: 'Cancel', autofocus: true });
-    const open = h('button', { type: 'button', class: 'sheet-btn primary', text: 'Open', disabled: true });
+    if (link.hasHiddenCharacters) card.append(h('div', { class: 'hidden-warn' }, icon('triangleFill'), h('span', { text: t('hiddenChars') })));
+    const cancel = h('button', { type: 'button', class: 'sheet-btn soft', text: t('cancel'), autofocus: true });
+    const open = h('button', { type: 'button', class: 'sheet-btn primary', text: t('open'), disabled: true });
     on(cancel, 'click', () => linkDialog.close());
     on(open, 'click', () => { gate.confirm(); linkDialog.close(); });
     // Disabled for 0.4 s, so the second click of a double-click cannot land on it.
@@ -2056,14 +2521,14 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     noteOverflow(address.block, address.pre, 200);
   }
   function closeButton(dialog) {
-    const b = h('button', { type: 'button', class: 'sheet-btn soft sheet-close', text: 'Close' });
+    const b = h('button', { type: 'button', class: 'sheet-btn soft sheet-close', text: t('close') });
     on(b, 'click', () => dialog.close());
     return b;
   }
   function showImage(url, filename) {
     const img = h('img', { alt: filename });
     img.src = url;
-    imageDialog.setAttribute('aria-label', `Image ${filename}`);
+    imageDialog.setAttribute('aria-label', t('imageLabel', { name: filename }));
     imageDialog.replaceChildren(h('div', { class: 'sheet preview-sheet' }, img, closeButton(imageDialog)));
     showModal(imageDialog);
   }
@@ -2077,29 +2542,29 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const st = obj(c.settings) || {};
     const rows = [];
     const add = (k, v) => { if (v !== null && v !== undefined && v !== '') rows.push(h('dt', { text: k }), h('dd', { text: String(v) })); };
-    add('Model', str(st.model) || 'Provider default');
-    add('Temperature', num(st.temperature));
-    add('Max tokens', num(st.maxTokens) !== null ? grouped(st.maxTokens) : null);
-    const EFFORT = { low: 'Low', medium: 'Medium', high: 'High' };
+    add(t('infoModel'), str(st.model) || t('providerDefault'));
+    add(t('temperature'), num(st.temperature));
+    add(t('maxTokens'), num(st.maxTokens) !== null ? grouped(st.maxTokens) : null);
+    const EFFORT = { low: t('effortLow'), medium: t('effortMedium'), high: t('effortHigh') };
     const effort = Object.prototype.hasOwnProperty.call(EFFORT, str(st.reasoningEffort)) ? EFFORT[str(st.reasoningEffort)] : null;
-    add('Reasoning effort', st.disablesThinking === true ? 'None (no thinking)' : effort || null);
-    add('Thinking budget', num(st.reasoningBudgetTokens) !== null ? `${grouped(st.reasoningBudgetTokens)} tokens` : null);
-    add('Tool calling', st.toolMode === 'react' ? 'ReAct (text)' : 'Native');
+    add(t('reasoningEffort'), st.disablesThinking === true ? t('effortNone') : effort || null);
+    add(t('thinkingBudget'), num(st.reasoningBudgetTokens) !== null ? t('tokensCount', { n: grouped(st.reasoningBudgetTokens) }) : null);
+    add(t('toolCalling'), st.toolMode === 'react' ? t('toolModeReact') : t('toolModeNative'));
     const servers = arr(st.mcpServerIDs).length;
-    add('MCP servers', servers ? String(servers) : 'None');
-    if (st.builtInToolsOff === true) add('Built-in tools', 'Off');
+    add(t('mcpServers'), servers ? grouped(servers) : t('none'));
+    if (st.builtInToolsOff === true) add(t('builtInTools'), t('off'));
     const created = dateOf(c.createdAt), updated = dateOf(c.updatedAt);
-    add('Created', created ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, created) : null);
-    add('Updated', updated ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, updated) : null);
-    add('Messages', arr(c.messages).length);
-    if (obj(c.forkedFrom)) add('Fork', 'Forked from another conversation');
-    add('File', entry.name);
+    add(t('created'), created ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, created) : null);
+    add(t('updated'), updated ? fmt({ dateStyle: 'medium', timeStyle: 'short' }, updated) : null);
+    add(t('messages'), grouped(arr(c.messages).length));
+    if (obj(c.forkedFrom)) add(t('fork'), t('forkedFrom'));
+    add(t('file'), entry.name);
     const prompt = str(st.systemPrompt);
     infoDialog.replaceChildren(h('div', { class: 'sheet info-sheet' },
-      h('h2', { text: str(c.title).trim() || 'Untitled' }),
-      h('p', { class: 'viewer-note', text: 'Conversation settings, read-only. In Parley they live in the Conversation Settings popover.' }),
-      h('h2', { text: 'System prompt' }),
-      h('div', { class: 'info-prompt' + (prompt ? '' : ' none'), dir: prompt ? 'auto' : null, text: prompt || 'No system prompt.' }),
+      h('h2', { text: str(c.title).trim() || t('untitled') }),
+      h('p', { class: 'viewer-note', text: t('viewerNote') }),
+      h('h2', { text: t('systemPrompt') }),
+      h('div', { class: 'info-prompt' + (prompt ? '' : ' none'), dir: prompt ? 'auto' : null, text: prompt || t('noSystemPrompt') }),
       h('dl', { class: 'info-grid' }, ...rows),
       closeButton(infoDialog)));
     showModal(infoDialog);

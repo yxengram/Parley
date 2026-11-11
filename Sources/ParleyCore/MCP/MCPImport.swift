@@ -31,8 +31,8 @@ public enum MCPImportError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .notJSON: return "This text is not JSON."
-        case .noServers: return "No servers found. Paste an object with mcpServers, or entries that have a command or a url."
+        case .notJSON: return String(localized: "This text is not JSON.")
+        case .noServers: return String(localized: "No servers found. Paste an object with mcpServers, or entries that have a command or a url.")
         }
     }
 }
@@ -111,11 +111,11 @@ public enum MCPConfigImport {
 
         if server["disabled"]?.boolValue == true {
             config.isEnabled = false
-            warnings.append("Switched off in the pasted config, so it stays off here.")
+            warnings.append(String(localized: "Switched off in the pasted config, so it stays off here."))
         }
 
         if type == "sse" {
-            problem = "This server uses an older connection type (HTTP+SSE) that Parley does not support."
+            problem = String(localized: "This server uses an older connection type (HTTP+SSE) that Parley does not support.")
         } else if let url = server["url"]?.stringValue, server["command"] == nil {
             config.kind = MCPServerConfig.kindHTTP
             secrets.url = url
@@ -125,14 +125,14 @@ public enum MCPConfigImport {
                let scheme = URLComponents(string: url)?.scheme?.lowercased(), scheme == "http" || scheme == "https" {
                 config.urlHost = host
             } else {
-                problem = variablePresent(url) ? "The URL uses a variable, which Parley does not expand." : MCPError.invalidURL.errorDescription
+                problem = variablePresent(url) ? String(localized: "The URL uses a variable, which Parley does not expand.") : MCPError.invalidURL.errorDescription
             }
             if let name = secrets.invalidHeaderName { problem = MCPError.invalidHeader(name).errorDescription }
             if variablePresent(secrets.headers.values) {
-                warnings.append("A header value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing.")
+                warnings.append(String(localized: "A header value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing."))
             }
             if URLComponents(string: url)?.path.lowercased().hasSuffix("/sse") == true {
-                warnings.append("This URL looks like an older HTTP+SSE server, which Parley does not support. It may not connect.")
+                warnings.append(String(localized: "This URL looks like an older HTTP+SSE server, which Parley does not support. It may not connect."))
             }
         } else if let command = server["command"]?.stringValue, !command.isEmpty {
             config.kind = MCPServerConfig.kindStdio
@@ -142,24 +142,24 @@ public enum MCPConfigImport {
             config.envNames = secrets.env.keys.sorted()
             if let cwd = server["cwd"]?.stringValue, !cwd.isEmpty { config.workingDirectory = cwd }
             if variablePresent(secrets.args + secrets.env.values + [command]) {
-                warnings.append("The command, an argument or an environment value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing.")
+                warnings.append(String(localized: "The command, an argument or an environment value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing."))
             }
             if command.contains(" ") {
                 // The command goes to preferences, not the Keychain, so a whole command line with a
                 // token in it must not be saved. A full path may hold a space.
                 if command.hasPrefix("/") || command.hasPrefix("~") {
-                    warnings.append("The command contains a space. It is run as one program name; put arguments under args.")
+                    warnings.append(String(localized: "The command contains a space. It is run as one program name; put arguments under args."))
                 } else {
                     problem = MCPError.commandNotFound(name: command, searched: []).summary
                 }
             }
             danger = dangers(config: config, secrets: secrets)
         } else {
-            problem = "This entry has neither a command nor a url."
+            problem = String(localized: "This entry has neither a command nor a url.")
         }
 
         for key in ["envFile", "auth", "oauth"] where server[key] != nil {
-            warnings.append("\(key) is ignored: Parley reads no other files. To sign in, press Sign In in Settings > MCP.")
+            warnings.append(String(localized: "\(key) is ignored: Parley reads no other files. To sign in, press Sign In in Settings > MCP."))
         }
         return MCPImportEntry(config: config, secrets: secrets, warnings: warnings, danger: danger, error: problem)
     }
@@ -205,27 +205,27 @@ public enum MCPConfigImport {
         func flag(_ condition: Bool, _ text: String) {
             if condition { out.append(text) }
         }
-        flag(words.contains { ["sudo", "doas"].contains(basename($0)) }, "Runs with sudo: the server would have administrator rights.")
+        flag(words.contains { ["sudo", "doas"].contains(basename($0)) }, String(localized: "Runs with sudo: the server would have administrator rights."))
         flag(lower.range(of: #"\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r"#, options: .regularExpression) != nil,
-             "Contains rm -rf, which deletes files without asking.")
+             String(localized: "Contains rm -rf, which deletes files without asking."))
         flag(lower.range(of: #"\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh|python3?)\b"#, options: .regularExpression) != nil,
-             "Downloads a script and runs it at once.")
+             String(localized: "Downloads a script and runs it at once."))
         let shells: Set<String> = ["sh", "bash", "zsh", "dash", "fish"]
         flag(shells.contains(program) && programArguments.contains { $0.range(of: #"^-[a-z]*c"#, options: .regularExpression) != nil },
-             "Runs a shell command line rather than a program.")
+             String(localized: "Runs a shell command line rather than a program."))
         let scripting = program.range(of: #"^(python[0-9.]*|node|deno|bun|ruby|perl)$"#, options: .regularExpression) != nil
         flag(scripting && programArguments.contains { ["-c", "-e", "-p", "--eval", "--print"].contains($0) },
-             "Runs code written into its arguments rather than a program.")
-        flag(words.contains("eval") || lower.range(of: #"\beval\s"#, options: .regularExpression) != nil, "Uses eval.")
-        flag(lower.contains("chmod 777") || lower.contains("chmod -r 777"), "Changes file permissions to world-writable (chmod 777).")
-        flag(program == "osascript", "Runs AppleScript, which can control other apps.")
+             String(localized: "Runs code written into its arguments rather than a program."))
+        flag(words.contains("eval") || lower.range(of: #"\beval\s"#, options: .regularExpression) != nil, String(localized: "Uses eval."))
+        flag(lower.contains("chmod 777") || lower.contains("chmod -r 777"), String(localized: "Changes file permissions to world-writable (chmod 777)."))
+        flag(program == "osascript", String(localized: "Runs AppleScript, which can control other apps."))
         let sensitive = ["~/.ssh", "/.ssh/", "~/.aws", "/.aws/", "~/.gnupg", "/.gnupg/", "~/library/keychains", "/library/keychains", "/etc/"]
         let touched = (words + Array(secrets.env.values)).map { $0.lowercased() }
         flag(touched.contains { word in sensitive.contains { word.contains($0) } || word == "/etc" || word.hasSuffix("/.ssh") },
-             "Points at a sensitive folder (SSH keys, cloud credentials, the Keychain or /etc).")
-        flag(touched.contains { $0 == ".env" || $0.hasSuffix("/.env") }, "Points at a .env file, which usually holds secrets.")
+             String(localized: "Points at a sensitive folder (SSH keys, cloud credentials, the Keychain or /etc)."))
+        flag(touched.contains { $0 == ".env" || $0.hasSuffix("/.env") }, String(localized: "Points at a .env file, which usually holds secrets."))
         for name in secrets.env.keys.sorted() where changesWhatRuns(name) {
-            out.append("Sets \(name)=\(secrets.env[name] ?? ""), which changes what code runs.")
+            out.append(String(localized: "Sets \(name)=\(secrets.env[name] ?? ""), which changes what code runs."))
         }
         return out
     }

@@ -170,9 +170,9 @@ struct MCPSignInSection: View {
     private var attentionText: String? {
         switch needsAttention {
         case .none: return nil
-        case .signIn: return "Sign in required."
-        case .moreAccess: return "This server asked for more permission. Sign in again to grant it."
-        case .notSaved: return "A renewed sign-in could not be saved to the Keychain. It lasts until Parley quits."
+        case .signIn: return String(localized: "Sign in required.")
+        case .moreAccess: return String(localized: "This server asked for more permission. Sign in again to grant it.")
+        case .notSaved: return String(localized: "A renewed sign-in could not be saved to the Keychain. It lasts until Parley quits.")
         }
     }
 }
@@ -218,9 +218,9 @@ struct MCPSignInReviewSheet: View {
 
     private var title: String {
         switch review.kind {
-        case .metadataHost: return "Contact another host?"
-        case .provider: return "Sign in to \(ToolDisplay.address(review.server))"
-        case .moreHosts: return "Contact more hosts?"
+        case .metadataHost: return String(localized: "Contact another host?")
+        case .provider: return String(localized: "Sign in to \(ToolDisplay.address(review.server))")
+        case .moreHosts: return String(localized: "Contact more hosts?")
         }
     }
 
@@ -266,7 +266,7 @@ struct MCPSignInReviewSheet: View {
                 Text("Permissions requested:")
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(review.scopes, id: \.self) { scope in
-                        Text(verbatim: ToolDisplay.line(scope) + (review.newScopes.contains(scope) ? " (new)" : ""))
+                        Text(verbatim: review.newScopes.contains(scope) ? String(localized: "\(ToolDisplay.line(scope)) (new)") : ToolDisplay.line(scope))
                             .font(.callout.monospaced())
                             .fontDesign(.monospaced)
                             .foregroundStyle(Hideout.boardInk)

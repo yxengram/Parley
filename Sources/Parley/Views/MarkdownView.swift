@@ -96,7 +96,7 @@ struct CodeBlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Text(language.isEmpty ? "code" : language)
+                (language.isEmpty ? Text("code") : Text(verbatim: language))
                     .font(.caption2.weight(.medium))
                     .fontDesign(.monospaced)
                     .foregroundStyle(Hideout.boardInkSoft)

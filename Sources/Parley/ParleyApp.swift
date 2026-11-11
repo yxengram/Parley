@@ -2,13 +2,15 @@ import AppKit
 import SwiftUI
 import ParleyCore
 
-@main
+/// Started by `ParleyMain` (InterfaceLanguage.swift), which settles the interface language first.
 struct ParleyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private var appState: AppState { AppState.shared }
 
     init() {
         #if DEBUG
+        // Prints the interface language and exits when PARLEY_SNAPSHOT_LOCALE_PROBE is set.
+        SnapshotHarness.localeProbeIfRequested()
         // Must run before anything touches UserDefaults.standard or AppState.shared.
         SnapshotHarness.bootstrapIfNeeded()
         #endif
@@ -33,7 +35,7 @@ struct ParleyApp: App {
                 FileCommands(appState: appState)
             }
             CommandGroup(after: .sidebar) {
-                Button(appState.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
+                Button(appState.isSidebarVisible ? String(localized: "Hide Sidebar") : String(localized: "Show Sidebar")) {
                     appState.toggleSidebar()
                 }
                 .keyboardShortcut("s", modifiers: [.control, .command])
@@ -128,11 +130,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = result.count == 1
-            ? "A conversation could not be saved."
-            : "\(result.count) conversations could not be saved."
-        alert.informativeText = "Quitting now loses the changes that were not saved. \(result.firstError ?? "")"
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Quit Anyway")
+            ? String(localized: "A conversation could not be saved.")
+            : String(localized: "\(result.count) conversations could not be saved.")
+        let loss = String(localized: "Quitting now loses the changes that were not saved.")
+        alert.informativeText = [loss, result.firstError].compactMap { $0 }.joined(separator: " ")
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.addButton(withTitle: String(localized: "Quit Anyway"))
         return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
     }
 

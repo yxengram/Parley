@@ -23,6 +23,17 @@
 // environment, PATH included, so these come from Resources/PARLEY_SNAPSHOT_LAUNCH.json in a copy of
 // the bundle.
 //
+// Optional: PARLEY_SNAPSHOT_LOCALE_PROBE (any value, no PARLEY_SNAPSHOT_DIR needed) prints the
+// interface language the bundle resolves (Bundle.main.preferredLocalizations, a lookup in
+// Localizable.strings and InfoPlist.strings) to stdout and exits before any window, setting or
+// conversation is touched. Run the binary with e.g. -AppleLanguages '(zh-Hans)' to check a language.
+// tools/snapshot.sh passes -AppleLanguages and -AppleLocale when PARLEY_SNAPSHOT_LANG is set; the
+// argument domain is process-wide, so it is unaffected by the UserDefaults redirect below.
+// Optional: PARLEY_SNAPSHOT_MISSING_STRINGS writes keys looked up through NSBundle (String(localized:),
+// alerts, dialogs) without a translation for the interface language to missing-strings.txt in
+// PARLEY_SNAPSHOT_DIR. SwiftUI Text bypasses NSBundle: -NSShowNonLocalizedStrings YES shows its
+// misses in capitals instead.
+//
 // The app is never activated, its windows sit off-screen at alpha 0 and ignore the mouse.
 // See tools/snapshot.sh for the one-command run.
 //
@@ -64,6 +75,27 @@ enum SnapshotHarness {
     nonisolated static let outputDirectoryPath: String? = setting("PARLEY_SNAPSHOT_DIR")
 
     nonisolated static var isActive: Bool { outputDirectoryPath != nil }
+
+    /// See the header: prints the resolved interface language and exits.
+    nonisolated static func localeProbeIfRequested() {
+        guard ProcessInfo.processInfo.environment["PARLEY_SNAPSHOT_LOCALE_PROBE"] != nil else { return }
+        let info = Bundle.main.localizedInfoDictionary?["NSLocalNetworkUsageDescription"] as? String ?? "(none)"
+        let lines = [
+            "preferredLanguages=\(Locale.preferredLanguages)",
+            "bundleLocalizations=\(Bundle.main.localizations.sorted())",
+            "preferredLocalizations=\(Bundle.main.preferredLocalizations)",
+            "locale=\(Locale.current.identifier)",
+            "Cancel=\(String(localized: "Cancel"))",
+            // Not in the tables: with -NSShowNonLocalizedStrings YES it comes back in capitals and is logged.
+            "missingKey=\(Bundle.main.localizedString(forKey: "Probe key without a translation", value: nil, table: nil))",
+            "handLettering=\(Hideout.handLettering)",
+            // System error text follows the app's interface language too.
+            "urlError=\(URLError(.cannotConnectToHost).localizedDescription)",
+            "NSLocalNetworkUsageDescription=\(info)",
+        ]
+        FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+        exit(0)
+    }
 
     /// Set by tools/snapshot.sh in its legacy-SDK mode (PARLEY_SNAPSHOT_SDK): views that use
     /// Liquid Glass show their pre-macOS 26 fallback, which cacheDisplay can render.
@@ -181,6 +213,9 @@ enum SnapshotHarness {
         standardSuiteName = tmp.appendingPathComponent("standard").path
         redirectStandardDefaults(to: UserDefaults(suiteName: standardSuiteName))
         allowOffscreenWindows()
+        if setting("PARLEY_SNAPSHOT_MISSING_STRINGS") != nil, let out = outputDirectoryPath {
+            recordMissingLocalizations(to: URL(fileURLWithPath: out).appendingPathComponent("missing-strings.txt"))
+        }
         hideWindowsBeforeTheyAppear()
         startDate = Date()
 
@@ -191,7 +226,7 @@ enum SnapshotHarness {
             try? FileManager.default.removeItem(atPath: rootPath)
             exit(3)
         }
-        log("bootstrap: tmp=\(tmp.path) bundle=\(Bundle.main.bundleIdentifier ?? "nil") mock=\(mockURL ?? "none") strata=\(strataURL ?? "none")")
+        log("bootstrap: tmp=\(tmp.path) bundle=\(Bundle.main.bundleIdentifier ?? "nil") mock=\(mockURL ?? "none") strata=\(strataURL ?? "none") languages=\(Bundle.main.preferredLocalizations) locale=\(Locale.current.identifier) handLettering=\(Hideout.handLettering)")
     }
 
     /// Makes `UserDefaults.standard` (and AppKit's internal use of it: window frames, split
@@ -212,6 +247,70 @@ enum SnapshotHarness {
         guard UserDefaults.standard === suite else {
             FileHandle.standardError.write(Data("[snapshot] standard defaults redirect failed\n".utf8))
             exit(4)
+        }
+    }
+
+    /// Collects lookups in the app's Localizable table that have no entry for the interface
+    /// language, the ones SwiftUI silently shows in English. One key per line, in order of first use.
+    private final class MissingStrings: @unchecked Sendable {
+        nonisolated(unsafe) static var handle: FileHandle?
+        nonisolated(unsafe) static var seen = Set<String>()
+        static let lock = NSLock()
+
+        nonisolated static func record(_ key: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            guard seen.insert(key).inserted else { return }
+            let escaped = key.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\n", with: "\\n")
+            handle?.write(Data((escaped + "\n").utf8))
+        }
+    }
+
+    /// PARLEY_SNAPSHOT_MISSING_STRINGS: wraps the NSBundle lookups that String(localized:) (the
+    /// private _localizedStringForKey:value:table:localizations:), NSLocalizedString, alerts and
+    /// confirmation dialogs (localizedStringForKey:value:table:) use, so a miss in the main bundle's
+    /// Localizable table is written to missing-strings.txt. SwiftUI's Text looks strings up below
+    /// NSBundle, so its misses are not recorded here: run with -NSShowNonLocalizedStrings YES
+    /// (tools/snapshot.sh: PARLEY_SNAPSHOT_SHOW_MISSING=1) to see them in capitals. Debug harness only.
+    private static func recordMissingLocalizations(to url: URL) {
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        MissingStrings.handle = try? FileHandle(forWritingTo: url)
+        let sentinel = "\u{1}parley-missing\u{1}" as NSString
+        let main = Bundle.main
+        func isMiss(_ result: NSString, _ bundle: Bundle, _ table: NSString?) -> Bool {
+            let name = table.map { $0 as String } ?? ""
+            return bundle == main && (name.isEmpty || name == "Localizable")
+                && result.caseInsensitiveCompare(sentinel as String) == .orderedSame
+        }
+
+        let publicSelector = #selector(Bundle.localizedString(forKey:value:table:))
+        if let method = class_getInstanceMethod(Bundle.self, publicSelector) {
+            typealias LookupFn = @convention(c) (Bundle, Selector, NSString, NSString?, NSString?) -> NSString
+            let original = unsafeBitCast(method_getImplementation(method), to: LookupFn.self)
+            let block: @convention(block) (Bundle, NSString, NSString?, NSString?) -> NSString = { bundle, key, value, table in
+                if bundle == main, isMiss(original(bundle, publicSelector, key, sentinel, table), bundle, table) {
+                    MissingStrings.record(key as String)
+                }
+                return original(bundle, publicSelector, key, value, table)
+            }
+            method_setImplementation(method, imp_implementationWithBlock(block))
+        } else {
+            log("could not hook localizedString(forKey:value:table:)")
+        }
+
+        let privateSelector = NSSelectorFromString("_localizedStringForKey:value:table:localizations:")
+        if let method = class_getInstanceMethod(Bundle.self, privateSelector) {
+            typealias LookupFn = @convention(c) (Bundle, Selector, NSString, NSString?, NSString?, AnyObject?) -> NSString
+            let original = unsafeBitCast(method_getImplementation(method), to: LookupFn.self)
+            let block: @convention(block) (Bundle, NSString, NSString?, NSString?, AnyObject?) -> NSString = { bundle, key, value, table, localizations in
+                if bundle == main, isMiss(original(bundle, privateSelector, key, sentinel, table, localizations), bundle, table) {
+                    MissingStrings.record(key as String)
+                }
+                return original(bundle, privateSelector, key, value, table, localizations)
+            }
+            method_setImplementation(method, imp_implementationWithBlock(block))
+        } else {
+            log("could not hook _localizedStringForKey:value:table:localizations: (String(localized:) misses are not recorded)")
         }
     }
 
@@ -1396,7 +1495,7 @@ enum SnapshotHarness {
         let lastAssistant = Message(
             role: .assistant,
             content: """
-            Sure. When you build a `URL` with `URL(string:)`, Foundation expects a fully formed URL string, which means every character outside the allowed set has to be percent-encoded already; a path such as `/Users/thomas/My Projects/config.json` contains a space, so the initializer returns `nil` instead of guessing what you meant. Force-unwrapping that `nil` is what traps at runtime, and because the crash only happens for paths with spaces (or other reserved characters such as `#` or `%`), it tends to slip through testing on developer machines whose folders have simple names. `URL(fileURLWithPath:)` is different: it treats its argument as a file-system path rather than a URL string, escapes whatever it needs to internally, and always succeeds, so it is the right tool whenever the input is a path. As a rule of thumb, reach for `URL(string:)` only for real URLs that arrive already encoded, validate them with `guard let`, and surface a readable error to the user instead of crashing; for anything the user picks in an open panel, keep the `URL` the panel gives you rather than round-tripping it through a string at all.
+            Sure. When you build a `URL` with `URL(string:)`, Foundation expects a fully formed URL string, which means every character outside the allowed set has to be percent-encoded already; a path such as `/Users/you/My Projects/config.json` contains a space, so the initializer returns `nil` instead of guessing what you meant. Force-unwrapping that `nil` is what traps at runtime, and because the crash only happens for paths with spaces (or other reserved characters such as `#` or `%`), it tends to slip through testing on developer machines whose folders have simple names. `URL(fileURLWithPath:)` is different: it treats its argument as a file-system path rather than a URL string, escapes whatever it needs to internally, and always succeeds, so it is the right tool whenever the input is a path. As a rule of thumb, reach for `URL(string:)` only for real URLs that arrive already encoded, validate them with `guard let`, and surface a readable error to the user instead of crashing; for anything the user picks in an open panel, keep the `URL` the panel gives you rather than round-tripping it through a string at all.
             """,
             createdAt: ago(31),
             model: "qwen3-14b-instruct",

@@ -281,16 +281,19 @@ public enum ParleyError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .wrongPassword: return "Wrong password, or the file has been tampered with."
-        case .notAConversationFile: return "This file is not a Parley conversation."
-        case .unsupportedVersion(let v): return "Unsupported conversation file version \(v)."
-        case .corruptFile(let why): return "The conversation file is damaged: \(why)"
+        // Shown only (unlock sheet, open notices, composer): in the interface language. `why` is a
+        // fixed English damage code, as in Parley Reader.
+        case .wrongPassword: return String(localized: "Wrong password, or the file has been tampered with.")
+        case .notAConversationFile: return String(localized: "This file is not a Parley conversation.")
+        case .unsupportedVersion(let v): return String(localized: "Unsupported conversation file version \(v).")
+        case .corruptFile(let why): return String(localized: "The conversation file is damaged: \(why)")
+        // Stored in message.error and matched by the app's ErrorPresentation: always English.
         case .keychain(let status): return "Keychain error (OSStatus \(status))."
         case .invalidBaseURL(let s): return "Invalid API base URL: \(s)"
         case .http(let status, let body): return "HTTP \(status): \(body)"
         case .api(let msg): return "API error: \(msg)"
-        case .unsupportedAttachment(let name): return "Unsupported file type: \(name)"
-        case .attachmentTooLarge(let name): return "File is too large: \(name)"
+        case .unsupportedAttachment(let name): return String(localized: "Unsupported file type: \(name)")
+        case .attachmentTooLarge(let name): return String(localized: "File is too large: \(name)")
         }
     }
 }

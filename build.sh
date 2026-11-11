@@ -20,5 +20,10 @@ fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Resources/Art "$APP/Contents/Resources/Art"
+# Interface languages: English (development language, and the fallback for every other language)
+# and Simplified Chinese. The system picks one from the user's preferred languages.
+for lproj in Resources/*.lproj; do
+    cp -R "$lproj" "$APP/Contents/Resources/"
+done
 codesign --force --sign - "$APP" >/dev/null
 echo "Built $PWD/$APP"

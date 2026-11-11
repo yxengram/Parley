@@ -196,10 +196,10 @@ struct SidebarView: View {
         let now = Date()
         let weekAgo = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now)) ?? now
         var groups: [DateGroup] = [
-            DateGroup(title: "Today", dateStyle: .time, entries: []),
-            DateGroup(title: "Yesterday", dateStyle: .time, entries: []),
-            DateGroup(title: "Previous 7 Days", dateStyle: .weekday, entries: []),
-            DateGroup(title: "Older", dateStyle: .date, entries: []),
+            DateGroup(title: String(localized: "Today"), dateStyle: .time, entries: []),
+            DateGroup(title: String(localized: "Yesterday"), dateStyle: .time, entries: []),
+            DateGroup(title: String(localized: "Previous 7 Days"), dateStyle: .weekday, entries: []),
+            DateGroup(title: String(localized: "Older"), dateStyle: .date, entries: []),
         ]
         for entry in entries {
             let date = appState.sortDate(for: entry)
@@ -344,7 +344,7 @@ struct SidebarRow: View {
                     // Locked conversations show their folder, which helps tell them apart
                     // without decrypting anything.
                     if locked || !appState.settings.isInDefaultDirectory(url) {
-                        Text(" · " + url.deletingLastPathComponent().lastPathComponent)
+                        Text(verbatim: " · " + url.deletingLastPathComponent().lastPathComponent)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }

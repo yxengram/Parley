@@ -7,16 +7,28 @@ import ParleyCore
 struct BuiltInToolsSettingsView: View {
     @Environment(AppState.self) private var appState
 
-    private static let folderCloudWarning = "This folder may be synced to a cloud service. Reading a file that is not on this Mac yet downloads it first."
+    private static let folderCloudWarning = String(localized: "This folder may be synced to a cloud service. Reading a file that is not on this Mac yet downloads it first.")
+
+    /// `BuiltInTools.Tool.title` in the interface language. (ParleyCore's titles stay English.)
+    static func title(_ tool: BuiltInTools.Tool) -> String {
+        switch tool {
+        case .currentTime: return String(localized: "Current Time")
+        case .calculate: return String(localized: "Calculator")
+        case .listFiles: return String(localized: "List Files")
+        case .readFile: return String(localized: "Read File")
+        case .fetchURL: return String(localized: "Fetch Web Page")
+        case .browseURL: return String(localized: "Browse Web Page")
+        }
+    }
 
     static func explanation(_ tool: BuiltInTools.Tool) -> String {
         switch tool {
-        case .currentTime: return "The date, time and time zone of this Mac. Runs without asking."
-        case .calculate: return "Works out arithmetic on this Mac. Runs without asking."
-        case .listFiles: return "Names and sizes in the folder above, one level at a time. Asks every time."
-        case .readFile: return "Text files in the folder above. Asks every time."
-        case .fetchURL: return "Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host."
-        case .browseURL: return "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host."
+        case .currentTime: return String(localized: "The date, time and time zone of this Mac. Runs without asking.")
+        case .calculate: return String(localized: "Works out arithmetic on this Mac. Runs without asking.")
+        case .listFiles: return String(localized: "Names and sizes in the folder above, one level at a time. Asks every time.")
+        case .readFile: return String(localized: "Text files in the folder above. Asks every time.")
+        case .fetchURL: return String(localized: "Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host.")
+        case .browseURL: return String(localized: "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host.")
         }
     }
 
@@ -27,8 +39,8 @@ struct BuiltInToolsSettingsView: View {
         )
     }
 
-    static let otherSitesTitle = "Let Browse Web Page load from other sites"
-    static let otherSitesExplanation = "Off: a page may load only from the address you approved, so some pages show little. On: the page's scripts may contact other websites (CDNs, analytics and the like), which see your IP address and what the page sends them. Each is still checked to be a public address; images, video, fonts, other sites' frames, popups and downloads stay blocked. The card says which way this is."
+    static let otherSitesTitle = String(localized: "Let Browse Web Page load from other sites")
+    static let otherSitesExplanation = String(localized: "Off: a page may load only from the address you approved, so some pages show little. On: the page's scripts may contact other websites (CDNs, analytics and the like), which see your IP address and what the page sends them. Each is still checked to be a public address; images, video, fonts, other sites' frames, popups and downloads stay blocked. The card says which way this is.")
 
     private var otherSitesRow: some View {
         let settings = appState.settings
@@ -47,7 +59,7 @@ struct BuiltInToolsSettingsView: View {
     private func row(_ tool: BuiltInTools.Tool) -> some View {
         SettingsSwitchRow(isOn: isOn(tool)) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: tool.title)
+                Text(verbatim: Self.title(tool))
                 Text(verbatim: Self.explanation(tool))
                     .font(.caption)
                     .foregroundStyle(Hideout.inkSoft)
@@ -81,7 +93,7 @@ struct BuiltInToolsSettingsView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Folder")
-                        Text(folder.isEmpty ? "None. The file tools need one." : abbreviated(folder))
+                        Text(verbatim: folder.isEmpty ? String(localized: "None. The file tools need one.") : abbreviated(folder))
                             .font(.caption)
                             .foregroundStyle(Hideout.inkSoft)
                             .lineLimit(2)
@@ -126,7 +138,7 @@ struct BuiltInToolsSettingsView: View {
         panel.canChooseFiles = false
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
+        panel.prompt = String(localized: "Choose")
         if panel.runModal() == .OK, let url = panel.url {
             appState.settings.builtInFolderPath = url.path
         }

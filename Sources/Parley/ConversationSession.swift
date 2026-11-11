@@ -55,7 +55,10 @@ struct PendingToolApproval: Equatable, Identifiable {
     var isBuiltIn = false
 
     var offersAlwaysAllow: Bool { !readFromText && !asksEveryTime }
-    var definitionLabel: String { isBuiltIn ? "Definition from Parley" : "Definition from the server" }
+    /// Shown on the approval card only (never sent to the model).
+    var definitionLabel: String {
+        isBuiltIn ? String(localized: "Definition from Parley") : String(localized: "Definition from the server")
+    }
 }
 
 enum ToolApprovalDecision {
@@ -339,7 +342,7 @@ final class ConversationSession: Identifiable {
             let apiKey = try KeychainStore.apiKey(for: provider.id)
             client = try ChatClient(baseURL: provider.baseURL, apiKey: apiKey)
         } catch {
-            placeholder.error = error.localizedDescription
+            placeholder.error = SystemErrorText.english(error)
             conversation.messages.append(placeholder)
             conversation.updatedAt = Date()
             saveNow()
@@ -515,7 +518,8 @@ final class ConversationSession: Identifiable {
                 return
             case .failed(let failure):
                 if let idx = index(of: messageID) {
-                    conversation.messages[idx].error = failure.localizedDescription
+                    // Saved in the file: fixed English, translated when shown (ErrorPresentation).
+                    conversation.messages[idx].error = SystemErrorText.english(failure)
                     conversation.messages[idx].isComplete = false
                 }
                 endStreaming()
@@ -868,7 +872,8 @@ final class ConversationSession: Identifiable {
             return BuiltInTools.approvalDetail(toolName: binding.tool.name, arguments: arguments, folderPath: tools.builtInFolderPath(),
                                                browseOtherSites: tools.builtInBrowseOtherSites())
         }
-        return server.kind == MCPServerConfig.kindHTTP ? server.urlHost : "Local command: \(server.command)"
+        // Shown on the approval card only (never sent to the model).
+        return server.kind == MCPServerConfig.kindHTTP ? server.urlHost : String(localized: "Local command: \(server.command)")
     }
 
     private func call(_ callID: String, in messageID: UUID) -> ToolCallRecord? {

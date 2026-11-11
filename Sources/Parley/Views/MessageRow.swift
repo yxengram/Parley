@@ -99,25 +99,25 @@ struct MessageRow: View, Equatable {
         .onHover { isHovering = $0 }
         .contextMenu { contextMenuItems }
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "Copy") { copy() }
-        .accessibilityAction(named: isUser ? "Edit and Resend" : "Regenerate") {
+        .accessibilityAction(named: Text("Copy")) { copy() }
+        .accessibilityAction(named: isUser ? Text("Edit and Resend") : Text("Regenerate")) {
             guard !conversationBusy else { return }
             if isUser { actions.edit(index) } else { requestRegenerate() }
         }
-        .accessibilityAction(named: "Fork from Here") {
+        .accessibilityAction(named: Text("Fork from Here")) {
             guard !conversationBusy else { return }
             actions.fork(index)
         }
-        .accessibilityAction(named: "Roll Back to Here") {
+        .accessibilityAction(named: Text("Roll Back to Here")) {
             guard !conversationBusy, !isLast else { return }
             confirmRollback = true
         }
         .confirmationDialog("Roll back to this message?", isPresented: $confirmRollback) {
             Button("Roll Back", role: .destructive) { actions.rollback(index) }
         } message: {
-            Text(laterCount == 1
-                 ? "The message after this one will be deleted from the conversation."
-                 : "The \(laterCount) messages after this one will be deleted from the conversation.")
+            laterCount == 1
+                ? Text("The message after this one will be deleted from the conversation.")
+                : Text("The \(laterCount) messages after this one will be deleted from the conversation.")
         }
         .confirmationDialog("Regenerate this reply?", isPresented: $confirmRegenerate) {
             Button("Regenerate", role: .destructive) { actions.regenerate(index) }
@@ -288,7 +288,7 @@ struct MessageRow: View, Equatable {
     private var header: some View {
         HStack(spacing: 5) {
             LanternMark(size: 16)
-            Text(message.model ?? "Assistant")
+            (message.model.map { Text(verbatim: $0) } ?? Text("Assistant"))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Hideout.inkSoft)
             Text(message.createdAt, format: .dateTime.hour().minute())
@@ -296,7 +296,13 @@ struct MessageRow: View, Equatable {
                 .foregroundStyle(Hideout.inkFaint)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("Assistant, \(message.model ?? "unknown model"), \(message.createdAt.formatted(date: .omitted, time: .shortened))"))
+        .accessibilityLabel(accessibilityHeader)
+    }
+
+    private var accessibilityHeader: Text {
+        let time = message.createdAt.formatted(date: .omitted, time: .shortened)
+        if let model = message.model { return Text("Assistant, \(model), \(time)") }
+        return Text("Assistant, unknown model, \(time)")
     }
 
     @ViewBuilder
@@ -322,12 +328,12 @@ struct MessageRow: View, Equatable {
         let contextFull = maxTokens.map { cap in completion.map { $0 < cap } ?? false } ?? true
         if message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(message.reasoning ?? "").isEmpty {
             return contextFull
-                ? "The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer."
-                : "The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate."
+                ? String(localized: "The reply ran out of room in the context while thinking. Start a new chat, fork from an earlier message or roll back; a thinking budget (Conversation Settings, ⌘I) leaves room to answer.")
+                : String(localized: "The reply ran out of tokens while thinking. Raise Max tokens, lower the reasoning effort (or choose None) or, on Strata, set a thinking budget (Conversation Settings, ⌘I), then regenerate.")
         }
         return contextFull
-            ? "The reply was cut off at the end of the context (or the server's own output limit). Start a new chat, fork from an earlier message or roll back to make room."
-            : "The reply was cut off at the token limit (Max tokens)."
+            ? String(localized: "The reply was cut off at the end of the context (or the server's own output limit). Start a new chat, fork from an earlier message or roll back to make room.")
+            : String(localized: "The reply was cut off at the token limit (Max tokens).")
     }
 
     enum ThinkingOffNoteKind: Equatable {
@@ -357,38 +363,46 @@ struct MessageRow: View, Equatable {
             return nil
         case .notAccepted:
             return repeated
-                ? "“None” was not accepted again, so this reply also used the default thinking."
-                : "This server did not accept “None (no thinking)”, so this reply used its default thinking."
+                ? String(localized: "“None” was not accepted again, so this reply also used the default thinking.")
+                : String(localized: "This server did not accept “None (no thinking)”, so this reply used its default thinking.")
         case .ignored:
-            if repeated { return "“None” was ignored again: this reply also contains thinking." }
-            let base = "This server or model ignored “None (no thinking)”: the reply still contains thinking."
+            if repeated { return String(localized: "“None” was ignored again: this reply also contains thinking.") }
             switch message.thinkingOffServerKind.flatMap(InferenceServerKind.init(rawValue:)) {
             case .lmStudio:
-                return base + " LM Studio may offer a thinking switch in this model's settings."
+                return String(localized: "This server or model ignored “None (no thinking)”: the reply still contains thinking. LM Studio may offer a thinking switch in this model's settings.")
             case .llamaCpp, .vLLM:
-                return base + " The model's chat template may not support turning it off."
+                return String(localized: "This server or model ignored “None (no thinking)”: the reply still contains thinking. The model's chat template may not support turning it off.")
             default:
-                return base
+                return String(localized: "This server or model ignored “None (no thinking)”: the reply still contains thinking.")
             }
         }
+    }
+
+    /// "name: summary" with MCPError's known summary in the interface language.
+    static func shownServerFailure(_ detail: String) -> String {
+        guard let colon = detail.range(of: ": ") else { return MCPErrorText.shown(detail) }
+        return String(detail[..<colon.upperBound]) + MCPErrorText.shown(String(detail[colon.upperBound...]))
     }
 
     /// The text of a note about tools. A kind a later version added shows its `detail`.
     static func toolNoteText(_ note: ToolNote) -> String {
         switch note.kind {
         case ToolNote.toolsNotAccepted:
-            return "The model's server did not accept tools, so this reply was written without them."
+            return String(localized: "The model's server did not accept tools, so this reply was written without them.")
         case ToolNote.toolsNotOffered:
-            return "Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata."
+            return String(localized: "Tools were not offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata.")
         case ToolNote.serverUnavailable:
-            let detail = (note.detail ?? "A server").trimmingCharacters(in: CharacterSet(charactersIn: ". \n"))
-            return "\(detail). Its tools were not offered."
+            // The detail is the server's stored (English) error summary; its system sentences are
+            // shown in the interface language.
+            let stored = note.detail.map(Self.shownServerFailure) ?? String(localized: "A server")
+            let detail = stored.trimmingCharacters(in: CharacterSet(charactersIn: ".。 \n"))
+            return String(localized: "\(detail). Its tools were not offered.")
         case ToolNote.roundLimit:
-            return "Reached the limit of \(note.detail ?? "") tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP."
+            return String(localized: "Reached the limit of \(note.detail ?? "") tool rounds, so the model was asked to answer without more tools. Change the limit in Settings > MCP.")
         case ToolNote.callsNotRun:
-            return "The reply ended inside a tool call, so it was not run."
+            return String(localized: "The reply ended inside a tool call, so it was not run.")
         case ToolNote.emptyAfterTools:
-            return "The model wrote nothing after the tool results."
+            return String(localized: "The model wrote nothing after the tool results.")
         default:
             return note.detail ?? ""
         }
@@ -396,7 +410,7 @@ struct MessageRow: View, Equatable {
 
     /// "Starting filesystem…", while a first start may take minutes (a first `npx` downloads).
     static func startingText(_ servers: [String]) -> String {
-        "Starting \(servers.map(ToolDisplay.visible).joined(separator: ", "))…"
+        String(localized: "Starting \(servers.map(ToolDisplay.visible).joined(separator: ", "))…")
     }
 
     /// For each message, whether the nearest earlier reply carries the same thinking-off note.
@@ -415,26 +429,30 @@ struct MessageRow: View, Equatable {
     static func footerText(usage: TokenUsage?, stats: GenerationStats?, toolRounds: Int = 0) -> String? {
         var groups: [String] = []
         if let usage {
+            // Counts as plain digits: an Int in String(localized:) would get grouping separators.
             let parts: [String] = [
-                usage.promptTokens.map { "\($0) prompt" },
-                usage.completionTokens.map { "\($0) completion" },
-                usage.totalTokens.map { "\($0) total" },
+                usage.promptTokens.map { String(localized: "\(String($0)) prompt") },
+                usage.completionTokens.map { String(localized: "\(String($0)) completion") },
+                usage.totalTokens.map { String(localized: "\(String($0)) total") },
             ].compactMap { $0 }
-            if !parts.isEmpty { groups.append(parts.joined(separator: " · ") + " tokens") }
+            if !parts.isEmpty { groups.append(String(localized: "\(parts.joined(separator: " · ")) tokens")) }
         }
         if let stats {
             let approx = (stats.isEstimated ?? false) ? "≈" : ""
             if groups.isEmpty, let n = stats.completionTokens {
-                groups.append("\(approx)\(n) tokens")
+                groups.append(String(localized: "\(approx)\(String(n)) tokens"))
             }
             if let r = stats.tokensPerSecond {
+                // tok/s is a unit, like MB: not translated.
                 groups.append(approx + TokenFormat.rate(r) + " tok/s")
             }
             if let t = stats.timeToFirstToken {
-                groups.append(TokenFormat.seconds(t) + " to first token")
+                groups.append(String(localized: "\(TokenFormat.seconds(t)) to first token"))
             }
         }
-        if toolRounds > 0 { groups.append(toolRounds == 1 ? "1 tool round" : "\(toolRounds) tool rounds") }
+        if toolRounds > 0 {
+            groups.append(toolRounds == 1 ? String(localized: "1 tool round") : String(localized: "\(toolRounds) tool rounds"))
+        }
         return groups.isEmpty ? nil : groups.joined(separator: " · ")
     }
 
@@ -453,17 +471,23 @@ struct MessageRow: View, Equatable {
         if isLast && !hasToolRounds { actions.regenerate(index) } else { confirmRegenerate = true }
     }
 
+    /// Whole sentences per case, so the order can change in a translation.
     static func regenerateWarning(laterCount: Int, ranTools: Bool) -> String {
-        let replaced: String
-        switch laterCount {
-        case 0: replaced = "This reply will be replaced."
-        case 1: replaced = "This reply and the message after it will be replaced."
-        default: replaced = "This reply and the \(laterCount) messages after it will be replaced."
+        switch (laterCount, ranTools) {
+        case (0, false):
+            return String(localized: "This reply will be replaced.")
+        case (1, false):
+            return String(localized: "This reply and the message after it will be replaced.")
+        case (_, false):
+            return String(localized: "This reply and the \(laterCount) messages after it will be replaced.")
+        case (0, true):
+            return String(localized: "This reply will be replaced. This reply ran tools. Their effects are not undone, and the model may run them again.")
+        case (1, true):
+            return String(localized: "This reply and the message after it will be replaced. This reply ran tools. Their effects are not undone, and the model may run them again.")
+        case (_, true):
+            return String(localized: "This reply and the \(laterCount) messages after it will be replaced. This reply ran tools. Their effects are not undone, and the model may run them again.")
         }
-        return ranTools ? replaced + " " + toolRegenerateWarning : replaced
     }
-
-    static let toolRegenerateWarning = "This reply ran tools. Their effects are not undone, and the model may run them again."
 
     @ViewBuilder
     private var contextMenuItems: some View {
@@ -561,12 +585,16 @@ struct WaitingIndicator: View {
 
     /// "Reading the prompt: 42% of 40,960 tokens (30,000 cached) · 12 s" or "Waiting for response… 12 s".
     static func statusText(progress: PromptProgress?, elapsed: TimeInterval) -> String {
-        let seconds = elapsed >= 2 ? " · \(Int(elapsed)) s" : ""
+        let elapsedSeconds = Int(elapsed)
         guard let progress else {
-            return "Waiting for response…" + (elapsed >= 2 ? " \(Int(elapsed)) s" : "")
+            return elapsed >= 2 ? String(localized: "Waiting for response… \(elapsedSeconds) s") : String(localized: "Waiting for response…")
         }
-        let cached = progress.cached > 0 ? " (\(TokenFormat.grouped(progress.cached)) cached)" : ""
-        return "Reading the prompt: \(Int((progress.fraction * 100).rounded(.down)))% of \(TokenFormat.grouped(progress.total)) tokens\(cached)" + seconds
+        let percent = Int((progress.fraction * 100).rounded(.down))
+        let total = TokenFormat.grouped(progress.total)
+        let reading = progress.cached > 0
+            ? String(localized: "Reading the prompt: \(percent)% of \(total) tokens (\(TokenFormat.grouped(progress.cached)) cached)")
+            : String(localized: "Reading the prompt: \(percent)% of \(total) tokens")
+        return elapsed >= 2 ? String(localized: "\(reading) · \(elapsedSeconds) s") : reading
     }
 }
 
@@ -644,7 +672,7 @@ private struct ErrorCallout: View {
 
 private struct ActionButton: View {
     let systemImage: String
-    let help: String
+    let help: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {

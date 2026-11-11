@@ -2,7 +2,8 @@
 //   node tools/test_reader_page.mjs BUILT_HTML
 // Checks the CSP, that every script is inline and parses, that no API that reaches the network or
 // writes markup from strings appears, that there are no real links, external URLs or inline event
-// handlers, and that the art is embedded.
+// handlers, and that the art is embedded. Also checks the two string tables (English, Simplified
+// Chinese) and the language pick.
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -95,12 +96,17 @@ function piece(start, end) {
   assert.ok(b > a, `anchor ${end} after ${start}`);
   return page.slice(a, b);
 }
-function run(source, names) {
+// The string tables, pickLanguage and t(), run with a fixed language instead of the browser's.
+const i18n = () => piece('  const STRINGS = {', '  function browserLanguages() {');
+function run(source, names, lang = 'en') {
   const context = vm.createContext({});
-  vm.runInContext(piece('  const str = v =>', '  const dateOf') + '\nconst grouped = n => String(n);\n'
+  vm.runInContext(i18n() + `\nconst LANG = ${JSON.stringify(lang)}, LOCALE = ${JSON.stringify(lang)};\n`
+    + piece('  const str = v =>', '  const dateOf') + '\nconst grouped = n => String(n);\n'
     + source + `\nthis.out = { ${names.join(', ')} };`, context);
   return context.out;
 }
+const { STRINGS, pickLanguage } = run('', ['STRINGS', 'pickLanguage']);
+const placeholders = text => [...text.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
 const same = value => JSON.parse(JSON.stringify(value));
 const timed = fn => { const t = performance.now(); const v = fn(); return [v, performance.now() - t]; };
 
@@ -205,16 +211,22 @@ test('file errors use the app\'s ParleyError wording (F9)', () => {
 });
 
 test('strings and elements match the app (F9, F10)', () => {
+  const en = STRINGS.en;
   assert.ok(!markup.includes('reader-label'), 'no READER label next to the wordmark');
   assert.ok(markup.includes('<div class="wordmark lettered">Parley</div>'));
-  assert.ok(page.includes("text: 'Files you open stay in this browser tab. Nothing is uploaded.'"));
+  assert.equal(en.privacyNote, 'Files you open stay in this browser tab. Nothing is uploaded.');
+  assert.ok(page.includes("h('span', { text: t('privacyNote') })"));
   assert.ok(!page.includes('Parley Reader shows conversations'), 'no second paragraph on the empty screen');
-  assert.ok(page.includes("text: 'The lantern\\'s on'"));
-  assert.ok(page.includes("text: 'Forgotten passwords can\\'t be recovered.'"));
+  assert.equal(en.lanternOn, 'The lantern\'s on');
+  assert.ok(page.includes("text: t('lanternOn')"));
+  assert.equal(en.forgottenPasswords, 'Forgotten passwords can\'t be recovered.');
+  assert.ok(page.includes("text: t('forgottenPasswords')"));
   assert.ok(!/’/.test(page), 'straight apostrophes, as in the app');
-  assert.ok(!page.includes("'Decrypting…'"), 'the unlock spinner has no visible words');
-  assert.ok(page.includes("const sub = entry.encrypted ? `Encrypted · ${entry.name}` : '';"), 'no subtitle for a plain file');
-  assert.ok(!page.includes("title: 'Shows the arguments and result'") && !page.includes('slip.title'), 'tool slips have no tooltip');
+  assert.ok(!page.includes("'Decrypting…'") && !Object.values(STRINGS).some(table => /…$/.test(table.decrypting)), 'the unlock spinner has no visible words');
+  assert.ok(page.includes("h('span', { class: 'sr-only', text: t('decrypting') })"));
+  assert.equal(en.encryptedSub, 'Encrypted · {name}');
+  assert.ok(page.includes("const sub = entry.encrypted ? t('encryptedSub', { name: entry.name }) : '';"), 'no subtitle for a plain file');
+  assert.ok(!page.includes("title: t('showsArgs')") && !page.includes('slip.title'), 'tool slips have no tooltip');
 });
 
 test('layout rules match the app (F1, F4, F5, F6, F7, F8, F11) and the page prints in full (PRINT)', () => {
@@ -260,7 +272,7 @@ test('markdown blocks are filled before dir=auto is set, and huge blocks fall ba
 
 test('lock and remove leave nothing from the conversation in dialogs (SEC-3)', () => {
   const clear = piece('  function clearDialog(d) {', '  function closeDialogs(');
-  assert.ok(clear.includes("d.replaceChildren();") && clear.includes("if (d === imageDialog) d.setAttribute('aria-label', 'Image preview');"));
+  assert.ok(clear.includes("d.replaceChildren();") && clear.includes("if (d === imageDialog) d.setAttribute('aria-label', t('imagePreview'));"));
   assert.ok(page.includes('function closeDialogs() { gate.cancel(); for (const d of allDialogs) { if (d.open) d.close(); clearDialog(d); } }'));
   assert.ok(page.includes("on(d, 'close', () => { clearDialog(d);"));
 });
@@ -279,6 +291,104 @@ test('a bad image cannot take its message down (B64-BACKTRACK)', () => {
   const image = piece('  function imageURL(entry, a) {', '  function imageThumb(');
   assert.ok(/try \{[\s\S]*Core\.base64ToBytes[\s\S]*\} catch \(_\) \{\s*return null;/.test(image));
   assert.ok(page.includes('if (text.length > MARKDOWN_LIMIT)'), 'SEC-1 backstop: huge texts render as plain text');
+});
+
+// ---- languages (English and Simplified Chinese)
+test('both string tables have the same keys, the same {placeholders} and no empty text (L10N)', () => {
+  const en = Object.keys(STRINGS.en).sort(), zh = Object.keys(STRINGS['zh-Hans']).sort();
+  assert.deepEqual(Object.keys(STRINGS).sort(), ['en', 'zh-Hans']);
+  assert.deepEqual(zh, en, 'same keys');
+  for (const key of en) {
+    for (const lang of ['en', 'zh-Hans']) {
+      assert.equal(typeof STRINGS[lang][key], 'string', `${lang}.${key}`);
+      assert.ok(STRINGS[lang][key].length > 0, `${lang}.${key} is empty`);
+    }
+    assert.deepEqual(placeholders(STRINGS['zh-Hans'][key]), placeholders(STRINGS.en[key]), `placeholders of ${key}`);
+  }
+  // Every key is translated, except text that is the same in both languages.
+  const same = en.filter(key => STRINGS.en[key] === STRINGS['zh-Hans'][key]);
+  assert.deepEqual(same, ['pageTitle', 'quoted', 'tokensPerSecond'], 'untranslated keys');
+  for (const key of en) assert.ok(!/’/.test(STRINGS['zh-Hans'][key]), `${key}: no curly apostrophe`);
+});
+
+test('every key the page asks for exists, and every key is used (L10N)', () => {
+  const asked = new Set([...page.matchAll(/\bt\('(\w+)'/g)].map(m => m[1]));
+  for (const m of page.matchAll(/t\(partial \? '(\w+)' : '(\w+)'/g)) { asked.add(m[1]); asked.add(m[2]); }
+  for (const m of markup.matchAll(/data-i18n(?:-[a-z-]+)?="(\w+)"/g)) asked.add(m[1]);
+  for (const m of page.matchAll(/: '(group\w+)'/g)) asked.add(m[1]);
+  for (const key of asked) assert.ok(Object.prototype.hasOwnProperty.call(STRINGS.en, key), `unknown key ${key}`);
+  const unused = Object.keys(STRINGS.en).filter(key => !asked.has(key));
+  assert.deepEqual(unused, [], 'keys no code uses');
+});
+
+test('the markup is translated at startup; the static lang stays for browsers without script (L10N)', () => {
+  for (const attr of ['data-i18n-title', 'data-i18n-aria-label', 'data-i18n-placeholder']) assert.ok(markup.includes(attr), attr);
+  assert.ok(markup.includes('<div class="drop-card lettered" id="drop-card" data-i18n="dropFiles">'));
+  assert.ok(page.includes('document.documentElement.lang = LANG;') && page.includes("document.title = t('pageTitle');"));
+  // The static pass runs before any shape or icon is added to the elements it fills.
+  const pass = page.indexOf("querySelectorAll('[data-i18n]')");
+  assert.ok(pass > 0 && pass < page.indexOf('addShape(document.getElementById(') && pass < page.indexOf('function addShape('));
+  assert.ok(/:root:lang\(zh\) \{ --lettered: var\(--rounded\); \}/.test(markup), 'no Noteworthy for Chinese');
+  for (const call of ['new Intl.DateTimeFormat(LOCALE, opts)', 'toLocaleString(LOCALE)', 'new Intl.RelativeTimeFormat(LOCALE,']) assert.ok(page.includes(call), call);
+});
+
+test('the language follows the first browser language: Chinese, else English (L10N)', () => {
+  const pick = list => pickLanguage(list).lang;
+  for (const list of [['zh-CN'], ['zh'], ['zh-SG'], ['zh-Hans-HK'], ['zh_CN'], ['zh-TW', 'zh-CN'], ['zh-TW'], ['zh-HK'], ['zh-MO'],
+    ['zh-Hant'], ['zh-Hant-CN'], ['zh-TW', 'en-US'], ['  zh-CN ', 'en']]) {
+    assert.equal(pick(list), 'zh-Hans', JSON.stringify(list));
+  }
+  // Japanese or French first is English, even with Chinese later in the list (the app does the same).
+  for (const list of [['ja', 'fr'], ['ja', 'zh-Hans'], ['fr', 'zh-Hans-CN', 'en'], ['en-GB', 'zh-CN'], [], [42, null], 'zh-CN']) {
+    assert.equal(pick(list), 'en', JSON.stringify(list));
+  }
+  assert.deepEqual(same(pickLanguage(['en-GB', 'zh-CN'])), { lang: 'en', locale: 'en-GB' });
+  assert.deepEqual(same(pickLanguage(['zh-Hans-CN', 'ja'])), { lang: 'zh-Hans', locale: 'zh-Hans-CN' });
+  assert.deepEqual(same(pickLanguage(['zh-TW'])), { lang: 'zh-Hans', locale: 'zh-Hans' }, 'one script on the page');
+  assert.deepEqual(same(pickLanguage(['ja', 'zh-Hans-CN'])), { lang: 'en', locale: 'en' });
+  assert.deepEqual(same(pickLanguage(['ja', 'fr'])), { lang: 'en', locale: 'en' }, 'English dates with the English fallback');
+});
+
+test('t() fills each placeholder once, never from file text, and falls back to English (L10N)', () => {
+  const { t } = run('', ['t'], 'zh-Hans');
+  assert.equal(t('cantOpenOne', { name: '{name}$&$\'.json' }), '无法打开“{name}$&$\'.json”');
+  assert.equal(t('noMatch', { query: '__proto__' }), '没有与“__proto__”匹配的对话。');
+  assert.equal(t('cantOpenOne', {}), '无法打开“{name}”', 'a missing value leaves the placeholder');
+  assert.equal(t('no such key'), 'no such key');
+  assert.equal(t('constructor'), 'constructor', 'own keys only');
+  assert.equal(run('', ['t'], 'fr').t('copy'), 'Copy', 'an unknown language gives English');
+});
+
+test('file errors in Chinese match the app\'s ParleyError translations (L10N, F9)', () => {
+  const { errorText } = run(piece('  const ERROR_TEXT = {', '  function readText(') + piece('  /** ParleyError.errorDescription', '  async function openFiles('), ['errorText'], 'zh-Hans');
+  const err = (code, detail) => ({ name: 'ReaderError', code, detail });
+  assert.equal(errorText(err('unsupportedVersion', '2')), '不支持的对话文件版本 2。');
+  assert.equal(errorText(err('unsupportedVersion', 'x')), '不支持的对话文件版本。');
+  assert.equal(errorText(err('corrupt', 'invalid JSON')), '对话文件已损坏：invalid JSON', 'damage details stay English codes');
+  assert.equal(errorText(err('corrupt', 'something from the file')), '对话文件已损坏。');
+  assert.equal(errorText(err('notParley')), '此文件不是 Parley 对话。');
+  assert.equal(errorText(err('constructor')), '无法读取此文件。');
+  assert.equal(STRINGS['zh-Hans'].errWrongPassword, '密码错误，或文件已被篡改。');
+  assert.equal(STRINGS.en.errWrongPassword, 'Wrong password, or the file has been tampered with.');
+});
+
+test('in Chinese, stored English errors are still recognised; only the words around them change (L10N)', () => {
+  const { presentError, toolNoteText, statusOf } = run(piece('  function serverMessage(', '  function errorCallout(')
+    + piece('  /** Trims \'.\' and whitespace', '  // ---- error presentation') + piece('  const STATUS = {', '  function toolTitle('),
+  ['presentError', 'toolNoteText', 'statusOf'], 'zh-Hans');
+  const timeout = presentError('The request timed out.', {});
+  assert.equal(timeout.title, '服务器响应超时');
+  assert.equal(timeout.detail, 'The request timed out.');
+  assert.equal(presentError('Could not connect to the server.', {}).detail, '服务器是否正在运行？Could not connect to the server.');
+  assert.equal(presentError('HTTP 401: {}', {}).title, '服务器拒绝了 API 密钥');
+  assert.equal(presentError('HTTP 500 <html><body><p>x</p></body></html>', {}).raw, 'HTTP 500: HTML 页面');
+  const dropped = presentError('API error: The connection closed before the reply finished (through Cloudflare).', { content: 'x' });
+  assert.equal(dropped.detail, '已收到的文本会保留。经由 Cloudflare 的连接在回复中途关闭：服务器或网络已断开。重试会重新请求完整的回复。');
+  assert.equal(presentError('context length exceeded', { toolDefinitionTokens: 1200 }).detail, '工具定义大约占用其中 1200 个 token。请用扳手按钮（⇧⌘T）关闭不需要的服务器或工具。');
+  assert.equal(toolNoteText({ kind: 'serverUnavailable', detail: 'Files.' }), 'Files。它的工具未提供给模型。');
+  assert.deepEqual(same(statusOf({ result: { status: 'completed' } })), ['check', '完成', 'var(--moss)']);
+  const replay = piece('  function replayResult(', '  function boardBlock(');
+  assert.ok(replay.includes("'(The tool returned no output.)'") && !replay.includes("t('"), 'the texts the model was sent stay English');
 });
 
 console.log(failures ? `page: ${failures} failed, ${passed} passed` : `page: all ${passed} passed`);

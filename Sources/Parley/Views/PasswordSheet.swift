@@ -45,8 +45,8 @@ struct PasswordFields: View {
     }
 
     static func hint(password: String, confirm: String) -> String? {
-        if !confirm.isEmpty && password != confirm { return "Passwords don't match." }
-        if !password.isEmpty && password.count < 8 { return "Short passwords are easy to guess. Use at least 8 characters." }
+        if !confirm.isEmpty && password != confirm { return String(localized: "Passwords don't match.") }
+        if !password.isEmpty && password.count < 8 { return String(localized: "Short passwords are easy to guess. Use at least 8 characters.") }
         return nil
     }
 }

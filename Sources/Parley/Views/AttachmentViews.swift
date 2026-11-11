@@ -113,7 +113,7 @@ struct TextFileChip: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(attachment.filename)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Preview") { showPreview = true }
+        .accessibilityAction(named: Text("Preview")) { showPreview = true }
         .help("Click to preview")
         .popover(isPresented: $showPreview) {
             VStack(alignment: .leading, spacing: 6) {

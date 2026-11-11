@@ -24,16 +24,16 @@ struct ThinkingDisclosure: View {
     }
 
     private var finishedLabel: String {
-        if let duration { return "Thought for \(Self.format(duration))" }
-        return isStreaming ? "Thinking…" : "Thoughts"
+        if let duration { return String(localized: "Thought for \(Self.format(duration))") }
+        return isStreaming ? String(localized: "Thinking…") : String(localized: "Thoughts")
     }
 
     static func format(_ seconds: Double) -> String {
-        if seconds < 1 { return "less than a second" }
-        if seconds < 60 { return "\(Int(seconds.rounded())) s" }
+        if seconds < 1 { return String(localized: "less than a second") }
+        if seconds < 60 { return String(localized: "\(Int(seconds.rounded())) s") }
         let m = Int(seconds) / 60
         let s = Int(seconds) % 60
-        return "\(m) min \(s) s"
+        return String(localized: "\(m) min \(s) s")
     }
 
     var body: some View {
@@ -87,7 +87,7 @@ struct ThinkingDisclosure: View {
         } else if isThinking {
             Text("Thinking…")
         } else {
-            Text(finishedLabel)
+            Text(verbatim: finishedLabel)
         }
     }
 

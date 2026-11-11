@@ -24,7 +24,7 @@ Encrypted files ask for their password.
 | `src/core.js` | File parsing and decryption (no DOM) |
 | `src/markdown.js` | Port of Parley's `MarkdownParser`, inline parsing and link checks (no DOM) |
 | `src/reader.html` | The page: markup, styles, rendering |
-| `ParleyReader.html` | Built page (do not edit by hand) |
+| `ParleyReader.html` | Built page (do not edit by hand). `.github/workflows/pages.yml` publishes it to https://yxengram.github.io/Parley/ |
 
 ## Build and test
 

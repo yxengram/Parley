@@ -15,7 +15,7 @@ struct ChatView: View {
         VStack(spacing: 0) {
             header
             if let saveError = session.saveError {
-                Banner(text: "Could not save: \(saveError)", systemImage: "exclamationmark.triangle.fill") {
+                Banner(text: String(localized: "Could not save: \(saveError)"), systemImage: "exclamationmark.triangle.fill") {
                     session.saveError = nil
                 }
             }
@@ -93,13 +93,19 @@ struct ChatView: View {
             Text(MessageRow.regenerateWarning(laterCount: 0, ranTools: true))
         }
         .focusedSceneValue(\.activeSession, session)
-        .navigationTitle(session.conversation.title)
+        .navigationTitle(displayTitle)
+    }
+
+    /// The stored default title stays English in the file; it is translated only here.
+    private var displayTitle: String {
+        let title = session.conversation.title
+        return title == ConversationSession.defaultTitle ? String(localized: "New Chat") : title
     }
 
     private var header: some View {
         RoomHeader {
             VStack(alignment: .leading, spacing: 0) {
-                Text(session.conversation.title)
+                Text(verbatim: displayTitle)
                     .font(Hideout.title(15))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -153,7 +159,7 @@ struct ChatView: View {
     /// "Encrypted", plus the folder name when the file is outside the default folder.
     private var subtitle: String {
         var parts: [String] = []
-        if session.isEncrypted { parts.append("Encrypted") }
+        if session.isEncrypted { parts.append(String(localized: "Encrypted")) }
         if !appState.settings.isInDefaultDirectory(session.fileURL) {
             parts.append(session.fileURL.deletingLastPathComponent().lastPathComponent)
         }
@@ -376,7 +382,7 @@ private struct EmptyChatHint: View {
             case .failed(let message) where model.isEmpty:
                 HintNotice(systemImage: "exclamationmark.triangle.fill",
                            title: Text("Can't reach \(provider.name)"),
-                           detail: Text("\(provider.baseURL)\n\(message)"),
+                           detail: Text(verbatim: "\(provider.baseURL)\n\(message)"),
                            fill: Hideout.dangerWash, edge: Hideout.danger) {
                     HStack {
                         Button("Try Again") {
@@ -519,7 +525,7 @@ private struct ModelMenu: View {
                 }
                 .fixedSize()
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Model: \(model.isEmpty ? "none" : model)")
+                .accessibilityLabel("Model: \(model.isEmpty ? String(localized: "none") : model)")
             } else {
                 menu(model: model, provider: provider, models: models, state: state, failure: failure)
             }
@@ -538,12 +544,11 @@ private struct ModelMenu: View {
                 ParcelTag(warning: failure != nil)
             }
         }
-        .help(failure.map { "Couldn't load models from \(provider?.name ?? "the server"): \($0)" }
-              ?? "Model: \(model.isEmpty ? "none" : model) · Provider: \(provider?.name ?? "none")")
+        .help(helpText(model: model, provider: provider, failure: failure))
         .popover(isPresented: $showCustom, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Custom Model ID").lettered(18)
-                TextField("Model ID", text: $customDraft, prompt: Text(provider?.defaultModel.isEmpty == false ? provider!.defaultModel : "e.g. qwen3-14b-instruct"))
+                TextField("Model ID", text: $customDraft, prompt: customPrompt(provider))
                     .textFieldStyle(.plain)
                     .foregroundStyle(Hideout.ink)
                     .padding(.horizontal, 10)
@@ -569,9 +574,23 @@ private struct ModelMenu: View {
         }
     }
 
+    private func helpText(model: String, provider: Provider?, failure: String?) -> String {
+        if let failure {
+            return provider.map { String(localized: "Couldn't load models from \($0.name): \(failure)") }
+                ?? String(localized: "Couldn't load models: \(failure)")
+        }
+        let none = String(localized: "none")
+        return String(localized: "Model: \(model.isEmpty ? none : model) · Provider: \(provider?.name ?? none)")
+    }
+
+    private func customPrompt(_ provider: Provider?) -> Text {
+        if let provider, !provider.defaultModel.isEmpty { return Text(verbatim: provider.defaultModel) }
+        return Text("e.g. qwen3-14b-instruct")
+    }
+
     private func modelLabel(_ model: String, failure: String?, ink: Color) -> some View {
         Label {
-            Text(model.isEmpty ? "Choose Model" : model)
+            (model.isEmpty ? Text("Choose Model") : Text(verbatim: model))
                 .foregroundStyle(ink)
                 .lineLimit(1)
                 .truncationMode(.middle)

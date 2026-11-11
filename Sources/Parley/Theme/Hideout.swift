@@ -86,10 +86,24 @@ enum Hideout {
     // MARK: Type
 
     /// Use `.lettered(_:)` on the view: an inherited `fontDesign` otherwise replaces this font.
-    fileprivate static func lettered(_ size: CGFloat) -> Font {
-        NSFont(name: "Noteworthy-Bold", size: size) != nil
+    /// Noteworthy has Latin glyphs only, so in a non-Latin interface language (Chinese) the
+    /// lettering is the rounded bold system font, as it is for a non-Latin string.
+    fileprivate static func lettered(_ size: CGFloat, handwritten: Bool = true) -> Font {
+        handwritten && handLettering && NSFont(name: "Noteworthy-Bold", size: size) != nil
             ? .custom("Noteworthy-Bold", size: size)
             : .system(size: size, weight: .bold, design: .rounded)
+    }
+
+    /// Whether the interface language is written in Latin script (English); decided once, at launch,
+    /// like the interface language itself.
+    static let handLettering: Bool = {
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        return Locale(identifier: language).language.maximalIdentifier.contains("-Latn")
+    }()
+
+    /// Whether every letter of `text` is Latin, so Noteworthy can draw it without a fallback font.
+    static func isLatin(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy { !$0.properties.isAlphabetic || $0.value < 0x0250 || (0x1E00...0x1EFF).contains($0.value) }
     }
 
     /// Conversation titles and other strong user text.
@@ -138,10 +152,17 @@ extension View {
         modifier(HideoutSceneStyle())
     }
 
-    /// Hand-lettering. **Fixed English strings only** (no user content: it has no CJK glyphs),
-    /// and never for warnings.
+    /// Hand-lettering, for fixed interface strings (titles, headings), never for warnings or user
+    /// content. Noteworthy in English; the rounded bold system font when the interface language is
+    /// not written in Latin script (Chinese), since Noteworthy has no CJK glyphs.
     func lettered(_ size: CGFloat) -> some View {
         font(Hideout.lettered(size)).fontDesign(nil)
+    }
+
+    /// Hand-lettering for a string that is not a fixed interface string: also falls back to the
+    /// rounded bold system font when `text` has non-Latin letters.
+    func lettered(_ size: CGFloat, text: String) -> some View {
+        font(Hideout.lettered(size, handwritten: Hideout.isLatin(text))).fontDesign(nil)
     }
 
     /// Root of a sheet or popover: the scene styling on a card background.

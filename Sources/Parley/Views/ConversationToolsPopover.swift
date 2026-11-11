@@ -170,7 +170,8 @@ struct ConversationToolsPopover: View {
         VStack(alignment: .leading, spacing: 2) {
             Toggle("Built-in tools", isOn: usesBuiltInTools)
                 .toggleStyle(.checkbox)
-            Text(verbatim: tools.map(\.title).joined(separator: ", "))
+            // The list separator is translated too: ", " in English, "、" in Chinese.
+            Text(verbatim: tools.map(BuiltInToolsSettingsView.title).joined(separator: String(localized: ", ")))
                 .font(.caption)
                 .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -189,7 +190,9 @@ struct ConversationToolsPopover: View {
                         .lineLimit(1)
                     if let snapshot, !snapshot.tools.isEmpty {
                         let count = snapshot.tools.filter { !server.disabledTools.contains($0.name) }.count
-                        Text(count == 1 ? "1 tool" : "\(count) tools")
+                        Group {
+                            if count == 1 { Text("1 tool") } else { Text("\(count) tools") }
+                        }
                             .font(.caption)
                             .foregroundStyle(Hideout.inkSoft)
                     }
@@ -198,7 +201,7 @@ struct ConversationToolsPopover: View {
             .toggleStyle(.checkbox)
             .help(MCPStatusDot.text(state))
             if case .failed(let message) = state {
-                Text(verbatim: message)
+                Text(verbatim: MCPErrorText.shown(message))
                     .font(.caption)
                     .foregroundStyle(Hideout.danger)
                     .lineLimit(3)
@@ -222,7 +225,7 @@ struct ConversationToolsPopover: View {
     static func definitionsWarning(tokens: Int, limit: ContextLimit?) -> String? {
         guard let limit, limit.tokens > 0, tokens * 2 > limit.tokens else { return nil }
         let share = min(tokens * 100 / limit.tokens, 100)
-        return "That is about \(share)% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request."
+        return String(localized: "That is about \(share)% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request.")
     }
 
     private var serverInfo: ModelContextInfo? {
@@ -242,10 +245,10 @@ struct ConversationToolsPopover: View {
     static func notes(info: ModelContextInfo, usesReAct: Bool) -> [String] {
         var notes: [String] = []
         if info.ignoresTools, !usesReAct {
-            notes.append("Strata runs this model in its runtime mode, which ignores tools. Use a native model in Strata.")
+            notes.append(String(localized: "Strata runs this model in its runtime mode, which ignores tools. Use a native model in Strata."))
         }
         if info.serverKind == .ollama, !usesReAct {
-            notes.append("Ollama keeps only basic schema keywords.")
+            notes.append(String(localized: "Ollama keeps only basic schema keywords."))
         }
         return notes
     }

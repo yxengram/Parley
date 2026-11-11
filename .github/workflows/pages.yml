@@ -1,0 +1,39 @@
+# Publishes Parley Reader (Reader/ParleyReader.html, built by tools/build_reader.sh and committed)
+# to GitHub Pages as index.html. Nothing is built here: the page is copied as it is.
+name: Publish Parley Reader
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - Reader/ParleyReader.html
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare site
+        run: |
+          mkdir _site
+          cp Reader/ParleyReader.html _site/index.html
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

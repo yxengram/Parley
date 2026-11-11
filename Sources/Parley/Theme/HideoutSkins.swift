@@ -74,6 +74,7 @@ struct HideoutPalette {
 
 /// The hideouts to choose from. Each has an afternoon and a lights-out look, which follow the
 /// system appearance, and its own pictures. Colours only: no skin changes a word or a control.
+/// `title` and `blurb` are display text only (localized); the stored value is `rawValue`.
 enum HideoutSkin: String, CaseIterable, Identifiable {
     case cardboard
     case pillow
@@ -83,17 +84,17 @@ enum HideoutSkin: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .cardboard: "Cardboard Fort"
-        case .pillow: "Pillow Fort"
-        case .treehouse: "Treehouse"
+        case .cardboard: String(localized: "Cardboard Fort")
+        case .pillow: String(localized: "Pillow Fort")
+        case .treehouse: String(localized: "Treehouse")
         }
     }
 
     var blurb: String {
         switch self {
-        case .cardboard: "Kraft and lantern light"
-        case .pillow: "Pink quilts and cushions"
-        case .treehouse: "Leaves and fireflies"
+        case .cardboard: String(localized: "Kraft and lantern light")
+        case .pillow: String(localized: "Pink quilts and cushions")
+        case .treehouse: String(localized: "Leaves and fireflies")
         }
     }
 

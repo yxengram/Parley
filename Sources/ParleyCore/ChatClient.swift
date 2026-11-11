@@ -334,7 +334,7 @@ public final class ChatClient: @unchecked Sendable {
             try await readStream(bytes: bytes, contentType: http?.value(forHTTPHeaderField: "Content-Type"),
                                  viaCloudflare: viaCloudflare, continuation: continuation)
         } catch let error as URLError where error.code != .cancelled {
-            throw ParleyError.api(StreamInterruption.message(underlying: error.localizedDescription, viaCloudflare: viaCloudflare))
+            throw ParleyError.api(StreamInterruption.message(underlying: SystemErrorText.english(error), viaCloudflare: viaCloudflare))
         }
     }
 

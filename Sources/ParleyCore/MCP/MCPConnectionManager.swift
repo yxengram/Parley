@@ -251,7 +251,7 @@ public actor MCPConnectionManager: MCPToolHost {
         } catch let error as MCPError {
             throw error
         } catch {
-            throw MCPError.secrets("Could not read this server's secrets from the Keychain: \(error.localizedDescription)")
+            throw MCPError.secrets("Could not read this server's secrets from the Keychain: \(SystemErrorText.english(error))")
         }
         let url = try MCPHTTPTransport.validated(url: secrets.url, secrets: secrets)
         let flow = MCPOAuthSignIn(
@@ -517,7 +517,7 @@ public actor MCPConnectionManager: MCPToolHost {
         } catch let error as MCPError {
             throw error
         } catch {
-            throw MCPError.secrets("Could not read this server's secrets from the Keychain: \(error.localizedDescription)")
+            throw MCPError.secrets("Could not read this server's secrets from the Keychain: \(SystemErrorText.english(error))")
         }
         switch config.kind {
         case MCPServerConfig.kindStdio:
@@ -537,7 +537,7 @@ public actor MCPConnectionManager: MCPToolHost {
             } catch let error as MCPError {
                 throw error
             } catch {
-                throw MCPError.secrets("Could not read this server's sign-in from the Keychain: \(error.localizedDescription)")
+                throw MCPError.secrets("Could not read this server's sign-in from the Keychain: \(SystemErrorText.english(error))")
             }
             return MCPHTTPTransport(url: url, headers: secrets.headers, registry: registry, authorizer: broker)
         default:
@@ -593,7 +593,9 @@ public actor MCPConnectionManager: MCPToolHost {
     }
 
     /// What may be saved or sent to the model (MCPError.summary).
+    /// Fixed English: a URLError from the transport (an unreachable server) would otherwise bring
+    /// Foundation's text in the interface language into tool results and saved notes.
     private static func summary(_ error: Error) -> String {
-        (error as? MCPError)?.summary ?? describe(error)
+        (error as? MCPError)?.summary ?? SystemErrorText.english(error)
     }
 }

@@ -39,8 +39,10 @@ enum TokenFormat {
         r >= 100 ? "\(Int(r.rounded()))" : String(format: "%.1f", r)
     }
 
+    /// "1.12 s" in English, "1.12 秒" in Chinese.
     static func seconds(_ s: Double) -> String {
-        s < 10 ? String(format: "%.2f s", s) : String(format: "%.1f s", s)
+        let number = s < 10 ? String(format: "%.2f", s) : String(format: "%.1f", s)
+        return String(localized: "\(number) s")
     }
 
     static func percent(_ p: Double) -> String {
@@ -146,8 +148,8 @@ struct ContextSnapshot: Equatable {
     static func toolActivity(_ phase: ConversationSession.ReplyPhase?) -> String? {
         switch phase {
         case .connecting(let servers): return MessageRow.startingText(servers)
-        case .awaitingApproval: return "Waiting for your approval"
-        case .runningTool(let tool): return "Running \(ToolDisplay.visible(tool))…"
+        case .awaitingApproval: return String(localized: "Waiting for your approval")
+        case .runningTool(let tool): return String(localized: "Running \(ToolDisplay.visible(tool))…")
         case .generating, nil: return nil
         }
     }
@@ -217,7 +219,7 @@ struct ContextStatusBar: View {
                 HStack(spacing: 3) {
                     Image(systemName: "gauge.with.dots.needle.67percent")
                         .imageScale(.small)
-                    Text(speedText(snap))
+                    Text(verbatim: speedText(snap))
                 }
                 .foregroundStyle(snap.isStreaming ? Hideout.ink : Hideout.inkSoft)
                 Text("·").foregroundStyle(Hideout.inkFaint)
@@ -234,15 +236,16 @@ struct ContextStatusBar: View {
             } else if let limit = snap.limit {
                 ContextRing(fraction: (snap.percent ?? 0) / 100, tint: snap.tint)
                 // Only the model's maximum is known: the loaded size may be much smaller.
-                let limitText = (limit.source == .serverMaximum ? "max " : "") + TokenFormat.tokens(limit.tokens)
-                Text(usageText(snap.usage) + " / " + limitText
-                     + (snap.usage.tokens > 0 ? " (" + TokenFormat.percent(snap.percent ?? 0) + ")" : ""))
+                let cap = TokenFormat.tokens(limit.tokens)
+                let limitText = limit.source == .serverMaximum ? String(localized: "max \(cap)") : cap
+                Text(verbatim: "\(usageText(snap.usage)) / \(limitText)"
+                     + (snap.usage.tokens > 0 ? " (\(TokenFormat.percent(snap.percent ?? 0)))" : ""))
                     .foregroundStyle(snap.textTint)
             } else if snap.isProbing && snap.info == nil {
                 Text("Context: checking…").foregroundStyle(Hideout.inkSoft)
             } else {
                 if snap.usage.tokens > 0 {
-                    Text(usageText(snap.usage) + " tokens").foregroundStyle(Hideout.inkSoft)
+                    Text("\(usageText(snap.usage)) tokens").foregroundStyle(Hideout.inkSoft)
                     Text("·").foregroundStyle(Hideout.inkFaint)
                 }
                 Text("Context: unknown — set…").foregroundStyle(Hideout.emberText)
@@ -261,6 +264,7 @@ struct ContextStatusBar: View {
         return (usage.isEstimated ? "≈" : "") + TokenFormat.tokens(usage.tokens)
     }
 
+    /// tok/s is a unit, like MB: not translated.
     private func speedText(_ snap: ContextSnapshot) -> String {
         guard let r = snap.tokensPerSecond else { return "— tok/s" }
         return (snap.speedIsEstimated ? "≈" : "") + TokenFormat.rate(r) + " tok/s"
@@ -269,13 +273,13 @@ struct ContextStatusBar: View {
     private func helpText(_ snap: ContextSnapshot, provider: Provider?) -> String {
         var lines: [String] = []
         if let limit = snap.limit {
-            lines.append("Context limit \(TokenFormat.grouped(limit.tokens)) tokens (\(ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind)))")
+            lines.append(String(localized: "Context limit \(TokenFormat.grouped(limit.tokens)) tokens (\(ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind)))"))
         } else {
-            lines.append("The server did not report a context length. Click to enter one.")
+            lines.append(String(localized: "The server did not report a context length. Click to enter one."))
         }
-        if let kind = snap.info?.serverKind { lines.append("Server: \(kind.displayName)") }
+        if let kind = snap.info?.serverKind { lines.append(String(localized: "Server: \(ContextPopover.serverName(kind))")) }
         if case .failed(let message) = snap.reload { lines.append(message) }
-        if snap.usage.isEstimated { lines.append("≈ means estimated from the text.") }
+        if snap.usage.isEstimated { lines.append(String(localized: "≈ means estimated from the text.")) }
         return lines.joined(separator: "\n")
     }
 
@@ -284,19 +288,32 @@ struct ContextStatusBar: View {
         if let activity = snap.toolActivity {
             parts.append(activity)
         } else if snap.isStreaming, let progress = snap.promptProgress {
-            let cached = progress.cached > 0 ? ", \(TokenFormat.grouped(progress.cached)) cached" : ""
-            parts.append("Reading prompt \(Int((progress.fraction * 100).rounded(.down))) percent of \(TokenFormat.grouped(progress.total)) tokens\(cached)")
+            let percent = Int((progress.fraction * 100).rounded(.down))
+            let total = TokenFormat.grouped(progress.total)
+            parts.append(progress.cached > 0
+                ? String(localized: "Reading prompt \(percent) percent of \(total) tokens, \(TokenFormat.grouped(progress.cached)) cached")
+                : String(localized: "Reading prompt \(percent) percent of \(total) tokens"))
         } else if let r = snap.tokensPerSecond {
-            parts.append("Speed \(TokenFormat.rate(r)) tokens per second\(snap.speedIsEstimated ? ", estimated" : "")")
+            let rate = TokenFormat.rate(r)
+            parts.append(snap.speedIsEstimated
+                ? String(localized: "Speed \(rate) tokens per second, estimated")
+                : String(localized: "Speed \(rate) tokens per second"))
         }
-        if case .failed = snap.reload { parts.append("Reload failed") }
-        let about = snap.usage.isEstimated ? "about " : ""
+        if case .failed = snap.reload { parts.append(String(localized: "Reload failed")) }
+        let used = snap.usage.tokens
+        let estimated = snap.usage.isEstimated
         if snap.reload?.isRunning == true {
-            parts.append("Reloading model")
+            parts.append(String(localized: "Reloading model"))
         } else if let limit = snap.limit {
-            parts.append("Context \(about)\(snap.usage.tokens) of \(limit.tokens) tokens, \(Int((snap.percent ?? 0).rounded())) percent; limit \(ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind))")
+            let percent = Int((snap.percent ?? 0).rounded())
+            let source = ContextPopover.sourceText(limit.source, serverKind: snap.info?.serverKind)
+            parts.append(estimated
+                ? String(localized: "Context about \(used) of \(limit.tokens) tokens, \(percent) percent; limit \(source)")
+                : String(localized: "Context \(used) of \(limit.tokens) tokens, \(percent) percent; limit \(source)"))
         } else {
-            parts.append("Context \(about)\(snap.usage.tokens) tokens, limit unknown")
+            parts.append(estimated
+                ? String(localized: "Context about \(used) tokens, limit unknown")
+                : String(localized: "Context \(used) tokens, limit unknown"))
         }
         return parts.joined(separator: ". ")
     }
@@ -415,11 +432,16 @@ struct ContextPopover: View {
 
     static func sourceText(_ source: ContextLimitSource, serverKind: InferenceServerKind? = nil) -> String {
         switch source {
-        case .server: return "reported by the server"
-        case .manual: return "your value"
-        case .learned: return serverKind == .strata ? "learned from Strata's error" : "learned from the server's error"
-        case .serverMaximum: return "model maximum; the loaded size is unknown"
+        case .server: return String(localized: "reported by the server")
+        case .manual: return String(localized: "your value")
+        case .learned: return serverKind == .strata ? String(localized: "learned from Strata's error") : String(localized: "learned from the server's error")
+        case .serverMaximum: return String(localized: "model maximum; the loaded size is unknown")
         }
+    }
+
+    /// The server kind's name; only the generic one is words to translate.
+    static func serverName(_ kind: InferenceServerKind) -> String {
+        kind == .hosted ? String(localized: "OpenAI-compatible API") : kind.displayName
     }
 
     var body: some View {
@@ -504,10 +526,7 @@ struct ContextPopover: View {
             GridRow {
                 Text("In use").foregroundStyle(Hideout.inkSoft)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(snap.usage.tokens > 0
-                         ? (snap.usage.isEstimated ? "≈ " : "") + "\(TokenFormat.grouped(snap.usage.tokens)) tokens"
-                         + (snap.percent.map { " (\(TokenFormat.percent($0)))" } ?? "")
-                         : "Nothing yet")
+                    inUseText(snap)
                     if snap.usage.isEstimated {
                         Text("Estimated from the text; the server's count replaces it after the next reply.")
                             .font(.caption).foregroundStyle(Hideout.inkSoft)
@@ -540,9 +559,7 @@ struct ContextPopover: View {
                     Text("Last error").foregroundStyle(Hideout.inkSoft)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(TokenFormat.grouped(learned)) tokens")
-                        Text(learned == snap.limit?.tokens
-                             ? "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named the same size."
-                             : "\(snap.info?.serverKind == .strata ? "Strata's" : "The server's") last overflow error named this size; \(snap.limit?.source == .manual ? "your value, entered after it," : "the reported value") is used instead.")
+                        lastErrorText(snap, learned: learned)
                             .font(.caption).foregroundStyle(Hideout.inkSoft)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -559,16 +576,16 @@ struct ContextPopover: View {
             if let kind = snap.info?.serverKind {
                 GridRow {
                     Text("Server").foregroundStyle(Hideout.inkSoft)
-                    Text(kind.displayName + (snap.info?.isLoaded.map { $0 ? " · model loaded" : " · model not loaded" } ?? ""))
+                    serverText(kind, isLoaded: snap.info?.isLoaded)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if snap.tokensPerSecond != nil || snap.timeToFirstToken != nil {
                 GridRow {
                     Text("Speed").foregroundStyle(Hideout.inkSoft)
-                    Text([
+                    Text(verbatim: [
                         snap.tokensPerSecond.map { (snap.speedIsEstimated ? "≈" : "") + TokenFormat.rate($0) + " tok/s" },
-                        snap.timeToFirstToken.map { TokenFormat.seconds($0) + " to first token" },
+                        snap.timeToFirstToken.map { String(localized: "\(TokenFormat.seconds($0)) to first token") },
                     ].compactMap { $0 }.joined(separator: " · "))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -576,7 +593,7 @@ struct ContextPopover: View {
             if let prompt = Self.promptText(snap) {
                 GridRow {
                     Text("Prompt").foregroundStyle(Hideout.inkSoft)
-                    Text(prompt)
+                    Text(verbatim: prompt)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -586,16 +603,53 @@ struct ContextPopover: View {
         .monospacedDigit()
     }
 
+    private func inUseText(_ snap: ContextSnapshot) -> Text {
+        guard snap.usage.tokens > 0 else { return Text("Nothing yet") }
+        let approx = snap.usage.isEstimated ? "≈ " : ""
+        let count = TokenFormat.grouped(snap.usage.tokens)
+        if let percent = snap.percent {
+            return Text("\(approx)\(count) tokens (\(TokenFormat.percent(percent)))")
+        }
+        return Text("\(approx)\(count) tokens")
+    }
+
+    /// Whole sentences per case, so a translation can order them its own way.
+    private func lastErrorText(_ snap: ContextSnapshot, learned: Int) -> Text {
+        let strata = snap.info?.serverKind == .strata
+        if learned == snap.limit?.tokens {
+            return strata
+                ? Text("Strata's last overflow error named the same size.")
+                : Text("The server's last overflow error named the same size.")
+        }
+        switch (strata, snap.limit?.source == .manual) {
+        case (true, true): return Text("Strata's last overflow error named this size; your value, entered after it, is used instead.")
+        case (true, false): return Text("Strata's last overflow error named this size; the reported value is used instead.")
+        case (false, true): return Text("The server's last overflow error named this size; your value, entered after it, is used instead.")
+        case (false, false): return Text("The server's last overflow error named this size; the reported value is used instead.")
+        }
+    }
+
+    private func serverText(_ kind: InferenceServerKind, isLoaded: Bool?) -> Text {
+        let name = Self.serverName(kind)
+        switch isLoaded {
+        case true?: return Text("\(name) · model loaded")
+        case false?: return Text("\(name) · model not loaded")
+        case nil: return Text(verbatim: name)
+        }
+    }
+
     /// "1,204 read at 850 tok/s · 30,112 cached": where the time to the first token went.
     static func promptText(_ snap: ContextSnapshot) -> String? {
         var parts: [String] = []
         if let read = snap.promptTokensRead {
-            parts.append("\(TokenFormat.grouped(read)) read" + (snap.promptTokensPerSecond.map { " at \(TokenFormat.rate($0)) tok/s" } ?? ""))
+            let count = TokenFormat.grouped(read)
+            parts.append(snap.promptTokensPerSecond.map { String(localized: "\(count) read at \(TokenFormat.rate($0)) tok/s") }
+                         ?? String(localized: "\(count) read"))
         } else if let rate = snap.promptTokensPerSecond {
-            parts.append("read at \(TokenFormat.rate(rate)) tok/s")
+            parts.append(String(localized: "read at \(TokenFormat.rate(rate)) tok/s"))
         }
         if let cached = snap.cachedPromptTokens, cached > 0 {
-            parts.append("\(TokenFormat.grouped(cached)) cached")
+            parts.append(String(localized: "\(TokenFormat.grouped(cached)) cached"))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -604,15 +658,19 @@ struct ContextPopover: View {
     @ViewBuilder
     private func strataNote(_ snap: ContextSnapshot) -> some View {
         let shared = snap.sharedInstance
-            ? " It applies to every provider that reaches this Strata (for example over Tailscale and Cloudflare)."
+            ? String(localized: " It applies to every provider that reaches this Strata (for example over Tailscale and Cloudflare).")
             : ""
-        Text(snap.info?.loadedContextLength != nil
-             ? "Strata sets the context length when it starts the model. To use a different size, change it in Strata's setup."
-             : snap.manual != nil
-             ? "Strata's shared port does not report the context length, so your value below is used.\(shared) If you change the context in Strata's setup, update it here."
-             : snap.learned != nil
-             ? "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.\(shared) A value below overrides it."
-             : "Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below, or Parley learns it from Strata's first overflow error; it can only be changed in Strata.")
+        Group {
+            if snap.info?.loadedContextLength != nil {
+                Text("Strata sets the context length when it starts the model. To use a different size, change it in Strata's setup.")
+            } else if snap.manual != nil {
+                Text("Strata's shared port does not report the context length, so your value below is used.\(shared) If you change the context in Strata's setup, update it here.")
+            } else if snap.learned != nil {
+                Text("Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.\(shared) A value below overrides it.")
+            } else {
+                Text("Strata's shared port does not report the context length. Enter the size chosen in Strata's setup below, or Parley learns it from Strata's first overflow error; it can only be changed in Strata.")
+            }
+        }
             .font(.caption)
             .foregroundStyle(Hideout.inkSoft)
             .fixedSize(horizontal: false, vertical: true)
@@ -707,7 +765,7 @@ struct ContextPopover: View {
             } else {
                 HStack {
                     TextField("Tokens", text: $reloadText,
-                              prompt: Text(loaded.map { "\($0)" } ?? "e.g. 16384").foregroundStyle(Hideout.inkFaint))
+                              prompt: (loaded.map { Text(verbatim: "\($0)") } ?? Text("e.g. 16384")).foregroundStyle(Hideout.inkFaint))
                         .accessibilityLabel("New context length in tokens")
                         .composerPopoverField()
                         .frame(width: 120)
@@ -715,8 +773,8 @@ struct ContextPopover: View {
                         .buttonStyle(TagButtonStyle())
                         .disabled(!valid || busy)
                 }
-                Text(max.map { "LM Studio can load this model with up to \(TokenFormat.grouped($0)) tokens." }
-                     ?? "LM Studio can reload this model with a different context length.")
+                (max.map { Text("LM Studio can load this model with up to \(TokenFormat.grouped($0)) tokens.") }
+                     ?? Text("LM Studio can reload this model with a different context length."))
                     .font(.caption)
                     .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)

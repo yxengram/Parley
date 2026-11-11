@@ -396,8 +396,10 @@ private struct ProvidersSettingsView: View {
                     ForEach(settings.providers) { p in
                         SettingsListTag(isSelected: selectedID == p.id, id: p.id, listFocused: listFocused) {
                             HStack {
-                                Text(p.name.isEmpty ? "Untitled" : p.name)
-                                    .lineLimit(1)
+                                Group {
+                                    if p.name.isEmpty { Text("Untitled") } else { Text(verbatim: p.name) }
+                                }
+                                .lineLimit(1)
                                 Spacer()
                                 if p.id == settings.defaultProviderID {
                                     Text("Default")
@@ -415,7 +417,7 @@ private struct ProvidersSettingsView: View {
                 .settingsKraftBoard(seed: 5)
                 HStack(spacing: 6) {
                     Button {
-                        let p = Provider(name: "New Provider", baseURL: "http://localhost:1234/v1")
+                        let p = Provider(name: String(localized: "New Provider"), baseURL: "http://localhost:1234/v1")
                         settings.providers.append(p)
                         if settings.defaultProviderID == nil { settings.defaultProviderID = p.id }
                         selectedID = p.id
@@ -499,7 +501,7 @@ struct ProviderEditor: View {
                     TextField("Name", text: $settings.providers[index].name)
                 }
                 SettingsField("Base URL") {
-                    TextField("Base URL", text: $settings.providers[index].baseURL, prompt: Text("http://192.168.1.20:1234/v1").foregroundStyle(Hideout.inkSoft))
+                    TextField("Base URL", text: $settings.providers[index].baseURL, prompt: Text(verbatim: "http://192.168.1.20:1234/v1").foregroundStyle(Hideout.inkSoft))
                         .textContentType(.URL)
                 }
                 if let warning = Self.urlWarning(provider.baseURL) {
@@ -521,7 +523,7 @@ struct ProviderEditor: View {
                             .labelsHidden()
                             .onSubmit(saveKey)
                             .settingsWell()
-                        Button(keySaved ? "Saved" : "Save Key", action: saveKey)
+                        Button(keySaved ? String(localized: "Saved") : String(localized: "Save Key"), action: saveKey)
                             .disabled(apiKeyDraft == storedKey)
                     }
                 }
@@ -542,8 +544,14 @@ struct ProviderEditor: View {
                     case .idle: EmptyView()
                     case .running: ProgressView().controlSize(.small)
                     case .ok(let n):
-                        Label("Connected, \(n) model\(n == 1 ? "" : "s")", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(Hideout.moss)
+                        Group {
+                            if n == 1 {
+                                Label("Connected, 1 model", systemImage: "checkmark.circle.fill")
+                            } else {
+                                Label("Connected, \(n) models", systemImage: "checkmark.circle.fill")
+                            }
+                        }
+                        .foregroundStyle(Hideout.moss)
                     case .failed(let msg):
                         Label(msg, systemImage: "xmark.octagon.fill")
                             .foregroundStyle(Hideout.danger)
@@ -591,12 +599,13 @@ struct ProviderEditor: View {
         guard !trimmed.isEmpty else { return nil }
         guard let comps = URLComponents(string: trimmed), let scheme = comps.scheme?.lowercased(),
               let host = comps.host, !host.isEmpty else {
-            return "Enter a full URL such as http://localhost:1234/v1."
+            return String(localized: "Enter a full URL such as http://localhost:1234/v1.")
         }
-        guard scheme == "http" || scheme == "https" else { return "Only http and https URLs are supported." }
+        guard scheme == "http" || scheme == "https" else { return String(localized: "Only http and https URLs are supported.") }
         if comps.path.isEmpty || comps.path == "/" {
             let port = comps.port.map { ":\($0)" } ?? ""
-            return "No version path. Most servers expect it to end in /v1, e.g. \(scheme)://\(host)\(port)/v1."
+            let example = "\(scheme)://\(host)\(port)/v1"
+            return String(localized: "No version path. Most servers expect it to end in /v1, e.g. \(example).")
         }
         // Loopback, LAN and Tailscale (100.64/10 and MagicDNS *.ts.net names, WireGuard-encrypted)
         // addresses stay quiet. (.ts.net counts as private for this warning only, not for probes.)
@@ -604,7 +613,8 @@ struct ProviderEditor: View {
             var https = comps
             https.scheme = "https"
             https.port = nil
-            return "Plain http over the internet: your API key and chats travel unencrypted, readable by anyone on the way. Use https if the server offers it (\(https.string ?? "https://…"))."
+            let secure = https.string ?? "https://…"
+            return String(localized: "Plain http over the internet: your API key and chats travel unencrypted, readable by anyone on the way. Use https if the server offers it (\(secure)).")
         }
         return nil
     }
@@ -640,7 +650,7 @@ struct ProviderEditor: View {
         if apiKeyDraft != storedKey {
             saveKey()
             if keyError != nil {
-                testStatus = .failed("The API key could not be saved to the Keychain.")
+                testStatus = .failed(String(localized: "The API key could not be saved to the Keychain."))
                 return
             }
         }
@@ -824,7 +834,7 @@ private struct GeneralSettingsView: View {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = appState.settings.defaultDirectoryURL
-        panel.prompt = "Choose"
+        panel.prompt = String(localized: "Choose")
         if panel.runModal() == .OK, let url = panel.url {
             appState.changeDefaultDirectory(to: url)
         }

@@ -1,0 +1,3 @@
+/* Localized Info.plist values. Keep in sync with Resources/Info.plist. */
+
+"NSLocalNetworkUsageDescription" = "Parley connects to the LLM server and MCP servers you configure, which may be on your local network.";

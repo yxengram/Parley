@@ -48,19 +48,28 @@ struct ConversationSettingsPopover: View {
     /// The footer's notes under the reasoning settings (none for the defaults).
     static func reasoningNotes(serverKind: InferenceServerKind?, disablesThinking: Bool, hasBudget: Bool) -> [String] {
         if serverKind == .strata {
-            return ["Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone."]
+            return [String(localized: "Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone.")]
         }
         var notes: [String] = []
         if disablesThinking {
-            notes.append("None asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored.")
+            notes.append(String(localized: "None asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored."))
         }
         if hasBudget {
             // While the probe is pending the server may still turn out to be Strata.
             notes.append(serverKind == nil
-                ? "The thinking budget is sent only to Strata."
-                : "The thinking budget is sent only to Strata; this server does not get it.")
+                ? String(localized: "The thinking budget is sent only to Strata.")
+                : String(localized: "The thinking budget is sent only to Strata; this server does not get it."))
         }
         return notes
+    }
+
+    /// The stored raw value stays English; the menu shows a translated name.
+    static func effortText(_ effort: ReasoningEffort) -> Text {
+        switch effort {
+        case .low: return Text("Low")
+        case .medium: return Text("Medium")
+        case .high: return Text("High")
+        }
     }
 
     var body: some View {
@@ -147,7 +156,7 @@ struct ConversationSettingsPopover: View {
                         Text("Not sent").tag(Thinking.notSent)
                         Text("None (no thinking)").tag(Thinking.off)
                         ForEach(ReasoningEffort.allCases, id: \.self) { e in
-                            Text(e.rawValue.capitalized).tag(Thinking.effort(e))
+                            Self.effortText(e).tag(Thinking.effort(e))
                         }
                     }
                     .pickerStyle(.menu)

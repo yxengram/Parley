@@ -168,7 +168,7 @@ struct NewChatSheet: View {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: directoryPath)
-        panel.prompt = "Choose"
+        panel.prompt = String(localized: "Choose")
         if panel.runModal() == .OK, let url = panel.url {
             directoryPath = url.path
         }
@@ -200,7 +200,7 @@ func abbreviated(_ path: String) -> String {
     (path as NSString).abbreviatingWithTildeInPath
 }
 
-let cloudSyncWarning = "This folder may be synced to a cloud service (iCloud Drive, Dropbox, OneDrive, Google Drive…). Unencrypted conversations stored here can leave this Mac."
+let cloudSyncWarning = String(localized: "This folder may be synced to a cloud service (iCloud Drive, Dropbox, OneDrive, Google Drive…). Unencrypted conversations stored here can leave this Mac.")
 
 /// Rough check for folders that may be uploaded by a sync service: iCloud Drive's
 /// "Desktop & Documents", iCloud Drive itself, File Provider mounts in ~/Library/CloudStorage

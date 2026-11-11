@@ -23,7 +23,7 @@ struct MCPSettingsView: View {
                                 HStack(spacing: 7) {
                                     PaperStatusDot(state: appState.mcpSnapshots[server.id]?.state ?? .stopped,
                                                    onWall: selectedID != server.id)
-                                    Text(verbatim: server.name.isEmpty ? "Untitled" : ToolDisplay.line(server.name))
+                                    Text(verbatim: server.name.isEmpty ? String(localized: "Untitled") : ToolDisplay.line(server.name))
                                         .lineLimit(1)
                                     Spacer()
                                     if !server.isEnabled {
@@ -244,22 +244,22 @@ struct MCPServerDraft: Equatable {
 
     /// Why this cannot be saved, or nil.
     var problem: String? {
-        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Enter a name." }
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Enter a name.") }
         if kind == MCPServerConfig.kindHTTP {
             let comps = URLComponents(string: url.trimmingCharacters(in: .whitespacesAndNewlines))
             guard let scheme = comps?.scheme?.lowercased(), scheme == "http" || scheme == "https",
                   let host = comps?.host, !host.isEmpty else {
-                return "Enter a full URL such as https://example.com/mcp."
+                return String(localized: "Enter a full URL such as https://example.com/mcp.")
             }
             let port = oauthCallbackPort.trimmingCharacters(in: .whitespacesAndNewlines)
             if !port.isEmpty, !(Int(port).map { (1024...65535).contains($0) } ?? false) {
-                return "The callback port is a number from 1024 to 65535. Leave it blank to use a free one."
+                return String(localized: "The callback port is a number from 1024 to 65535. Leave it blank to use a free one.")
             }
         } else if command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Enter the program to run."
+            return String(localized: "Enter the program to run.")
         }
         if ![callTimeout, startupTimeout, maxResultCharacters].allSatisfy(Self.isBlankOrPositive) {
-            return "Timeouts and the result limit are whole numbers. Leave them blank for the default."
+            return String(localized: "Timeouts and the result limit are whole numbers. Leave them blank for the default.")
         }
         return nil
     }
@@ -277,7 +277,7 @@ struct MCPServerDraft: Equatable {
         guard let comps = URLComponents(string: url.trimmingCharacters(in: .whitespacesAndNewlines)),
               comps.scheme?.lowercased() == "http", let host = comps.host, !host.isEmpty,
               !ProviderEditor.isPrivateRoute(host) else { return nil }
-        return "Plain http over the internet: your tokens, tool arguments and results travel unencrypted, readable by anyone on the way. Use https if the server offers it (https://…)."
+        return String(localized: "Plain http over the internet: your tokens, tool arguments and results travel unencrypted, readable by anyone on the way. Use https if the server offers it (https://…).")
     }
 }
 
@@ -390,7 +390,7 @@ struct MCPServerEditor: View {
             }
             if isHTTP {
                 SettingsField("URL") {
-                    TextField("URL", text: $draft.url, prompt: Text("https://example.com/mcp").foregroundStyle(Hideout.inkSoft))
+                    TextField("URL", text: $draft.url, prompt: Text(verbatim: "https://example.com/mcp").foregroundStyle(Hideout.inkSoft))
                         .textContentType(.URL)
                 }
                 if let warning = MCPServerDraft.urlWarning(draft.url) {
@@ -451,7 +451,7 @@ struct MCPServerEditor: View {
                 TextField("Tool timeout (seconds)", text: $draft.callTimeout, prompt: Text(verbatim: String(Int(MCPServerConfig.defaultCallTimeout))).foregroundStyle(Hideout.inkSoft))
             }
             SettingsField("Start timeout (seconds)") {
-                TextField("Start timeout (seconds)", text: $draft.startupTimeout, prompt: Text(isHTTP ? "20" : "120").foregroundStyle(Hideout.inkSoft))
+                TextField("Start timeout (seconds)", text: $draft.startupTimeout, prompt: Text(verbatim: isHTTP ? "20" : "120").foregroundStyle(Hideout.inkSoft))
             }
             SettingsField("Result limit (characters)") {
                 TextField("Result limit (characters)", text: $draft.maxResultCharacters, prompt: Text(verbatim: String(MCPServerConfig.defaultMaxResultCharacters)).foregroundStyle(Hideout.inkSoft))
@@ -470,7 +470,7 @@ struct MCPServerEditor: View {
     private var connectBlocker: String? {
         guard loaded else { return nil }
         if let problem = draft.problem { return problem }
-        return draft.isEnabled ? nil : "Turn on Enabled to connect."
+        return draft.isEnabled ? nil : String(localized: "Turn on Enabled to connect.")
     }
 
     /// A failed server is an error; one that will restart on next use is a warning.
@@ -539,7 +539,7 @@ struct MCPServerEditor: View {
                                 .foregroundStyle(Hideout.inkSoft)
                                 .lineLimit(2)
                                 .truncationMode(.middle)
-                            Text(verbatim: "Not available: \(hidden.reason)")
+                            Text(verbatim: String(localized: "Not available: \(Self.hiddenReason(hidden.reason))"))
                                 .font(.caption)
                                 .foregroundStyle(Hideout.inkSoft)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -560,6 +560,21 @@ struct MCPServerEditor: View {
                     }
                 }
             }
+        }
+    }
+
+    /// The reasons ParleyCore gives for a tool it hides stay English there (they are logged and may
+    /// reach the model); the ones known here are shown in the interface language.
+    private static func hiddenReason(_ reason: String) -> String {
+        switch reason {
+        case "Its name is too long, or has spaces or invisible characters.":
+            return String(localized: "Its name is too long, or has spaces or invisible characters.")
+        case "The server lists this name twice.":
+            return String(localized: "The server lists this name twice.")
+        case "It runs only as a task, which Parley does not support.":
+            return String(localized: "It runs only as a task, which Parley does not support.")
+        default:
+            return reason
         }
     }
 
@@ -602,7 +617,7 @@ struct MCPServerEditor: View {
 private struct MCPPairRows: View {
     @Binding var pairs: [MCPServerDraft.Pair]
     let namePrompt: String
-    let addLabel: String
+    let addLabel: LocalizedStringKey
 
     var body: some View {
         ForEach($pairs) { $pair in
@@ -755,9 +770,9 @@ private struct MCPLogSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: "Log: \(ToolDisplay.visible(serverName))").font(Hideout.title(16))
+            Text(verbatim: String(localized: "Log: \(ToolDisplay.visible(serverName))")).font(Hideout.title(16))
             ScrollView {
-                Text(verbatim: lines.isEmpty ? "Nothing yet." : ToolDisplay.visible(text))
+                Text(verbatim: lines.isEmpty ? String(localized: "Nothing yet.") : ToolDisplay.visible(text))
                     .font(.system(size: 11, design: .monospaced))
                     .fontDesign(.monospaced)
                     .foregroundStyle(lines.isEmpty ? Hideout.boardInkSoft : Hideout.boardInk)

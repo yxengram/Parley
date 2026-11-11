@@ -202,10 +202,16 @@ final class AppState {
     }
 
     /// Display title. Encrypted conversations only show a title while unlocked in memory.
+    /// The stored default title stays "New Chat" in the file (auto-titling compares it); it is
+    /// shown in the interface language. Renaming starts from the stored title, not this one.
     func displayTitle(for entry: LibraryEntry) -> String? {
-        if let session = sessions[entry.id] { return session.conversation.title }
+        if let session = sessions[entry.id] { return Self.shownTitle(session.conversation.title) }
         if entry.isEncrypted { return nil }
-        return entry.title ?? "Untitled"
+        return entry.title.map(Self.shownTitle) ?? String(localized: "Untitled")
+    }
+
+    private static func shownTitle(_ title: String) -> String {
+        title == ConversationSession.defaultTitle ? String(localized: "New Chat") : title
     }
 
     func sortDate(for entry: LibraryEntry) -> Date {
@@ -342,7 +348,8 @@ final class AppState {
     /// fails, the conversation stays unlocked (so nothing is lost) and a notice explains why.
     func lock(_ id: UUID) {
         if let error = lockSession(id) {
-            notice = Notice(title: "Could not lock", message: "The conversation could not be saved, so it was left unlocked to keep your changes. \(error)")
+            notice = Notice(title: String(localized: "Could not lock"),
+                            message: String(localized: "The conversation could not be saved, so it was left unlocked to keep your changes. \(error)"))
         }
     }
 
@@ -352,9 +359,12 @@ final class AppState {
             if let error = lockSession(id) { failures.append(error) }
         }
         if !failures.isEmpty {
+            let first = failures[0], count = failures.count
             notice = Notice(
-                title: "Could not lock",
-                message: "\(failures.count) conversation\(failures.count == 1 ? "" : "s") could not be saved and stayed unlocked to keep your changes. \(failures[0])"
+                title: String(localized: "Could not lock"),
+                message: count == 1
+                    ? String(localized: "1 conversation could not be saved and stayed unlocked to keep your changes. \(first)")
+                    : String(localized: "\(count) conversations could not be saved and stayed unlocked to keep your changes. \(first)")
             )
         }
     }
@@ -433,7 +443,8 @@ final class AppState {
         let newSession = ConversationSession(conversation: forked, fileURL: url, encryption: session.encryption)
         newSession.markUnsaved()
         if let error = newSession.flushSync() {
-            notice = Notice(title: "Could not fork", message: "The new conversation could not be saved. \(error)")
+            notice = Notice(title: String(localized: "Could not fork"),
+                            message: String(localized: "The new conversation could not be saved. \(error)"))
             return
         }
         register(newSession)
@@ -445,8 +456,8 @@ final class AppState {
     // MARK: - Encryption management
 
     static let encryptedOverwriteNotice = Notice(
-        title: "Conversation encrypted",
-        message: "The previous unencrypted file was overwritten in place. On SSDs/APFS this is not a secure erase; older copies may exist in backups or snapshots."
+        title: String(localized: "Conversation encrypted"),
+        message: String(localized: "The previous unencrypted file was overwritten in place. On SSDs/APFS this is not a secure erase; older copies may exist in backups or snapshots.")
     )
 
     /// Encrypts (or re-keys) an open conversation and overwrites its file in place.
@@ -473,7 +484,8 @@ final class AppState {
         session.encryption = nil
         if let error = session.flushSync() {
             session.encryption = previous
-            notice = Notice(title: "Could not remove encryption", message: "The file could not be written and is still encrypted. \(error)")
+            notice = Notice(title: String(localized: "Could not remove encryption"),
+                            message: String(localized: "The file could not be written and is still encrypted. \(error)"))
         }
     }
 
@@ -484,7 +496,7 @@ final class AppState {
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.message = "Choose Parley conversation files"
+        panel.message = String(localized: "Choose Parley conversation files")
         guard panel.runModal() == .OK else { return }
         var firstID: UUID?
         var failures: [String] = []
@@ -503,7 +515,8 @@ final class AppState {
         }
         if let firstID { selection = firstID }
         if !failures.isEmpty {
-            notice = Notice(title: "Could not open", message: "Not a Parley conversation: \(failures.joined(separator: ", "))")
+            let names = failures.joined(separator: ", ")
+            notice = Notice(title: String(localized: "Could not open"), message: String(localized: "Not a Parley conversation: \(names)"))
         }
     }
 
@@ -515,7 +528,8 @@ final class AppState {
     func removeFromList(_ entry: LibraryEntry) {
         if let s = sessions[entry.id] {
             if let error = s.close(saving: true) {
-                notice = Notice(title: "Could not remove from list", message: "The conversation could not be saved, so it was kept open to keep your changes. \(error)")
+                notice = Notice(title: String(localized: "Could not remove from list"),
+                                message: String(localized: "The conversation could not be saved, so it was kept open to keep your changes. \(error)"))
                 return
             }
             sessions[entry.id] = nil
@@ -542,7 +556,7 @@ final class AppState {
             entries.removeAll { $0.id == entry.id }
             if selection == entry.id { selection = nil }
         } catch {
-            notice = Notice(title: "Could not move to Trash", message: error.localizedDescription)
+            notice = Notice(title: String(localized: "Could not move to Trash"), message: error.localizedDescription)
         }
     }
 
@@ -776,7 +790,7 @@ final class AppState {
                 // Refused before it started (another reload running, no client): still say so.
                 let key = ContextKey(provider: provider, model: model)
                 if reloadStates[key]?.isRunning != true {
-                    reloadStates[key] = .failed("Reload failed: \(error.localizedDescription)")
+                    reloadStates[key] = .failed(Self.reloadFailed(error))
                 }
             }
         }
@@ -791,7 +805,8 @@ final class AppState {
         let key = ContextKey(provider: provider, model: model)
         let serverKey = Self.normalizedBaseURL(provider.baseURL) + "\n" + (contextInfo[key]?.modelKey ?? model)
         guard reloadStates[key]?.isRunning != true, !reloadsInFlight.contains(serverKey) else {
-            throw ParleyError.api("\(model) is already being reloaded.")
+            // UI only: startReload shows it in the context popover (no "API error: " prefix).
+            throw ReloadRefused(errorDescription: String(localized: "\(model) is already being reloaded."))
         }
         let client = try ChatClient(baseURL: provider.baseURL, apiKey: try KeychainStore.apiKey(for: provider.id))
         // Claimed before the first await, so a second call is refused deterministically.
@@ -806,7 +821,8 @@ final class AppState {
             let info = try await client.reloadModel(model, contextLength: contextLength)
             var notes: [String] = []
             if let applied = info.loadedContextLength, applied != contextLength {
-                notes.append("The server loaded the model with \(applied.formatted()) tokens instead.")
+                let tokens = applied.formatted()
+                notes.append(String(localized: "The server loaded the model with \(tokens) tokens instead."))
             }
             let newKey = ContextKey(provider: provider, model: info.model)
             // A size learned from an earlier overflow described the old load.
@@ -817,7 +833,8 @@ final class AppState {
                 if let session, ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider) == model {
                     session.conversation.settings.model = info.model
                     session.settingsChanged(debounced: false)
-                    notes.append("This conversation now uses \(info.model).")
+                    let newModel = info.model
+                    notes.append(String(localized: "This conversation now uses \(newModel)."))
                 }
             }
             store(info, for: newKey)
@@ -828,9 +845,20 @@ final class AppState {
         } catch {
             // The model may now be unloaded: show what the server says, then report the failure.
             store(await client.fetchModelInfo(model: model), for: key)
-            reloadStates[key] = .failed("Reload failed: \(error.localizedDescription)")
+            reloadStates[key] = .failed(Self.reloadFailed(error))
             throw error
         }
+    }
+
+    /// The context popover's line for a reload that failed or was refused.
+    private static func reloadFailed(_ error: Error) -> String {
+        let description = error.localizedDescription
+        return String(localized: "Reload failed: \(description)")
+    }
+
+    /// A second reload of the same model, refused before anything is sent.
+    private struct ReloadRefused: LocalizedError {
+        let errorDescription: String?
     }
 
     private static func normalizedBaseURL(_ s: String) -> String {
@@ -915,5 +943,5 @@ final class AppState {
 /// A conversation file could not be written. The message never contains conversation content.
 struct SaveFailure: LocalizedError {
     let message: String
-    var errorDescription: String? { "Could not save the conversation: \(message)" }
+    var errorDescription: String? { String(localized: "Could not save the conversation: \(message)") }
 }

@@ -1,151 +1,112 @@
-# Parley
+<p align="center"><img src="docs/images/icon.png" width="128" alt="Parley icon"></p>
 
-一个简易的 macOS LLM 聊天客户端，使用 OpenAI 兼容 API。纯 Swift / SwiftUI，没有任何第三方依赖。
+<h1 align="center">Parley</h1>
 
-## 构建与运行
-```bash
-./build.sh            # 生成 build/Parley.app（ad-hoc 签名）
-open build/Parley.app
-swift test            # 1138 个测试：核心层 846 个，App 层 292 个；集成测试会自动启动 tools/mock_server.py 和 tools/mock_mcp_server.py
-```
-只装了 Command Line Tools 就能构建，不需要 Xcode。
+<p align="center">
+A cosy, private chat app for macOS that talks to the AI models you choose,<br>
+on your own computer or online.
+</p>
 
-## 用法
-- **设置 → Providers**：填写 Base URL（需包含 `/v1`，例如 `http://192.168.1.20:1234/v1` 或 `https://api.openai.com/v1`）。API key 保存在 macOS 钥匙串里，不会同步到 iCloud。用 `http://` 连接互联网地址时（不是本机、局域网、Tailscale 的 100.x 地址或 MagicDNS 的 `*.ts.net` 名字），设置里会警告：API key 和聊天内容会以明文经过互联网，并给出对应的 `https://` 地址。Tailscale 走 WireGuard 加密，所以 `http://100.x…` 和 `http://….ts.net` 不警告。
-- 会话的默认存放目录是 `~/Library/Application Support/Parley/Conversations`。这个位置不会被 iCloud 同步，可以在设置里修改。新建对话时也可以单独选择目录。
-- 消息上的悬停按钮：复制、回滚到此处、从此处分叉、编辑并重发（用户消息）、重新生成（模型消息）。
-- 思考内容：兼容 `reasoning_content`、`reasoning`，以及内联的 `<think>…</think>` 标签。
-- **不思考（None）**：会话设置（⌘I）的推理强度可以直接选“None (no thinking)”，所有服务器都可以选（默认仍是“Not sent”，什么都不发）。按服务器类型发送：
-  - 已确认的：Strata 发 `reasoning_effort: "none"`（实测）；llama.cpp 和 vLLM 发 `chat_template_kwargs: {"enable_thinking": false}`（是否生效取决于模型的聊天模板，例如 Qwen3 支持，gpt-oss 不支持；vLLM 旧版和 gpt-oss 会以 400 拒绝 `"none"`，所以不发它）；Ollama 发 `reasoning_effort: "none"`（0.12.4 起等于 `think: false`）；LM Studio 发 `reasoning_effort: "none"`（文档没写，2026-11-04 实测 Qwen 3.8 27B 生效：没有思考内容，reasoning_tokens 为 0）。
-  - 尽力而为的：在线 API 和还没识别出类型的服务器发 `reasoning_effort: "none"`。OpenAI gpt-5.1 及以后、OpenRouter、Gemini 2.5 Flash 支持，有些模型会拒绝。
-  - 服务器以 400/422 拒绝这个字段（错误里提到这个字段、reasoning 或 thinking）时，Parley 去掉它重试一次。重试成功，才在回复下方说明服务器没有接受 None、这条回复用了默认的思考方式，并在本次运行中对这个 Provider 的这个模型记住被拒的字段，之后不再发送，回复照样标注；重试也失败，说明不是这个字段的问题，显示原来的错误，什么都不记。上下文超长等其他 400 不重试；Strata 已确认接受 None，它的 400 也不重试。
-  - 发了 None 却仍收到思考内容时，回复下方注明服务器或模型忽略了它（LM Studio 会提示该模型的设置里可能有思考开关，界面位置未核实）。连续几条回复是同一种情况时，后面的只显示一行简短说明。这些标注保存在会话文件里，旧版本仍能打开文件。
-  - 刚启动、还没识别出服务器类型时，用 None 的消息会先等识别结果（最多 4 秒），用思考预算的最多等约 6.5 秒（没识别出 Strata 就不能发预算）；Stop 可以立即取消。其他设置不等待。
-  - 以前在 Strata 上设为“Off”的会话，现在显示为 None；换到其他服务器时也会按上面的方式发送（以前其他服务器什么都收不到）。
-- 回复因达到 token 上限而被截断时（`finish_reason: length`），消息下方会说明原因：用满了 Max Tokens 时，提示提高 Max Tokens、降低推理强度（或选 None），在 Strata 上也可以设置思考预算；没有设置 Max Tokens，或回复比 Max Tokens 短（上下文已满，Strata 会把 Max Tokens 缩短到剩余空间）时，提示新建对话、分叉或回滚。
-- 推理速度：生成时，窗口右下角的状态条实时显示每秒 token 数（tok/s），每秒刷新几次。回复结束后，速度和首个 token 的等待时间会显示在消息底部的 token 用量旁边（设置里的“显示 token 用量”同时控制它）。服务器返回 usage 或 llama.cpp/Strata 的 timings 时用精确数值；否则按流式分块估算（一块约等于一个 token），并标上“≈”。等待第一个 token 时显示已等待的秒数；服务器报告读取提示词的进度时（Strata 引擎、llama.cpp），显示“Reading the prompt: 42% …”。
-- 上下文长度：状态条显示“已用 / 上限（百分比）”，超过 80% 变橙色，超过 95% 变红。点击可查看详情：已用 token、上限及其来源、模型最大值、服务器类型和速度。
-  - Parley 会向当前服务器读取模型的上下文长度：LM Studio（`/api/v1/models`，旧版 `/api/v0/models`）、llama.cpp（`/props`）、vLLM（`max_model_len`）、Ollama（`/api/ps`），以及在线 API 模型列表里的字段。
-  - 上限的优先级：服务器报告的当前值 > 你自己填写的值 > 从服务器的超长错误里得知的值 > 模型最大值。只知道模型最大值时（例如 LM Studio 里还没加载的模型），状态条写成“max 256k”，因为实际加载的长度可能小得多。都不知道时显示“Context: unknown — set…”，可以在弹窗里填写一个数值（按服务器和模型分别保存）。服务器暂时连不上时不会记住“未知”，下次成功回复后会再问一次。
-  - LM Studio 0.4 及以上可以在弹窗里“用 N tokens 重新加载模型”。这会在服务器上卸载并重新加载该模型，影响所有使用它的应用，所以必须先确认（回车不会触发），绝不会自动执行；填写的值和当前已加载的值相同时不能重新加载。重新加载在后台进行，关闭弹窗不会中断，失败信息会保留在弹窗和状态条里；同一服务器上的同一模型同时只能有一个重新加载。llama.cpp、vLLM、Ollama 和在线 API 无法在运行时修改，只能手动填写。
-  - 已用 token 以最近一次服务器统计的 usage 为准，并扣除思考部分（思考内容不会再发回服务器）：服务器报告 reasoning_tokens 时用它，否则按思考文字估算（LM Studio、llama.cpp、Strata 都不报告）；之后的新消息和没有统计时按文字估算（中日韩字符约 1 字 1 token，其他约 4 字符 1 token），并标上“≈”。
+<p align="center">
+<b>English</b> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-## MCP
-Parley 是 MCP 客户端：它连接你配置的 MCP 服务器，把服务器的工具（tools）提供给模型，模型要调用时由你批准，结果再发回模型，循环到模型给出回答。和 LM Studio 的集成类似。
+<p align="center">
+<a href="https://github.com/yxengram/Parley/releases/latest"><b>Download for Mac</b></a> ·
+<a href="https://yxengram.github.io/Parley/">Parley Reader (open chats in any browser)</a>
+</p>
 
-**支持什么**
-- 传输：stdio（本机命令）和 Streamable HTTP（远程 URL）。
-- 能力：只有 tools。
-- HTTP 认证：固定的请求头（例如 `Authorization: Bearer …`），或在浏览器里登录（OAuth，遵循 MCP 2026-07-28 授权规范，使用 PKCE）。
+![Parley chat window](docs/images/en/chat.jpg)
 
-**不支持什么**：resources、prompts、sampling、elicitation，以及已废弃的 HTTP+SSE 传输（导入这种配置时会明确说不支持）。工具结果里的图片、音频和二进制内容不会发给模型，结果下方会注明。
+## What Parley does
 
-**登录（OAuth）**
-- 服务器要求登录时，连接会停在 401，只显示“需要登录”，不会查询任何东西。只有你在**设置 → MCP**里按下 **Sign In**，Parley 才开始查找登录信息（`.well-known`）。
-- 除 MCP 服务器以外的主机，Parley 都会先在确认框里列出主机名和它会收到什么，你同意后才会联系。如果登录服务商不是 MCP 服务器本身，确认框会提醒：这个服务器将持有该服务商签发的令牌，这个令牌可能在服务器之外也能用。
-- 服务商可能要求注册客户端。没有填写 Client ID 时，Parley 会自动注册，服务商会收到名称 Parley 和一个本机地址，并留下一条记录。GitHub 这类需要手工注册的服务商，请填写 Client ID 和 Client Secret，并把编辑页显示的重定向地址登记到服务商那里；需要固定端口时可以填写 Callback Port。
-- 服务器地址（含路径）会发给服务商，也会留在浏览器历史里，历史可能会同步。这是规范要求的，确认框每次都会说明。URL 里带用户名或密码时不能登录；非本机的纯 http 服务器也不能登录，因为令牌会明文传输。
-- 令牌只保存在登录钥匙串里（不同步），不会写入 UserDefaults、会话文件或日志。只在你发送消息或点 Connect 时才会刷新，不会定时刷新。如果服务商支持，Parley 会申请长期访问（`offline_access`）。
-- Sign Out 只删除本机的令牌，不联系服务商；关闭连接时仍会向 MCP 服务器发送结束会话的 DELETE。修改 URL 或删除服务器时，令牌也会删除。
-- Parley 看不到你在浏览器里选了哪个账号，所以每次登录都会清除这个服务器的“总是允许”。
-- 服务器需要更多权限时不会自动打开任何东西，再按一次 Sign In，确认框会标出新增的权限。
-- 设置了固定的 `Authorization` 头时，这个服务器不使用登录，固定请求头的行为不变。其他固定请求头只发给 MCP 服务器，不发给登录服务商。
+**Chat with almost any model.** Parley works with any service that speaks the common
+"OpenAI-compatible" language: models running on your own Mac or home server (LM Studio, Ollama,
+llama.cpp, vLLM and others) and online services such as OpenAI or OpenRouter. Add as many
+servers as you like and switch models from the top of the window.
 
-**配置**
-1. 打开**设置 → MCP**，点 `+` 填写，或点 **Import…** 粘贴其他 MCP 客户端的配置（`{"mcpServers":{…}}`、VS Code 的 `{"servers":{…}}`，或只有里面的部分）。Parley 不会读取其他应用的配置文件，只看你粘贴的文字。导入前逐项显示完整的命令或 URL、工作目录、危险写法（`sudo`、`curl … | sh`、指向 `~/.ssh` 等）、会改变实际运行代码的环境变量及其值（`PATH`、`DYLD_*`、`NODE_OPTIONS` 等）和隐藏了值的其他变量名；有危险提示的服务器默认不勾选，提示也会留在编辑页里。`${VAR}` 不展开，按原样保存。命令里写了整条命令行（程序名后带空格和参数）的条目不能导入，因为命令名保存在偏好设置里，不在钥匙串里；配置里写了 `"disabled": true` 的服务器导入后保持关闭。
-2. 本机命令只写程序名时（`npx`、`uvx`），Parley 第一次用到时会运行一次登录 shell（`$SHELL -l -c`，不加 `-i`）取得 PATH，再加上 Homebrew、nvm、Volta 等常见目录。找不到时，设置里的状态会列出查过的目录（回复下方的说明不列，那段文字会保存在对话文件里）；可以写绝对路径，或在这个服务器的环境变量里设 `PATH`。
-3. 在对话里点输入框旁的扳手按钮（⇧⌘T）选择这个对话用哪些服务器。标记了“Use in new chats”的服务器在新对话里默认打开；New Chat 窗口里也能选。用 `+` 新建的服务器在第一次保存之前是关闭的，不会出现在这些列表里。
+**Your data stays yours.** Parley talks only to the servers you set up. There is no account, no
+tracking and no analytics. API keys are kept in the macOS Keychain, and every conversation is a
+plain file in a folder you choose.
 
-**什么时候启动**：默认没有任何服务器。只有在列出了该服务器的对话里发送消息，或在设置里按 Connect，才会启动或连接；打开设置、切换对话、勾选服务器都不会。一个服务器只有一个进程，多个对话共用，进程崩溃后下次使用时重启，一分钟内崩溃三次就停下等你处理。在对话里取消勾选不会停止进程：它一直运行到你在设置里按 Stop，或退出 Parley。你按了 Stop、关闭或删除服务器之后，正在进行的回复不会再启动它，也不会再调用它的工具（等待批准的卡片即使按了 Allow 也不运行）；下一条消息才会重新启动没有关闭的服务器。退出 Parley 时会结束这些进程及其子进程。
+**Lock a conversation with a password.** Any conversation can be encrypted. It stays unreadable
+on disk until you unlock it, and it locks again with one click. Forgotten passwords can't be
+recovered, so keep them somewhere safe.
 
-**批准**
-- 每次调用前，回复里都会出现卡片，显示服务器、工具名和完整参数：Deny、Allow Once 或 Always Allow This Tool。卡片没有键盘快捷键，回车不会批准任何东西；一直不回答也不会超时，后台对话在侧边栏显示一只橙色的手，Parley 不在前台时 Dock 图标也会跳动。卡片刚出现的 0.4 秒内两个 Allow 按钮不可用，每次点击只回答它自己那张卡片，连点不会批准下一张。
-- 参数里的隐藏字符（零宽字符、双向控制符、tag 字符等）显示成 `\u{…}`，卡片上另有一行提示，模型无法把内容藏在你看不见的字符里。“Definition from the server”里可以看到工具的描述和模型收到的全部参数定义。服务器给的工具名超过 128 个字符，或含空格、换行、不可见字符时，这个工具不提供，设置里注明原因。
-- “总是允许”按服务器和工具保存，绑定工具定义的指纹：工具的描述或参数变了，卡片会回来并说明；服务器的命令、参数、URL、工作目录或它自己的 `PATH` 变了，全部清除（只是换了 token 不清除）。可以在设置 → MCP 里撤销，服务器没有运行时也可以，不需要先启动你不再信任的程序。
-- Stop（Esc 或 ⌘.）取消正在运行的调用（通知服务器），等待批准的调用不再运行。模型总能收到每个调用的结果文字（包括拒绝、失败、被中断），所以之后可以继续对话。
-- 一个回复最多运行 10 轮工具（设置 → MCP 可改为 1 到 50）。到达上限后，最后一次请求不带工具，并在末尾加一条只发给模型、不保存的用户消息，让模型用已有结果回答，回复下方会注明。同一轮的多个调用按顺序逐个运行。
-- 重新生成带工具的回复总是先询问：工具已经造成的影响不会撤销，模型可能再次运行它们。
+![An encrypted conversation waiting for its password](docs/images/en/encrypted.jpg)
 
-**结果和上下文**
-- 单个结果默认最多 32,000 个字符，并按上下文剩余空间收紧（至少 2,000），超出部分截断，模型和你都会看到说明。模型上下文很小时，这能避免一个结果直接让回复超长失败。
-- 工具定义和结果都算进上下文，状态条会显示；工具运行时，状态条显示“Running read_file…”。结果和图片一样，每条消息都会重新发送。工具定义占到上下文一半以上时，工具弹窗会警告；模型因上下文超长拒绝请求时，错误说明里会写出工具定义占了多少 token。
-- 模型或服务器不接受 `tools` 时（Ollama 的“does not support tools”、llama.cpp 没开 `--jinja`、vLLM 没开工具解析器等），Parley 去掉工具重试一次，并在回复下方说明；“不支持”会在本次运行中按服务商和模型记住，工具弹窗里可以点 Try Again。发送没有工具的请求时，之前的工具轮次会合并成普通文字，所以任何服务器都能继续这段对话。
-- Strata 的运行时模式（runtime mode）会忽略工具，所以不提供，回复下方会说明，换成原生模型即可，也可以改用下面的 ReAct。
+**Everything you expect from a good chat app**
+- Attach pictures and text files by dragging, pasting or clicking the paper clip.
+- See the model's "thinking" in a fold-out section, and choose how hard it should think, or turn
+  thinking off.
+- Hover over a message to copy it, edit and resend, regenerate a reply, roll back, or branch off
+  a new conversation from that point.
+- Code blocks, tables, lists and links are formatted nicely. Links always ask before opening.
+- A small strip under the message box shows how fast the model is replying and how full its
+  memory (context) is.
 
-**ReAct（文本方式调用工具）**
+**Let the model use tools, safely.** Parley can give a model tools: a clock, a calculator,
+reading files in one folder you pick, and reading web pages. You can also connect "MCP" tool
+servers, the same kind used by other AI apps. Every tool is off until you turn it on, and
+anything that touches your files or the web asks you first, showing exactly what it wants to do.
 
-有些模型或服务器不支持原生 `tools`：不支持工具的 Ollama 模型、没开 `--jinja` 的 llama.cpp、Strata 的运行时模式。这时可以在工具弹窗（⇧⌘T）里把 **Tool calling** 从 Native 改成 **ReAct (text)**：工具以文字形式写进系统提示，模型用 `Thought`、`Action`、`Action Input`、`Final Answer` 这几行文字来调用工具和回答。
-- 默认关闭，按对话设置，分叉时保留，在每个回复开始时读取一次。服务器拒绝或忽略工具时，工具弹窗会多一个 **Use ReAct** 按钮；Parley 不会自己切换。
-- 请求里没有 `tools`，也没有 `stop`。模型写完第一个 Action 的参数后，只要再写出别的文字，Parley 就立刻结束这次流式回复，模型后面编造的 Observation 不会保存，也不会发回去。这样结束的一轮没有服务器的 token 统计，状态条和回复下方显示的是估算值（带 ≈）；模型自己停下的一轮和最后一轮回答，统计都是完整的。
-- **每次调用都要批准**，即使这个工具已经设为“总是允许”。卡片上没有 Always Allow，并说明原因：文字可能是模型照抄的工具输出，比结构化的调用更不可靠。已保存的“总是允许”不受影响，换回 Native 后照常生效。工具名必须完全一致；没写工具名的 Action 不算调用。参数可以放在代码围栏里，一行或多行都可以；参数不是 JSON 对象时不会调用工具，也不会询问，模型会收到原因。模型另外发来的原生 `tool_calls` 不会运行，回复下方会说明。
-- 工具的输出放在带标记的围栏里发回模型，输出里出现的结束标记会在发送时被破坏，保存的内容不变；工具定义同样处理。围栏标记不是秘密，对话 id 就写在文件头里，这个做法也不依赖保密。
-- 回答显示为正常内容，`Final Answer` 之前的 Thought 折叠显示在回答上方，不发回模型，不算在复制内容里。保存位置是两个可选字段（`toolMode`、`reactThought`），文件版本不变。
-- 到达工具轮数上限后，最后一次请求不带这些文字，模型的回答按普通文字显示，不再解析。
-- 这种方式依赖模型遵守格式，有些模型用不好。目前只用 `tools/mock_server.py` 测试过，没有在真实模型或服务器上验证。模板自己打开 `<think>` 的模型，思考内容在 `</think>` 之前看起来就是正文。完整的 Action 后面紧跟 `</think>` 时，Parley 会把它算作思考内容；如果中间还有别的文字，就会弹出批准卡片（不批准就不会运行）。这时无论批准还是拒绝，Action 之前的思考内容都会作为这一轮的 Thought 发回模型，模型本来要写的回答也读不到了，它会在看到结果后重新回答。
+![Parley asking before a tool runs](docs/images/en/tool-approval.jpg)
 
-**数据放在哪里**
-- 参数、URL、环境变量值和请求头放在登录钥匙串里，每个服务器一项（粘贴的配置常把 token 写在参数或 URL 路径里）。偏好设置里放的是：服务器名称、类型、命令名、工作目录、URL 的主机名、环境变量名和请求头名（不含值）、开关和超时、关闭的工具名、已“始终允许”的工具名和定义指纹，以及两个 SHA-256 指纹（命令、参数、URL 等算出的散列，用来判断配置是否变了）。
-- 工具调用保存在对话文件里，和消息一样；加密对话也一起加密。结果按模型看到的样子保存（已截断）。对话文件里有服务器 id、服务器名称、工具名、模型写的参数、工具结果和回复下方的说明文字，不会有命令、URL、环境变量或请求头。
-- 服务器的 stderr 只留在内存（可在设置里查看），不写进对话文件，也不发给模型：回复下方的说明和发给模型的文字都去掉了 stderr 和本机文件夹路径（stderr 里常有 token）。锁定对话时清除这个对话用到的服务器的日志，以及状态文字里引用的 stderr；锁定之后还在运行的服务器再写出的 stderr 不算在内。Parley 无法清除运行中的服务器自己内存里的内容。
-- 文件版本没有变。旧版 Parley 打开新文件时只显示最后一轮的回答；如果旧版又保存了这个文件，工具轮次会丢失。
+**Three hand-made looks.** Pick a skin in Settings: *Cardboard Fort* (kraft paper and lantern
+light), *Pillow Fort* (pink quilts and cushions) or *Treehouse* (leaves and fireflies). Each one
+has a light and a dark version that follows your Mac's appearance.
 
-## 内置工具
-Parley 自带六个基础工具，不需要 MCP 服务器。**默认全部关闭**，在设置 → Built-in Tools 里逐个打开。
+![Pillow Fort, Cardboard Fort at night, and Treehouse at night](docs/images/en/skins.jpg)
 
-| 工具 | 作用 | 批准 |
-|---|---|---|
-| Current Time | 这台 Mac 的日期、时间和时区 | 直接运行 |
-| Calculator | 计算算术表达式 | 直接运行 |
-| List Files | 列出你选定的文件夹里的内容，一次一层 | 每次都问 |
-| Read File | 读取你选定的文件夹里的文本文件 | 每次都问 |
-| Fetch Web Page | 从这台 Mac 直接获取一个公开网页，转成文字 | 每次都问 |
-| Browse Web Page | 在一次性的私密浏览器（WKWebView）里打开一个公开网页，运行它的脚本，读出渲染后的文字 | 每次都问 |
+**English and Chinese.** Parley uses Simplified Chinese when your Mac's main language is
+Chinese, and English otherwise.
 
-- 打开的工具在所有对话里都可用，不用再逐个对话勾选。要在某个对话里不用它们（比如模型不支持工具），在扳手弹窗（⇧⌘T）里取消勾选“Built-in tools”，这个选择保存在会话里，分叉时一起复制。
-- “每次都问”的工具没有 Always Allow，只能 Deny 或 Allow Once：网页或文件的内容可以指使模型读别的东西、再把内容放进网址，每张卡片都是拦住这件事的地方。卡片上会显示要访问的主机，或文件夹名和文件路径，看清再批准。批准时文件夹已被换掉的话，这次调用不会算数。ReAct 模式下所有调用都要批准，Current Time 和 Calculator 也一样。
-- 文件工具只能在你选定的一个文件夹里工作，没选文件夹时不能打开；只读，不写。隐藏文件（名字以点开头，或被 Finder 隐藏的，比如 `~/Library`）不会被列出或读取，指向文件夹外的符号链接会被拒绝，模型也不会知道文件夹的路径和名字。清除文件夹时，文件工具也会一起关闭。已知限制：硬链接分辨不出来，所以指向文件夹外的硬链接能被读到。放在 iCloud 等同步目录里时，读取还没下载到本机的文件会先下载它，设置里会提示。
-- Fetch Web Page 只发 GET，不运行脚本，不加载图片，不写磁盘，不带 cookie、API key 或 MCP 的请求头。网站能看到你的 IP 地址。本机、局域网、Tailscale 等私有地址会被拒绝。重定向只在协议、主机和端口都不变时才跟随，最多 5 次；其他重定向不跟随，而是把目标告诉模型，再访问就是一张新卡片。已知限制：检查地址和实际连接是两次解析，DNS 重绑定或代理可能让请求到达局域网设备，之后 Parley 发现并丢弃响应，模型收不到。Clash、Surge 这类 fake-IP 代理会把所有域名解析成自己的地址，开着它们时，地址检查分辨不出目标是公网还是局域网，这时只能靠卡片上的地址把关。
-- Browse Web Page 用于要靠 JavaScript 才显示内容的网页（Fetch Web Page 读出来是空的那种）。每次调用新建一个 WKWebView，用不持久化的数据存储（`WKWebsiteDataStore.nonPersistent()`），读完立即销毁：cookie、缓存、本地存储都不会留下，也不会带入。页面的所有连接都经过 Parley 在本机开的一个一次性代理，代理逐个检查目标地址，只放行公网地址；本机地址 WebKit 不走代理，由内容规则拦截。不加载图片、视频、字体，不开弹窗，不下载文件，不允许 http(s) 以外的地址，第三方 iframe 和 WebRTC 也被关掉。主页面离开你批准的网址（同协议、主机、端口）时停下，把新地址告诉模型，再访问就是一张新卡片。默认只允许从你批准的网址（同协议主机端口）加载，其他网站的请求在代理处直接拒绝，结果里会告诉模型拦了几个其他网站，并提示可以在设置里放开。设置 → Built-in Tools 里另有一个开关“Let Browse Web Page load from other sites”，默认关闭；打开后页面的脚本可能联系其他网站（CDN、统计服务等），这些网站也能看到你的 IP 地址，但每个地址仍要通过“仅公网”检查，图片、视频、字体、第三方 iframe、弹窗和下载照旧拦截。批准卡片会写明这次是否允许其他网站；卡片弹出后再拨动开关，这次调用作废。整个调用最长 60 秒，Stop、锁定对话或退出 Parley 都会立即关掉页面。已知限制：它不走系统代理设置（Fetch Web Page 会走），开着 Clash、Surge 的系统代理模式或公司代理时，网站会直接看到这台 Mac 的 IP，只允许走代理的网络上则打不开；TUN 模式不受影响。
-- 没有写文件、运行命令或搜索的工具（搜索需要第三方服务）。
-- 全部关闭时，请求和以前逐字节相同，Parley 不读任何文件，也不会多联系任何地方（`BuiltInOffGoldenTests` 用改动之前录下的请求逐字节核对）。
+## Parley Reader: your chats on any device
 
-## Strata
-Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做了这些处理：
-- **识别方式**：Strata 桌面版“在网络上共享”的端口（默认 47832）的模型列表写着 `owned_by: "strata"`；直接运行的 Strata 引擎（`serve/server.py`，默认 8080）则通过不需要 key 的 `GET /health`（`"service":"strata"`）识别。识别后弹窗里的“Server”显示 Strata。共享端口只有 `/v1/models`、`/v1/chat/completions`、`/v1/messages` 三个接口，所以 Parley 不会再向它发送其他探测请求。
-- **上下文长度**：共享端口不报告上下文长度（Strata issue #3931），请在弹窗里填写 Strata 安装时选择的值（例如 131072），或者等第一次超长错误：Parley 会从错误里读出上下文长度（“learned from Strata's error”），保存下来，重启 Parley 后仍然有效；之后的超长错误给出不同数值时会更新它。你填写的值和从错误里得知的值以较新的为准：之后的超长错误给出与你填写的不同的数值时，会替换你填写的值（服务器刚说明了它实际用的大小）；之后再填写的值又优先于它，弹窗里会同时显示“Last error”那一行。引擎端口从 `/health` 和模型列表读取。Strata 在启动模型时就固定了上下文长度，API 无法修改，所以没有“重新加载”按钮；要改只能在 Strata 里重新设置。
-- **多条线路共享**：同一个 Strata 可以通过多个地址访问（例如 Tailscale `http://100.x.x.x:47832/v1` 和 Cloudflare Tunnel `https://…/v1`，用同一个 key）。Parley 从 `/v1/models` 的 `meta.instanceId` 识别出它们是同一个实例，于是你填写的值和从错误里得知的值对这个模型的所有线路都生效（按实例 id + 模型保存）；没有实例 id 的服务器仍按“服务器 + 模型”分别保存。以前按单个 Provider 填写的值会在第一次读到实例 id 时迁移过去。Strata 重新启动模型后实例 id 会改变（实测同一个模型隔天换了 id），这时你填写的值会带到新 id 上，其他线路也跟着指向新 id；从错误里得知的值不带过去（重启后上下文可能不同，下一次超长错误会再告诉 Parley）。Provider 改成别的地址后，不再沿用原来实例的数值；没有任何线路再用到的旧实例数值会被删除。
-- **超出上下文**：Max Tokens 总是按你的设置发送。Strata 默认（`fit_max_tokens` 开启）会把放不下的 Max Tokens 精确缩短到剩余空间；关闭 `fit_max_tokens` 时会报 400，并给出最多还能用多少。Strata 的超长错误会显示成可读的说明：对话有多少 token、上下文多大，以及下一步怎么做（新建对话、从更早的消息分叉、回滚，或把 Max Tokens 降到提示的数值）。错误里的上下文长度也会自动填入状态条。
-- **思考**：推理强度照常发送 low/medium/high（Strata 把 high 当作最高档），“None (no thinking)”按服务器类型发送（见上面的“不思考”）。连接 Strata 时，会话设置里还多出“Thinking Budget”（`reasoning_budget_tokens`），它只发给 Strata，其他服务器收不到。
-- **提示词进度与速度**：只对 Strata 发送 `return_progress: true`。Strata 引擎会返回读取提示词的进度和缓存命中的 token 数，Parley 会显示出来（引擎端口的这一点没有实测）；实测桌面版的共享端口目前不发送进度（读 6505 个 token 的提示词用了 4 秒，只有 keep-alive），所以通过共享端口时只显示已等待的秒数。10 秒后还没有进度和第一个 token 时提示“Strata may be loading the model or reading a long prompt”。tok/s 使用 Strata 自己报告的 `predicted_per_second`；弹窗里还显示提示词读取速度和缓存命中的 token 数。
-- **图片**：共享端口单次请求最多 12 MB（运行时模式 4 MB），而每条消息都会重新发送之前的所有图片，所以超出时 Parley 在发送前就拒绝（不提供重试按钮，因为重试只会同样失败），并建议从第一张图片之前分叉或新建对话。模型没有开启图片读取（Pictures）时，Strata 会拒绝请求；Parley 会记住这一点（只在内存中），并在输入框上方提前警告：草稿里有图片时提示移除它；对话里之前已经有图片时（每条消息都会重新发送它们），提示在 Strata 里开启 Pictures 或从第一张图片之前分叉。
-- **其他错误**：模型还在加载、没有加载模型、暂停了新请求、引擎正在启动或已停止、正忙（Strata 一次只处理一个请求，排队超时）、显存被其他程序占用、API key 错误、共享端口连不上（可能换了端口）等情况都会显示成明确的说明和重试建议（共享端口不转发 Retry-After）。
-- 这些请求都只发往你配置的 Strata 地址本身（相同协议、主机和端口），与其他请求一样不跟随重定向。
+[Parley Reader](https://yxengram.github.io/Parley/) is a single web page that opens Parley
+conversation files, including encrypted ones (it asks for the password), and shows them the way
+Parley does. It runs entirely in your browser: nothing is uploaded anywhere.
 
-## Cloudflare（Tunnel 或代理的域名）
-适用于任何放在 Cloudflare 后面的服务器，不只是 Strata：
-- **Cloudflare 自己的错误页**不会以 HTML 显示，而是存成一行（例如 `HTTP 524: Cloudflare error 524: A timeout occurred · Ray ID …`，“Details”里可以看到），并说明下一步：
-  - 524：服务器 100 秒内没有开始回答（模型可能正在加载或正忙），过一分钟再试；Tailscale/局域网地址没有这个限制。
-  - 530 / 错误 1033：Cloudflare Tunnel 没有连到服务器所在的电脑（cloudflared 或 Strata 没在运行，或电脑睡眠/离线）。
-  - 520–523、502、504：Cloudflare 正常，但后面的服务器没有回应。525/526：Cloudflare 到服务器的 TLS 设置问题。
-  - 403 质询或防火墙拦截（WAF、Bot Fight Mode、错误 1020）：API 客户端无法通过浏览器验证，需要在 Cloudflare 为 `/v1/*` 加跳过规则，或改用 Tailscale 地址。429 / 错误 1015：Cloudflare 的限速规则。
-  - 重定向到 `*.cloudflareaccess.com`：这个地址受 Cloudflare Access 保护，需要浏览器登录，Parley 做不到（它从不跟随重定向，所以什么也没发到登录页）。其他重定向也会说明指向哪里；例如 http 被转到 https 时，提示把 Base URL 改成 https。
-- 经过 Cloudflare 的**服务器自身错误**（Strata 的 401、超长、正忙等 JSON 错误）照常识别：只有 Cloudflare 专有的状态码、错误页标记、质询头或 Access 重定向才算 Cloudflare 的错误。
-- **回复中途断开**：服务器已经开始回答后连接断了（隧道重启、电脑睡眠、网络切换），或者响应在没有 `finish_reason` / `[DONE]` 的情况下结束，都会显示“The connection dropped before the reply finished”，已经收到的文字保留，经过 Cloudflare 时会说明。Retry 会重新请求整条回复。
-- **超时**：Parley 的请求超时是 600 秒（指两次收到数据之间的间隔）；Cloudflare 在 100 秒没有任何字节时返回 524。Strata 排队或读取提示词时每 10 秒内会发送 `: keep-alive`，所以流式回复不会因此中断；只有在第一个字节之前就等了 100 秒（例如冷启动加载模型）才会碰到 524。
-- Cloudflare 响应里的 `nel` / `report-to` 头 Parley 自己不读也不处理；Parley 发出的请求仍然只发往你配置的地址。实测（尽力而为）：通过隧道收到两次带这些头的 401 后观察了 80 秒，没有任何到上报地址的连接；macOS 的网络框架里也找不到 NEL/Report-To 的实现，看起来系统不会按 NEL 上报。
+- **On a Mac or PC:** open the link, click **Open…** and pick a conversation file (`.json`), or
+  drag files onto the page. You can also download `ParleyReader.html` from the
+  [release page](https://github.com/yxengram/Parley/releases/latest) and use it offline.
+- **On an iPhone or iPad:** put the conversation file somewhere the Files app can reach (for
+  example iCloud Drive, or AirDrop it to yourself). Open the link in Safari, tap **Open…** and
+  choose the file. Tip: tap Share → **Add to Home Screen** to keep the Reader one tap away.
 
-## 加密格式
-- 每次保存时对整个会话重新加密，然后原子写入（先写临时文件，再 rename）。文件里只有版本、KDF 参数、salt 和 id 是明文，标题、消息数和时间都在密文里。
-- 加密方式：PBKDF2-HMAC-SHA256（60 万次迭代）派生密钥，再用 AES-256-GCM 加密，明文头部作为 AAD 防止篡改。
-- 密码只在解锁时用来派生密钥，之后只有密钥保存在内存里。“锁定”会把密钥从内存中清除。
+To find a conversation's file, right-click it in Parley's sidebar and choose
+**Reveal in Finder**.
 
-## 隐私
-- 网络请求只发往你配置的 API 地址、MCP 服务器，你在 Sign In 确认框里同意的登录主机，以及（仅当你打开了 Fetch Web Page 或 Browse Web Page 时）你在卡片上逐次批准的网站，Browse Web Page 在你打开“允许其他网站”开关时，还包括该网页的脚本要加载的其他公网网站；除 Fetch Web Page 按上文的规则处理重定向外，都会拒绝 HTTP 重定向。URLSession 是 ephemeral 模式：没有缓存，也没有 cookie。
-- MCP 服务器是你自己配置的目的地。工具的参数和结果会发给这些服务器，**也会发给模型的服务商**。只要对话启用了服务器，每个请求都会把工具名（包括 `<服务器名>__<工具名>` 里的服务器名）、描述和参数定义发给模型的服务商，即使这次没有调用任何工具。stdio 服务器是以你的权限在这台 Mac 上运行的程序，只添加你信任的。Parley 没有服务器目录，不查询任何注册表，不自动发现服务器，也不读取其他应用的 MCP 配置；但你配置的程序自己可能联网，例如 `npx -y` 和 `uvx` 会访问各自的软件包仓库。服务器发来的工具描述只作为该工具的 `description` 交给模型，界面上标明来自服务器，不会当作 Parley 自己的话，也不按 Markdown 渲染。唯一的例外是你在对话里选择的 ReAct 模式：这时描述和参数定义在系统提示里，放在围栏中，并说明这些文字由工具服务器写成、只是数据。
-- 内置工具默认全部关闭。打开后，工具名、描述和参数定义会随每个请求发给模型的服务商，你批准的工具结果（文件内容、网页文字）也会发给它，Fetch Web Page 和 Browse Web Page 还会直接联系你批准的网站。Current Time 和 Calculator 不读你的文件，也不联系任何地方，所以不用批准。
-- 读取上下文长度只会向同一个服务器（相同的协议、主机和端口）发送只读 GET 请求，超时 5 秒，失败时静默忽略。LM Studio、Strata 引擎（`/health`）、llama.cpp、Ollama 的原生接口只对本机、局域网或 Tailscale 地址（或模型列表显示是 LM Studio/llama.cpp/Strata 时）尝试；Strata 共享端口除了模型列表什么都不问，`/slots` 永远不读。不会查询任何第三方的模型数据库。
-- 聊天请求会附带 `stream_options: {include_usage: true}` 以获得 token 统计；如果服务器以 400/422 拒绝这个字段，会去掉它重试一次，并在本次运行中记住。
-- 没有遥测，也不会把消息内容写进日志。Markdown 渲染不会加载远程图片。
-- 模型回复里的链接不会直接打开。链接的地址里可能夹带对话内容（工具结果可以要求模型这样写），点击后会先弹出确认框，显示真实的网站和完整地址（而不是链接文字），隐藏字符和从右到左字符会写成 `\u{…}`，点「Open」才交给浏览器。只有带主机名的 http 和 https 链接能打开，其他链接（包括 `mailto:`，以及主机名含百分号编码或写成非标准 IPv4 的链接，因为浏览器实际访问的地址和显示的不一样）只显示为普通文字。
-- 复制按钮使用 `.currentHostOnly`，不会经由通用剪贴板同步到其他设备。
-- 已知限制：在消息正文里选中文字后按 ⌘C，走的是系统默认剪贴板。
+## Install
+
+1. Download `Parley-<version>.zip` from the
+   [latest release](https://github.com/yxengram/Parley/releases/latest) and double-click it.
+2. Drag **Parley** into your **Applications** folder.
+3. Open Parley. The first time, macOS will say it can't check the app for malicious software,
+   because Parley is a free project that isn't registered with Apple. To open it anyway:
+   - Click **Done** (or **OK**), then open **System Settings → Privacy & Security**, scroll down
+     and click **Open Anyway** next to the message about Parley. Confirm once more, and macOS
+     will remember your choice.
+   - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/Parley.app`
+
+Requires macOS 14 Sonoma or later, on Apple silicon or Intel Macs.
+
+## Getting started
+
+1. Open **Settings → Providers** and add a server. For a model on your own Mac, LM Studio's
+   address is usually `http://localhost:1234/v1`; for OpenAI it's `https://api.openai.com/v1`
+   with your API key.
+2. Click **New Chat**, choose a model at the top of the window, and start typing.
+3. Optional: turn on tools in **Settings → Built-in Tools** or add tool servers in
+   **Settings → MCP**, then pick which ones a conversation may use from the 🛠 button next to the
+   message box.
+
+The **Help** menu inside Parley explains every feature in more detail.
+
+## For developers
+
+Parley is written in Swift and SwiftUI with no third-party dependencies. Build it with
+`./build.sh` (Xcode Command Line Tools are enough) and run the tests with `swift test`.
+Technical notes (in Chinese) are in [docs/TECHNICAL.zh-CN.md](docs/TECHNICAL.zh-CN.md), and the
+design and module contracts are in [DESIGN.md](DESIGN.md). The Reader's source is in
+[Reader/](Reader/).

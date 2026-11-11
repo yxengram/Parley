@@ -18,7 +18,7 @@ struct ComposerView: View {
     private var placeholder: String {
         let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
         let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
-        return model.isEmpty ? "Message" : "Message \(model)"
+        return model.isEmpty ? String(localized: "Message") : String(localized: "Message \(model)")
     }
 
     var body: some View {
@@ -184,7 +184,7 @@ struct ComposerView: View {
         .disabled(session.isStreaming)
         .help("Tools: what this conversation can use (⇧⌘T)")
         .accessibilityLabel("Tools")
-        .accessibilityValue(count == 1 ? "1 source on" : "\(count) sources on")
+        .accessibilityValue(count == 1 ? Text("1 source on") : Text("\(count) sources on"))
         .popover(isPresented: $showToolsPopover, arrowEdge: .top) {
             ConversationToolsPopover(session: session)
                 .hideoutSheet()
@@ -230,26 +230,26 @@ struct ComposerView: View {
         let historyHasImages = history.contains { $0.role == .user && $0.attachments.contains(where: isImage) }
         if info.acceptsImages == false, historyHasImages {
             return info.serverKind == .strata
-                ? "\(model) on \(providerName) does not read images (Pictures is off for it in Strata), and every message sends this conversation's earlier images again. Turn Pictures on in Strata, or fork from a message before the first image."
-                : "\(providerName) says \(model) does not read images, and every message sends this conversation's earlier images again. Fork from a message before the first image, or choose a model that does."
+                ? String(localized: "\(model) on \(providerName) does not read images (Pictures is off for it in Strata), and every message sends this conversation's earlier images again. Turn Pictures on in Strata, or fork from a message before the first image.")
+                : String(localized: "\(providerName) says \(model) does not read images, and every message sends this conversation's earlier images again. Fork from a message before the first image, or choose a model that does.")
         }
         if info.acceptsImages == false, draftHasImages {
             return info.serverKind == .strata
-                ? "\(model) on \(providerName) does not read images (Pictures is off for it in Strata). Remove the image, or turn Pictures on in Strata first."
-                : "\(providerName) says \(model) does not read images. Remove the image, or choose a model that does."
+                ? String(localized: "\(model) on \(providerName) does not read images (Pictures is off for it in Strata). Remove the image, or turn Pictures on in Strata first.")
+                : String(localized: "\(providerName) says \(model) does not read images. Remove the image, or choose a model that does.")
         }
         if let limit = info.maxRequestBytes, draftHasImages || history.contains(where: { !$0.attachments.isEmpty || $0.toolRounds != nil }) {
             let bytes = estimatedRequestBytes(history, draft: draft, text: draftText)
             if bytes > limit {
                 let mb = { (n: Int) in String(format: "%.1f MB", Double(n) / 1_048_576) }
                 if !draftHasImages, !historyHasImages {
-                    return "With its tool results this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends them again. Fork from an earlier message, or roll back."
+                    return String(localized: "With its tool results this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends them again. Fork from an earlier message, or roll back.")
                 }
-                return "With its images this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends the images again. Remove some, or fork from a message before the first image."
+                return String(localized: "With its images this conversation is about \(mb(bytes)) per request, more than the \(mb(limit)) \(providerName) accepts: every message sends the images again. Remove some, or fork from a message before the first image.")
             }
         }
         if hasToolServers, info.ignoresTools, !usesReAct {
-            return "Tools will not be offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata."
+            return String(localized: "Tools will not be offered: Strata runs this model in its runtime mode, which ignores them. Use a native model in Strata.")
         }
         return nil
     }
@@ -311,7 +311,7 @@ struct ComposerView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.message = "Attach images or text files"
+        panel.message = String(localized: "Attach images or text files")
         guard panel.runModal() == .OK else { return }
         AttachmentImport.importFiles(panel.urls, into: session)
     }
@@ -380,6 +380,14 @@ private struct EditingBar: View {
     let laterCount: Int
     let onCancel: () -> Void
 
+    private var hint: Text {
+        switch laterCount {
+        case ..<1: return Text("Sending replaces it. Esc cancels.")
+        case 1: return Text("Sending replaces it and the message after it. Esc cancels.")
+        default: return Text("Sending replaces it and the \(laterCount) messages after it. Esc cancels.")
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "pencil")
@@ -387,9 +395,7 @@ private struct EditingBar: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Editing message")
                     .font(.callout.weight(.medium))
-                Text(laterCount > 0
-                     ? "Sending replaces it and the \(laterCount) message\(laterCount == 1 ? "" : "s") after it. Esc cancels."
-                     : "Sending replaces it. Esc cancels.")
+                hint
                     .font(.caption)
                     .foregroundStyle(Hideout.inkSoft)
             }

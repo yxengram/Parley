@@ -3,6 +3,7 @@
 # snapshot harness (Sources/Parley/Debug/SnapshotHarness.swift).
 #
 #   tools/snapshot.sh OUTPUT_DIR
+#   PARLEY_SNAPSHOT_LANG=zh-Hans tools/snapshot.sh OUTPUT_DIR     (the whole run in Chinese)
 #
 # - builds the debug app (./build.sh debug)
 # - starts tools/mock_server.py on a free 127.0.0.1 port (killed afterwards)
@@ -14,6 +15,12 @@
 # - PARLEY_SNAPSHOT_MCP_COMMAND points at tools/mock_mcp_server.py, which the app starts on stdio
 #   for the MCP states; its secrets stay in memory, so no Keychain item is touched
 # - checks that the user's real settings, conversations and saved state were not touched
+# - PARLEY_SNAPSHOT_LANG (e.g. zh-Hans, en) runs the app with -AppleLanguages '(LANG)' and
+#   -AppleLocale (PARLEY_SNAPSHOT_LOCALE, default zh_CN for zh-Hans, en_US for en); without it the
+#   app uses the system's languages. OUTPUT_DIR/missing-strings.txt lists the keys looked up through
+#   NSBundle (String(localized:), alerts, dialogs) without a translation for the interface language.
+#   PARLEY_SNAPSHOT_SHOW_MISSING=1 adds -NSShowNonLocalizedStrings YES: every string without a
+#   translation, SwiftUI Text included, is drawn in CAPITALS in the PNGs.
 #
 # The binary runs from a temporary copy of the bundle with the identifier
 # local.parley.chat.snapshot, so even a write that bypassed the harness's UserDefaults
@@ -29,7 +36,24 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$1"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
-rm -f "$OUT"/[0-9][0-9]-*.png "$OUT"/[0-9][0-9][0-9]-*.png "$OUT"/snapshot-log.txt
+rm -f "$OUT"/[0-9][0-9]-*.png "$OUT"/[0-9][0-9][0-9]-*.png "$OUT"/snapshot-log.txt "$OUT"/missing-strings.txt
+
+# Interface language: the argument domain is process-wide, so the harness's UserDefaults redirect
+# (a different suite for UserDefaults.standard) does not hide it.
+LANG_ARGS=()
+if [[ -n "${PARLEY_SNAPSHOT_LANG:-}" ]]; then
+    case "$PARLEY_SNAPSHOT_LANG" in
+        zh-Hans*) DEFAULT_LOCALE=zh_CN ;;
+        en*) DEFAULT_LOCALE=en_US ;;
+        *) DEFAULT_LOCALE="${PARLEY_SNAPSHOT_LANG//-/_}" ;;
+    esac
+    LANG_ARGS=(-AppleLanguages "($PARLEY_SNAPSHOT_LANG)" -AppleLocale "${PARLEY_SNAPSHOT_LOCALE:-$DEFAULT_LOCALE}")
+    echo "==> Interface language $PARLEY_SNAPSHOT_LANG, locale ${PARLEY_SNAPSHOT_LOCALE:-$DEFAULT_LOCALE}"
+fi
+if [[ -n "${PARLEY_SNAPSHOT_SHOW_MISSING:-}" ]]; then
+    LANG_ARGS+=(-NSShowNonLocalizedStrings YES)
+    echo "==> Strings without a translation are drawn in CAPITALS"
+fi
 
 REAL_PLIST="$HOME/Library/Preferences/local.parley.chat.plist"
 SNAP_ID="local.parley.chat.snapshot"
@@ -111,7 +135,8 @@ echo "==> Running snapshot harness (exits on its own; hard limit 600 s)"
 NO_GLASS=""
 [[ -n "${PARLEY_SNAPSHOT_SDK:-}" ]] && NO_GLASS=1
 PARLEY_SNAPSHOT_DIR="$OUT" PARLEY_SNAPSHOT_MOCK_URL="http://127.0.0.1:$PORT/v1" PARLEY_SNAPSHOT_STRATA_URL="http://127.0.0.1:$STRATA_PORT/v1" \
-    PARLEY_SNAPSHOT_MCP_COMMAND="$ROOT/tools/mock_mcp_server.py" PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" "$BIN" 2>"$WORK/stderr.txt" &
+    PARLEY_SNAPSHOT_MCP_COMMAND="$ROOT/tools/mock_mcp_server.py" PARLEY_SNAPSHOT_NO_GLASS="$NO_GLASS" \
+    PARLEY_SNAPSHOT_MISSING_STRINGS=1 "$BIN" "${LANG_ARGS[@]}" 2>"$WORK/stderr.txt" &
 APP_PID=$!
 STATUS=0
 for _ in {1..6000}; do
@@ -153,5 +178,9 @@ PNGS=("$OUT"/[0-9][0-9]-*.png "$OUT"/[0-9][0-9][0-9]-*.png)
 COUNT=${#PNGS}
 echo "==> $COUNT PNGs in $OUT (log: $OUT/snapshot-log.txt)"
 for f in "${PNGS[@]}"; do print -r -- "    ${f:t}"; done
+grep -m1 -o 'languages=.*handLettering=[a-z]*' "$OUT/snapshot-log.txt" 2>/dev/null | sed 's/^/==> /' || true
+if [[ -s "$OUT/missing-strings.txt" ]]; then
+    echo "==> $(wc -l < "$OUT/missing-strings.txt" | tr -d ' ') strings without a translation for this language: $OUT/missing-strings.txt"
+fi
 if [[ $COUNT -eq 0 && $STATUS -eq 0 ]]; then STATUS=1; fi
 exit $STATUS

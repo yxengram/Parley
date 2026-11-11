@@ -91,7 +91,7 @@ struct LinkConfirmationSheet: View {
                         .truncationMode(.head)
                         .textSelection(.enabled)
                 }
-                ToolTextBlock(title: "Address", text: link.address, maxHeight: 200)
+                ToolTextBlock(title: String(localized: "Address"), text: link.address, maxHeight: 200)
                 if link.hasHiddenCharacters {
                     Label("The address contains hidden or right-to-left characters, shown here as \\u{…}.", systemImage: "exclamationmark.triangle.fill")
                         .safetyNotice(.caution)

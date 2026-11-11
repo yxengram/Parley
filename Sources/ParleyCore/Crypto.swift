@@ -28,11 +28,17 @@ enum ConversationCryptoError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidIterations(let n): return "Invalid key derivation iteration count \(n)."
-        case .emptySalt: return "Key derivation salt is empty."
-        case .keyDerivationFailed(let s): return "Key derivation failed (status \(s))."
-        case .randomGenerationFailed(let s): return "Secure random generation failed (status \(s))."
-        case .sealFailed: return "Encryption failed."
+        // Shown only (encrypt and password sheets): in the interface language.
+        case .invalidIterations(let n): return String(localized: "Invalid key derivation iteration count \(n).")
+        case .emptySalt: return String(localized: "Key derivation salt is empty.")
+        case .keyDerivationFailed(let s):
+            // A String, not an Int: String(localized:) would group the digits ("-25,300").
+            let status = String(s)
+            return String(localized: "Key derivation failed (status \(status)).")
+        case .randomGenerationFailed(let s):
+            let status = String(s)
+            return String(localized: "Secure random generation failed (status \(status)).")
+        case .sealFailed: return String(localized: "Encryption failed.")
         }
     }
 }

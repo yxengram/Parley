@@ -174,7 +174,7 @@ private struct MCPImportRow: View {
                         .background(Hideout.board, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 if let folder = entry.config.workingDirectory {
-                    Text(verbatim: "Working folder: \(ToolDisplay.line(folder))")
+                    Text(verbatim: String(localized: "Working folder: \(ToolDisplay.line(folder))"))
                         .font(.caption)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -183,15 +183,15 @@ private struct MCPImportRow: View {
                     SettingsNotice(.caution, warning, systemImage: "exclamationmark.triangle.fill")
                 }
                 if let error = entry.error {
-                    SettingsNotice(.danger, error)
+                    SettingsNotice(.danger, MCPErrorText.shown(error))
                 } else if isStdio {
-                    SettingsNotice(.caution, "Runs this program on your Mac with your permissions.")
+                    SettingsNotice(.caution, String(localized: "Runs this program on your Mac with your permissions."))
                 }
                 ForEach(entry.warnings, id: \.self) { line in
                     SettingsNotice(.caution, line)
                 }
                 if !hiddenNames.isEmpty {
-                    Text(verbatim: "Values hidden: " + hiddenNames.map(ToolDisplay.line).joined(separator: ", "))
+                    Text(verbatim: String(localized: "Values hidden: \(hiddenNames.map(ToolDisplay.line).joined(separator: ", "))"))
                         .font(.caption)
                         .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)

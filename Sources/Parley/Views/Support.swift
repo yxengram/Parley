@@ -76,9 +76,73 @@ struct ErrorPresentation: Equatable {
             return self
         }
         var out = self
-        let note = "Tool definitions take about \(TokenFormat.grouped(tokens)) tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T)."
-        out.detail = detail.map { "\($0) \(note)" } ?? note
+        let grouped = TokenFormat.grouped(tokens)
+        let note = String(localized: "Tool definitions take about \(grouped) tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).")
+        out.detail = detail.map { Self.sentences($0, note) } ?? note
         return out
+    }
+
+    /// Joins whole sentences: a space after English ones, nothing after a Chinese full stop.
+    static func sentences(_ parts: String?...) -> String {
+        var out = ""
+        for part in parts.compactMap({ $0 }) where !part.isEmpty {
+            if let last = out.last, !"。！？；：）」”".contains(last) { out += " " }
+            out += part
+        }
+        return out
+    }
+
+    /// Foundation's own description of a URL error follows the interface language, and an error
+    /// without one reads "(NSURLErrorDomain error -1004.)" (zh: "（NSURLErrorDomain错误-1004。）").
+    /// Stored errors may be in either language, so both are recognized.
+    static let unreachablePhrases = [
+        "could not connect to the server", "connection refused", "hostname could not be found",
+        "network connection was lost", "appears to be offline",
+        // CFNetwork's zh_CN text for -1004, -1003, -1005, -1009 and its offline notice.
+        "无法连接服务器", "未能连接到服务器", "未能找到使用指定主机名的服务器", "网络连接已中断",
+        "似乎已断开与互联网的连接", "似乎已断开互联网连接",
+    ]
+    static let timeoutPhrases = ["timed out", "请求超时", "网关超时"]
+
+    /// SystemErrorText's English sentences, as the interface shows them (zh: CFNetwork's wording).
+    static var systemSentences: [(english: String, shown: String)] {
+        [
+            ("The request timed out.", String(localized: "The request timed out.")),
+            ("A server with the specified hostname could not be found.",
+             String(localized: "A server with the specified hostname could not be found.")),
+            ("Could not connect to the server.", String(localized: "Could not connect to the server.")),
+            ("The network connection was lost.", String(localized: "The network connection was lost.")),
+            ("The Internet connection appears to be offline.", String(localized: "The Internet connection appears to be offline.")),
+            ("An SSL error has occurred and a secure connection to the server cannot be made.",
+             String(localized: "An SSL error has occurred and a secure connection to the server cannot be made.")),
+        ]
+    }
+
+    /// A stored error with its system sentences in the interface language (unchanged in English).
+    static func shownSystemText(_ text: String) -> String {
+        systemSentences.reduce(text) { out, sentence in
+            out.replacingOccurrences(of: sentence.english, with: sentence.shown)
+        }
+    }
+
+    /// The NSURLErrorDomain code in Foundation's generic description ("… NSURLErrorDomain error -1004 …").
+    static func urlErrorCode(in text: String) -> Int? {
+        guard let range = text.range(of: "NSURLErrorDomain") else { return nil }
+        let rest = text[range.upperBound...].prefix(16)
+        guard let minus = rest.firstIndex(of: "-") else { return nil }
+        let digits = rest[rest.index(after: minus)...].prefix { $0.isASCII && $0.isNumber }
+        return Int(digits).map { -$0 }
+    }
+
+    static func isUnreachable(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        if unreachablePhrases.contains(where: { lower.contains($0) }) { return true }
+        return [-1003, -1004, -1005, -1009].contains(urlErrorCode(in: text) ?? 0)
+    }
+
+    static func isTimeout(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return timeoutPhrases.contains(where: { lower.contains($0) }) || urlErrorCode(in: text) == -1001
     }
 
     /// `serverKind` is what the app learned about the server (only a few messages need it; the
@@ -87,9 +151,9 @@ struct ErrorPresentation: Equatable {
     static func make(_ error: String, providerName: String? = nil, baseURL: String? = nil,
                      serverKind: InferenceServerKind? = nil, partialReply: Bool = false) -> ErrorPresentation {
         let text = error.trimmingCharacters(in: .whitespacesAndNewlines)
-        let server = providerName.map { "\($0)" } ?? "the server"
+        let server = providerName.map { "\($0)" } ?? String(localized: "the server")
         let host = baseURL.flatMap { URLComponents(string: $0)?.host }
-        let place = host.map { "\(server) at \($0)" } ?? server
+        let place = host.map { String(localized: "\(server) at \($0)") } ?? server
         let isStrata = serverKind == .strata
 
         if let (status, rawBody) = splitHTTP(text) {
@@ -117,43 +181,43 @@ struct ErrorPresentation: Equatable {
             switch status {
             case 401, 403:
                 return ErrorPresentation(
-                    title: "The server rejected the API key",
+                    title: String(localized: "The server rejected the API key"),
                     detail: isStrata
-                        ? "Check the API key for \(server) in Settings. Strata shows its keys (sk-strata-…) on its Serving page."
-                        : message ?? "Check the API key for \(server) in Settings.",
+                        ? String(localized: "Check the API key for \(server) in Settings. Strata shows its keys (sk-strata-…) on its Serving page.")
+                        : message ?? String(localized: "Check the API key for \(server) in Settings."),
                     status: statusText, raw: text, suggestsSettings: true)
             // Strata's shared port could not reach its engine (Node's "fetch failed": stopped, or a
             // cold load that took too long). Other Node-based proxies send the same text.
             case 502 where isStrata && message == "fetch failed":
                 return ErrorPresentation(
-                    title: "Strata's engine did not answer",
-                    detail: "The model may still be loading (a cold start can take several minutes), or the engine stopped. Retry in a moment.",
+                    title: String(localized: "Strata's engine did not answer"),
+                    detail: String(localized: "The model may still be loading (a cold start can take several minutes), or the engine stopped. Retry in a moment."),
                     status: statusText, raw: text)
             // Strata's shared port: a failure while reading the request, most often a body over 12 MiB.
             case 500 where isStrata && body == "Request failed":
                 return ErrorPresentation(
-                    title: "Strata could not read the request",
-                    detail: "Its shared port takes requests up to 12 MB, and images are sent again with every message. Remove images, or fork from a message before the first one, then retry.",
+                    title: String(localized: "Strata could not read the request"),
+                    detail: String(localized: "Its shared port takes requests up to 12 MB, and images are sent again with every message. Remove images, or fork from a message before the first one, then retry."),
                     status: statusText, raw: text)
             case 404:
                 return ErrorPresentation(
-                    title: "Model or endpoint not found",
-                    detail: message.map { "Check the model ID and the base URL. The server said: \($0)" }
-                        ?? "Check the model ID and the base URL (it usually ends in /v1).",
+                    title: String(localized: "Model or endpoint not found"),
+                    detail: message.map { String(localized: "Check the model ID and the base URL. The server said: \($0)") }
+                        ?? String(localized: "Check the model ID and the base URL (it usually ends in /v1)."),
                     status: statusText, raw: text, suggestsSettings: true)
             case 429:
                 return ErrorPresentation(
-                    title: "Too many requests",
-                    detail: message ?? "The server is rate limiting. Wait a moment and try again.",
+                    title: String(localized: "Too many requests"),
+                    detail: message ?? String(localized: "The server is rate limiting. Wait a moment and try again."),
                     status: statusText, raw: text)
             case 500...599:
                 return ErrorPresentation(
-                    title: message ?? "The server had a problem",
-                    detail: message == nil ? "Try again in a moment." : nil,
+                    title: message ?? String(localized: "The server had a problem"),
+                    detail: message == nil ? String(localized: "Try again in a moment.") : nil,
                     status: statusText, raw: text)
             default:
                 return ErrorPresentation(
-                    title: message ?? "The server rejected the request",
+                    title: message ?? String(localized: "The server rejected the request"),
                     status: statusText, raw: text)
             }
         }
@@ -163,9 +227,10 @@ struct ErrorPresentation: Equatable {
         if text.hasPrefix("API error: ") {
             let message = String(text.dropFirst("API error: ".count))
             if let size = ChatClient.requestTooLarge(in: message) {
+                let bytes = size.bytes, limit = size.limit
                 return ErrorPresentation(
-                    title: "Request too large for \(server) (\(size.bytes) of \(size.limit))",
-                    detail: "Images are sent again with every message, so this conversation stays too large. Fork from a message before the first image, or start a new chat.",
+                    title: String(localized: "Request too large for \(server) (\(bytes) of \(limit))"),
+                    detail: String(localized: "Images are sent again with every message, so this conversation stays too large. Fork from a message before the first image, or start a new chat."),
                     raw: text, retryable: false)
             }
             // Errors inside a started stream (Strata sends them as data: {"error":…}).
@@ -177,26 +242,56 @@ struct ErrorPresentation: Equatable {
                 title: message, raw: nil,
                 suggestsSettings: text.contains(ChatClient.missingVersionPathHint))
         }
-        let lower = text.lowercased()
-        if lower.contains("could not connect to the server") || lower.contains("connection refused")
-            || lower.contains("hostname could not be found") || lower.contains("network connection was lost")
-            || lower.contains("appears to be offline") {
+        // A stored system sentence is fixed English (SystemErrorText): shown in the interface language.
+        let shown = shownSystemText(text)
+        if isUnreachable(text) {
             return ErrorPresentation(
-                title: "Can't reach \(place)",
+                title: String(localized: "Can't reach \(place)"),
                 detail: isStrata && host.map(ChatClient.isLocalHost) ?? false
-                    ? "Is Strata running, with sharing on the network turned on? It may also be using another port now (Strata picks a free one when its usual port is taken). \(text)"
+                    ? String(localized: "Is Strata running, with sharing on the network turned on? It may also be using another port now (Strata picks a free one when its usual port is taken). \(shown)")
                     : isStrata
-                    ? "Is this Mac online, and is Strata (and its tunnel, if any) running? \(text)"
-                    : "Is the server running? \(text)",
+                    ? String(localized: "Is this Mac online, and is Strata (and its tunnel, if any) running? \(shown)")
+                    : String(localized: "Is the server running? \(shown)"),
                 raw: nil, suggestsSettings: true)
         }
-        if lower.contains("timed out") {
-            return ErrorPresentation(title: "\(server.prefix(1).uppercased() + server.dropFirst()) took too long to respond", detail: text)
+        if isTimeout(text) {
+            let Server = server.prefix(1).uppercased() + server.dropFirst()
+            return ErrorPresentation(title: String(localized: "\(Server) took too long to respond"), detail: shown)
         }
         if text.hasPrefix("No model selected") || text.hasPrefix("No API provider") || text.hasPrefix("Invalid API base URL") {
-            return ErrorPresentation(title: text, suggestsSettings: true)
+            return ErrorPresentation(title: settingsErrorTitle(text), suggestsSettings: true)
         }
-        return ErrorPresentation(title: text)
+        if let status = keychainStatus(text).map(String.init) {
+            return ErrorPresentation(title: String(localized: "Keychain error (OSStatus \(status))."))
+        }
+        return ErrorPresentation(title: shown)
+    }
+
+    /// The app's own stored texts for a missing provider or model and a bad base URL (English on
+    /// disk), shown in the interface language. Anything else is shown as stored.
+    static func settingsErrorTitle(_ text: String) -> String {
+        if text == "No API provider is configured. Add one in Settings." {
+            return String(localized: "No API provider is configured. Add one in Settings.")
+        }
+        let noModel = "No model selected. Pick a model at the top of the window or set a default model for "
+        let inSettings = " in Settings."
+        if text.hasPrefix(noModel), text.hasSuffix(inSettings), text.count > noModel.count + inSettings.count {
+            let provider = String(text.dropFirst(noModel.count).dropLast(inSettings.count))
+            return String(localized: "No model selected. Pick a model at the top of the window or set a default model for \(provider) in Settings.")
+        }
+        let invalid = "Invalid API base URL: "
+        if text.hasPrefix(invalid) {
+            let url = String(text.dropFirst(invalid.count))
+            return String(localized: "Invalid API base URL: \(url)")
+        }
+        return text
+    }
+
+    /// "Keychain error (OSStatus -25300)." → -25300.
+    static func keychainStatus(_ text: String) -> Int? {
+        let prefix = "Keychain error (OSStatus ", suffix = ")."
+        guard text.hasPrefix(prefix), text.hasSuffix(suffix) else { return nil }
+        return Int(text.dropFirst(prefix.count).dropLast(suffix.count))
     }
 
     /// Strata's own error texts (serve/server.py and the desktop app's shared port), whatever the
@@ -206,62 +301,82 @@ struct ErrorPresentation: Equatable {
         if let overflow = ContextBudget.strataOverflow(fromError: message) {
             let context = TokenFormat.grouped(overflow.contextLength)
             if let maxTokens = overflow.maxTokens {
-                let prompt = overflow.promptTokens.map { "The conversation (\(TokenFormat.grouped($0)) tokens) plus" } ?? "The conversation plus"
-                let room = overflow.room.map { " to at most \(TokenFormat.grouped($0))" } ?? ""
+                let max = TokenFormat.grouped(maxTokens)
+                let fits: String
+                if let promptTokens = overflow.promptTokens {
+                    let prompt = TokenFormat.grouped(promptTokens)
+                    fits = String(localized: "The conversation (\(prompt) tokens) plus Max tokens (\(max)) is more than the context (\(context) tokens).")
+                } else {
+                    fits = String(localized: "The conversation plus Max tokens (\(max)) is more than the context (\(context) tokens).")
+                }
+                let fix: String
+                if let room = overflow.room {
+                    let room = TokenFormat.grouped(room)
+                    fix = String(localized: "Lower Max tokens to at most \(room) in Conversation Settings (⌘I), or turn it off so Strata uses the room left.")
+                } else {
+                    fix = String(localized: "Lower Max tokens in Conversation Settings (⌘I), or turn it off so Strata uses the room left.")
+                }
                 return ErrorPresentation(
-                    title: "Max tokens does not fit in the model's context",
-                    detail: "\(prompt) Max tokens (\(TokenFormat.grouped(maxTokens))) is more than the context (\(context) tokens). Lower Max tokens\(room) in Conversation Settings (⌘I), or turn it off so Strata uses the room left.")
+                    title: String(localized: "Max tokens does not fit in the model's context"),
+                    detail: sentences(fits, fix))
             }
-            let prompt = overflow.promptTokens.map { "The conversation is \(TokenFormat.grouped($0)) tokens; the" } ?? "The"
+            let detail: String
+            if let promptTokens = overflow.promptTokens {
+                let prompt = TokenFormat.grouped(promptTokens)
+                detail = String(localized: "The conversation is \(prompt) tokens; the model's context holds \(context). Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself.")
+            } else {
+                detail = String(localized: "The model's context holds \(context). Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself.")
+            }
             return ErrorPresentation(
-                title: "The conversation no longer fits in the model's context",
-                detail: "\(prompt) model's context holds \(context). Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself.")
+                title: String(localized: "The conversation no longer fits in the model's context"),
+                detail: detail)
         }
         if isStrataVisionRefusal(message) {
             return ErrorPresentation(
-                title: "This Strata model does not read images",
-                detail: "Picture reading is off for it. Turn on Pictures for the model in the Strata app (or run Strata's setup again and choose vision). Every message sends earlier images again: to go on without them, fork from a message before the first image.")
+                title: String(localized: "This Strata model does not read images"),
+                detail: String(localized: "Picture reading is off for it. Turn on Pictures for the model in the Strata app (or run Strata's setup again and choose vision). Every message sends earlier images again: to go on without them, fork from a message before the first image."))
         }
+        // The cases match Strata's English texts exactly: never translate them.
         switch message {
         case "This model is not ready.":
-            return ErrorPresentation(title: "The model is still loading in Strata",
-                                     detail: "Retry once Strata shows it as ready.")
+            return ErrorPresentation(title: String(localized: "The model is still loading in Strata"),
+                                     detail: String(localized: "Retry once Strata shows it as ready."))
         case "No model is loaded.":
-            return ErrorPresentation(title: "No model is loaded in Strata",
-                                     detail: "Load a model in the Strata app, then retry.")
+            return ErrorPresentation(title: String(localized: "No model is loaded in Strata"),
+                                     detail: String(localized: "Load a model in the Strata app, then retry."))
         case "Choose a loaded model ID.", "That model ID is not loaded. Choose one from /v1/models.",
              "Use a model ID from /v1/models.", "This alias matches more than one instance. Choose its exact model ID.":
-            return ErrorPresentation(title: "Strata has no loaded model with this ID",
-                                     detail: "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: \(message)")
+            return ErrorPresentation(title: String(localized: "Strata has no loaded model with this ID"),
+                                     detail: String(localized: "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: \(message)"))
         // Busy: Strata reads one request at a time, and its shared port drops Retry-After.
         case "the inference queue wait deadline expired; retry later", "the inference admission limit is full; retry later":
-            return ErrorPresentation(title: "Strata is busy with other requests",
-                                     detail: "It answers one request at a time and this one waited too long. Retry when the other replies are done.")
+            return ErrorPresentation(title: String(localized: "Strata is busy with other requests"),
+                                     detail: String(localized: "It answers one request at a time and this one waited too long. Retry when the other replies are done."))
         case "this instance is draining; retry against the next instance":
-            return ErrorPresentation(title: "Strata is shutting this model down",
-                                     detail: "It finishes running replies and takes no new ones. Retry in a moment.")
+            return ErrorPresentation(title: String(localized: "Strata is shutting this model down"),
+                                     detail: String(localized: "It finishes running replies and takes no new ones. Retry in a moment."))
         default:
             break
         }
         if message.hasPrefix("the GPU is in use by another program") {
-            return ErrorPresentation(title: "Another program is using the GPU memory",
-                                     detail: "Strata keeps the model unloaded until enough VRAM is free. Close the other program (a game, another model), then retry. Strata said: \(message)")
+            return ErrorPresentation(title: String(localized: "Another program is using the GPU memory"),
+                                     detail: String(localized: "Strata keeps the model unloaded until enough VRAM is free. Close the other program (a game, another model), then retry. Strata said: \(message)"))
         }
         if message.hasPrefix("the engine's batch slots are not free") {
-            return ErrorPresentation(title: "Strata is busy with other requests",
-                                     detail: "All of its parallel slots are in use. Retry in a moment.")
+            return ErrorPresentation(title: String(localized: "Strata is busy with other requests"),
+                                     detail: String(localized: "All of its parallel slots are in use. Retry in a moment."))
         }
         if message.hasSuffix("; the next request restarts it") {
-            return ErrorPresentation(title: "Strata's engine stopped",
-                                     detail: "Retry to start it again (loading the model takes a while). Strata said: \(message)")
+            return ErrorPresentation(title: String(localized: "Strata's engine stopped"),
+                                     detail: String(localized: "Retry to start it again (loading the model takes a while). Strata said: \(message)"))
         }
         if message.hasPrefix("New API requests are paused") {
-            return ErrorPresentation(title: "Strata has paused new requests",
-                                     detail: "Resume them on Strata's Serving page, then retry.")
+            return ErrorPresentation(title: String(localized: "Strata has paused new requests"),
+                                     detail: String(localized: "Resume them on Strata's Serving page, then retry."))
         }
         if message.contains("the engine is starting") {
-            return ErrorPresentation(title: "Strata is starting the model",
-                                     detail: "This takes a minute or two. Retry shortly.")
+            return ErrorPresentation(title: String(localized: "Strata is starting the model"),
+                                     detail: String(localized: "This takes a minute or two. Retry shortly."))
         }
         return nil
     }
@@ -273,54 +388,58 @@ struct ErrorPresentation: Equatable {
     static func cloudflarePresentation(_ error: CloudflareError, server: String, isStrata: Bool) -> ErrorPresentation {
         let name = isStrata ? "Strata" : server
         let Name = name.prefix(1).uppercased() + name.dropFirst()
-        let direct = isStrata ? "Strata's Tailscale or LAN address" : "a direct address (Tailscale, LAN)"
+        let direct = isStrata ? String(localized: "Strata's Tailscale or LAN address") : String(localized: "a direct address (Tailscale, LAN)")
         switch error.kind {
         case .timeout:
             return ErrorPresentation(
-                title: "No answer within Cloudflare's 100-second limit",
-                detail: "\(Name) didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; \(direct) has no such limit.")
+                title: String(localized: "No answer within Cloudflare's 100-second limit"),
+                detail: String(localized: "\(Name) didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; \(direct) has no such limit."))
         case .tunnelDown:
+            let target = isStrata ? String(localized: "Strata's computer") : name
             return ErrorPresentation(
-                title: "The Cloudflare Tunnel is not connected to \(isStrata ? "Strata's computer" : name)",
+                title: String(localized: "The Cloudflare Tunnel is not connected to \(target)"),
                 detail: isStrata
-                    ? "cloudflared or the Strata app isn't running on Strata's computer, or that computer is asleep or offline. Start them, then retry."
-                    : "cloudflared isn't running on the server's computer, or that computer is asleep or offline. Start it, then retry.")
+                    ? String(localized: "cloudflared or the Strata app isn't running on Strata's computer, or that computer is asleep or offline. Start them, then retry.")
+                    : String(localized: "cloudflared isn't running on the server's computer, or that computer is asleep or offline. Start it, then retry."))
         case .originUnreachable:
             let why: String
             switch error.code ?? error.status {
-            case 521: why = "it refused the connection"
-            case 522: why = "the connection timed out"
-            case 523: why = "it is unreachable"
-            case 520: why = "it gave an answer Cloudflare could not read"
-            case 504: why = "it took too long"
-            default: why = "no usable answer came back"
+            case 521: why = String(localized: "it refused the connection")
+            case 522: why = String(localized: "the connection timed out")
+            case 523: why = String(localized: "it is unreachable")
+            case 520: why = String(localized: "it gave an answer Cloudflare could not read")
+            case 504: why = String(localized: "it took too long")
+            default: why = String(localized: "no usable answer came back")
             }
             return ErrorPresentation(
-                title: "Cloudflare can't reach \(name)",
+                title: String(localized: "Cloudflare can't reach \(name)"),
                 detail: isStrata
-                    ? "Cloudflare is up, but Strata behind it didn't answer (\(why)). Check that the Strata app is running with network sharing on and that the tunnel points at its port, then retry."
-                    : "Cloudflare is up, but \(name) behind it didn't answer (\(why)). Check that it is running and that the tunnel or DNS record points at it, then retry.")
+                    ? String(localized: "Cloudflare is up, but Strata behind it didn't answer (\(why)). Check that the Strata app is running with network sharing on and that the tunnel points at its port, then retry.")
+                    : String(localized: "Cloudflare is up, but \(name) behind it didn't answer (\(why)). Check that it is running and that the tunnel or DNS record points at it, then retry."))
         case .originTLS:
             return ErrorPresentation(
-                title: "Cloudflare could not open a secure connection to \(name)",
-                detail: "This is set up on the Cloudflare side (SSL/TLS mode or the origin certificate), not in Parley.")
+                title: String(localized: "Cloudflare could not open a secure connection to \(name)"),
+                detail: String(localized: "This is set up on the Cloudflare side (SSL/TLS mode or the origin certificate), not in Parley."))
         case .challenge:
             return ErrorPresentation(
-                title: "Cloudflare's bot protection blocks Parley",
-                detail: "This address answers apps with a browser check or a firewall block (WAF, Bot Fight Mode or Under Attack mode), which an API client can't pass. Add a Cloudflare rule that skips these checks for the API path (/v1/*), or use \(direct).")
+                title: String(localized: "Cloudflare's bot protection blocks Parley"),
+                detail: String(localized: "This address answers apps with a browser check or a firewall block (WAF, Bot Fight Mode or Under Attack mode), which an API client can't pass. Add a Cloudflare rule that skips these checks for the API path (/v1/*), or use \(direct)."))
         case .rateLimited:
             return ErrorPresentation(
-                title: "Cloudflare is rate limiting this address",
-                detail: "A rate-limiting rule on the Cloudflare side refused the request. Wait a minute, then retry.")
+                title: String(localized: "Cloudflare is rate limiting this address"),
+                detail: String(localized: "A rate-limiting rule on the Cloudflare side refused the request. Wait a minute, then retry."))
         case .access:
             return ErrorPresentation(
-                title: "This address is protected by Cloudflare Access",
-                detail: "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use \(direct), or a hostname without an Access policy that requires sign-in.",
+                title: String(localized: "This address is protected by Cloudflare Access"),
+                detail: String(localized: "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use \(direct), or a hostname without an Access policy that requires sign-in."),
                 suggestsSettings: true)
         case .other:
+            // A String, not an Int: String(localized:) would group the digits ("1,020").
+            let code = String(error.code ?? error.status)
             return ErrorPresentation(
-                title: "Cloudflare error \(error.code ?? error.status)" + (error.title.map { ": \($0)" } ?? ""),
-                detail: "Cloudflare answered instead of \(name). Retry in a moment.")
+                title: error.title.map { String(localized: "Cloudflare error \(code): \($0)") }
+                    ?? String(localized: "Cloudflare error \(code)"),
+                detail: String(localized: "Cloudflare answered instead of \(name). Retry in a moment."))
         }
     }
 
@@ -333,15 +452,17 @@ struct ErrorPresentation: Equatable {
             var https = base
             https.scheme = "https"
             if base.port != nil { https.port = target.port }
+            let address = https.string ?? "https://…"
             return ErrorPresentation(
-                title: "\(Server) only answers over https",
-                detail: "Change the base URL to \(https.string ?? "https://…") in Settings. Parley does not follow redirects, so nothing was sent to the new address.",
+                title: String(localized: "\(Server) only answers over https"),
+                detail: String(localized: "Change the base URL to \(address) in Settings. Parley does not follow redirects, so nothing was sent to the new address."),
                 status: "HTTP \(status)", raw: raw, suggestsSettings: true)
         }
         let target = ResponseText.redirectTarget(body)
         return ErrorPresentation(
-            title: "\(Server) redirected the request" + (target?.host.map { " to \($0)" } ?? ""),
-            detail: "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.",
+            title: target?.host.map { String(localized: "\(Server) redirected the request to \($0)") }
+                ?? String(localized: "\(Server) redirected the request"),
+            detail: String(localized: "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL."),
             status: "HTTP \(status)", raw: raw, suggestsSettings: true)
     }
 
@@ -349,19 +470,19 @@ struct ErrorPresentation: Equatable {
     static func interruptedPresentation(_ interruption: (viaCloudflare: Bool, underlying: String?), server: String,
                                         isStrata: Bool, partialReply: Bool, raw: String) -> ErrorPresentation {
         let name = isStrata ? "Strata" : server
-        let kept = partialReply ? "The text received so far is kept. " : ""
+        let Name = name.prefix(1).uppercased() + name.dropFirst()
+        let kept = partialReply ? String(localized: "The text received so far is kept.") : nil
         // Hosted APIs sit behind Cloudflare too: the tunnel wording is for Strata only.
         let cause = interruption.viaCloudflare
             ? (isStrata
-               ? "Cloudflare dropped the connection mid-reply: the tunnel may have restarted, or Strata's computer went to sleep or offline."
-               : "The connection through Cloudflare closed mid-reply: the server or the network went away.")
-            : "\(name.prefix(1).uppercased() + name.dropFirst()) stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN)."
+               ? String(localized: "Cloudflare dropped the connection mid-reply: the tunnel may have restarted, or Strata's computer went to sleep or offline.")
+               : String(localized: "The connection through Cloudflare closed mid-reply: the server or the network went away."))
+            : String(localized: "\(Name) stopped answering mid-reply, or the network changed (sleep, Wi-Fi, VPN).")
         return ErrorPresentation(
-            title: "The connection dropped before the reply finished",
-            detail: kept + cause + " Retry asks for the whole reply again.",
+            title: String(localized: "The connection dropped before the reply finished"),
+            detail: sentences(kept, cause, String(localized: "Retry asks for the whole reply again.")),
             raw: raw)
     }
-
     /// An HTML page in a stored error body, reduced to its title (older versions stored the page).
     static func sanitizedBody(_ body: String) -> String {
         ResponseText.isHTMLPage(body) ? ResponseText.htmlSummary(body) : body
@@ -381,7 +502,8 @@ struct ErrorPresentation: Equatable {
         guard let (status, body) = splitHTTP(text) else { return text }
         if CloudflareError.parse(status: status, body: body) != nil || (300..<400).contains(status) {
             let p = make(text)
-            return [p.title + ".", p.detail].compactMap { $0 }.joined(separator: " ")
+            let title = p.title
+            return sentences(String(localized: "\(title)."), p.detail)
         }
         return displayText(text)
     }

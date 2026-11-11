@@ -67,7 +67,7 @@ enum ToolDisplay {
     /// For text taller than `maxHeight`: scroll bars may be hidden, and sorted keys can put what
     /// matters last. `height` is measured, since how text wraps depends on its width and its breaks.
     static func overflowLine(height: CGFloat, maxHeight: CGFloat) -> String? {
-        height > maxHeight ? "About \(Int((height / textBlockRowHeight).rounded(.up))) lines. Scroll to see all of them." : nil
+        height > maxHeight ? String(localized: "About \(Int((height / textBlockRowHeight).rounded(.up))) lines. Scroll to see all of them.") : nil
     }
 
     /// ToolTextBlock's 12 pt monospaced text with its line spacing.
@@ -98,13 +98,13 @@ enum ToolDisplay {
         guard let total = result.originalCharacters else { return nil }
         let shown = result.text.range(of: #"showing the first \d+ of"#, options: [.regularExpression, .backwards])
             .flatMap { Int(result.text[$0].filter(\.isNumber)) }
-        guard let shown else { return "Truncated: \(TokenFormat.grouped(total)) characters in all." }
-        return "Truncated: showing \(TokenFormat.grouped(shown)) of \(TokenFormat.grouped(total)) characters."
+        guard let shown else { return String(localized: "Truncated: \(TokenFormat.grouped(total)) characters in all.") }
+        return String(localized: "Truncated: showing \(TokenFormat.grouped(shown)) of \(TokenFormat.grouped(total)) characters.")
     }
 
     static func omittedLine(_ result: ToolCallResult) -> String? {
         guard let omitted = result.omitted, !omitted.isEmpty else { return nil }
-        return "Not shown to the model: \(omitted.joined(separator: "; "))."
+        return String(localized: "Not shown to the model: \(omitted.joined(separator: "; ")).")
     }
 
     /// Copy Tool Calls: each call's name, arguments and result.
@@ -127,20 +127,20 @@ struct ToolCallPresentation: Equatable {
 
     static func make(_ call: ToolCallRecord, isActive: Bool, isPending: Bool, replyInProgress: Bool) -> ToolCallPresentation {
         guard let result = call.result else {
-            if isPending { return ToolCallPresentation(glyph: .symbol("hand.raised"), text: "Waiting for your approval") }
-            if isActive { return ToolCallPresentation(glyph: .progress, text: "Running…") }
-            if replyInProgress { return ToolCallPresentation(glyph: .symbol("clock"), text: "Waiting") }
-            return ToolCallPresentation(glyph: .symbol("stop.circle"), text: "Interrupted")
+            if isPending { return ToolCallPresentation(glyph: .symbol("hand.raised"), text: String(localized: "Waiting for your approval")) }
+            if isActive { return ToolCallPresentation(glyph: .progress, text: String(localized: "Running…")) }
+            if replyInProgress { return ToolCallPresentation(glyph: .symbol("clock"), text: String(localized: "Waiting")) }
+            return ToolCallPresentation(glyph: .symbol("stop.circle"), text: String(localized: "Interrupted"))
         }
         switch result.callStatus {
-        case .completed: return ToolCallPresentation(glyph: .symbol("checkmark"), text: "Done")
-        case .toolError: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: "Tool error")
-        case .failed: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: "Failed")
-        case .timedOut: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: "Timed out")
-        case .denied: return ToolCallPresentation(glyph: .symbol("hand.raised"), text: "Denied")
-        case .cancelled: return ToolCallPresentation(glyph: .symbol("stop.circle"), text: call.startedAt == nil ? "Stopped" : "Interrupted")
-        case .notCalled: return ToolCallPresentation(glyph: .symbol("xmark"), text: "Not called")
-        case nil: return ToolCallPresentation(glyph: .symbol("questionmark"), text: "Finished")
+        case .completed: return ToolCallPresentation(glyph: .symbol("checkmark"), text: String(localized: "Done"))
+        case .toolError: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: String(localized: "Tool error"))
+        case .failed: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: String(localized: "Failed"))
+        case .timedOut: return ToolCallPresentation(glyph: .symbol("exclamationmark.triangle"), text: String(localized: "Timed out"))
+        case .denied: return ToolCallPresentation(glyph: .symbol("hand.raised"), text: String(localized: "Denied"))
+        case .cancelled: return ToolCallPresentation(glyph: .symbol("stop.circle"), text: call.startedAt == nil ? String(localized: "Stopped") : String(localized: "Interrupted"))
+        case .notCalled: return ToolCallPresentation(glyph: .symbol("xmark"), text: String(localized: "Not called"))
+        case nil: return ToolCallPresentation(glyph: .symbol("questionmark"), text: String(localized: "Finished"))
         }
     }
 }
@@ -248,14 +248,14 @@ struct ToolCallRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(ToolDisplay.title(call)), \(presentation.text)")
+            .accessibilityLabel(Text(verbatim: "\(ToolDisplay.title(call)), \(presentation.text)"))
             .accessibilityHint(isExpanded ? "Hides the arguments and result" : "Shows the arguments and result")
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
-                    ToolTextBlock(title: "Arguments", text: ToolDisplay.prettyArguments(call.arguments))
-                    if call.result != nil || presentation.text == "Interrupted" {
-                        ToolTextBlock(title: "Result", text: call.replayResult)
+                    ToolTextBlock(title: String(localized: "Arguments"), text: ToolDisplay.prettyArguments(call.arguments))
+                    if call.result != nil || presentation.glyph == .symbol("stop.circle") {
+                        ToolTextBlock(title: String(localized: "Result"), text: call.replayResult)
                     }
                     if let result = call.result {
                         ForEach([ToolDisplay.truncationLine(result), ToolDisplay.omittedLine(result)].compactMap { $0 }, id: \.self) { line in
@@ -428,10 +428,10 @@ struct ToolApprovalCard: View {
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        ToolTextBlock(title: "Parameters", text: approval.parameters, maxHeight: 160)
+                        ToolTextBlock(title: String(localized: "Parameters"), text: approval.parameters, maxHeight: 160)
                     }
             }
-            ToolTextBlock(title: "Arguments", text: approval.arguments, maxHeight: 220)
+            ToolTextBlock(title: String(localized: "Arguments"), text: approval.arguments, maxHeight: 220)
             if ToolDisplay.containsHidden(approval.arguments) {
                 Label("The arguments contain hidden characters, shown here as \\u{…}.", systemImage: "exclamationmark.triangle.fill")
                     .safetyNotice(.caution)
@@ -487,27 +487,31 @@ struct MCPStatusDot: View {
 
     static func text(_ state: MCPServerState) -> String {
         switch state {
-        case .stopped: return "Stopped"
-        case .starting: return "Starting…"
-        case .ready: return "Ready"
-        case .restarting(let reason): return "Stopped unexpectedly, restarts on next use: \(reason)"
-        case .failed(let message): return message
+        case .stopped: return String(localized: "Stopped")
+        case .starting: return String(localized: "Starting…")
+        case .ready: return String(localized: "Ready")
+        case .restarting(let reason):
+            let shown = MCPErrorText.shown(reason)
+            return String(localized: "Stopped unexpectedly, restarts on next use: \(shown)")
+        case .failed(let message): return MCPErrorText.shown(message)
         }
     }
 
     /// The state in a few words, for a row with `reason` below it.
     static func label(_ state: MCPServerState) -> String {
         switch state {
-        case .restarting: return "Stopped unexpectedly"
-        case .failed: return "Failed"
+        case .restarting: return String(localized: "Stopped unexpectedly")
+        case .failed: return String(localized: "Failed")
         default: return text(state)
         }
     }
 
     static func reason(_ state: MCPServerState) -> String? {
         switch state {
-        case .restarting(let reason): return "Restarts on next use. \(reason)"
-        case .failed(let message): return message
+        case .restarting(let reason):
+            let shown = MCPErrorText.shown(reason)
+            return String(localized: "Restarts on next use. \(shown)")
+        case .failed(let message): return MCPErrorText.shown(message)
         default: return nil
         }
     }
