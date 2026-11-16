@@ -70,7 +70,7 @@ private struct ConversationMenuContent: View {
             if let open { appState.toolsPopoverRequest = open.id }
         }
         .keyboardShortcut("t", modifiers: [.command, .shift])
-        .disabled(open == nil || streaming || !appState.settings.offersTools)
+        .disabled(open == nil || streaming || !appState.offersTools)
 
         Button("Fork from Last Message") {
             if let open, let last = open.conversation.messages.indices.last {

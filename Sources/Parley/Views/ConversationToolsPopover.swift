@@ -48,6 +48,16 @@ struct ConversationToolsPopover: View {
         return BuiltInTools.Tool.allCases.filter(on.contains)
     }
 
+    private var usesSkills: Binding<Bool> {
+        Binding(
+            get: { session.conversation.settings.usesSkills },
+            set: { on in
+                session.conversation.settings.usesSkills = on
+                session.settingsChanged(debounced: false)
+            }
+        )
+    }
+
     private var usesBuiltInTools: Binding<Bool> {
         Binding(
             get: { session.conversation.settings.usesBuiltInTools },
@@ -61,9 +71,10 @@ struct ConversationToolsPopover: View {
     var body: some View {
         let servers = appState.settings.mcpServers.filter(\.isEnabled)
         let builtIns = builtInTools
+        let skills = appState.enabledSkills
         VStack(alignment: .leading, spacing: 10) {
             Text("Tools").lettered(20)
-            if servers.isEmpty, builtIns.isEmpty {
+            if servers.isEmpty, builtIns.isEmpty, skills.isEmpty {
                 Text(appState.settings.mcpServers.isEmpty
                      ? "No MCP server yet. Add one in Settings > MCP."
                      : "Every MCP server is switched off. Turn one on in Settings > MCP.")
@@ -71,9 +82,12 @@ struct ConversationToolsPopover: View {
                     .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !servers.isEmpty || !builtIns.isEmpty {
+            if !servers.isEmpty || !builtIns.isEmpty || !skills.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        if !skills.isEmpty {
+                            skillsRow(skills)
+                        }
                         if !builtIns.isEmpty {
                             builtInRow(builtIns)
                         }
@@ -90,7 +104,7 @@ struct ConversationToolsPopover: View {
                 .stitchedCard(Hideout.card, seed: 31, radius: 14)
             }
 
-            if appState.settings.offersTools {
+            if appState.offersTools {
                 Picker("Tool calling", selection: toolMode) {
                     Text("Native").tag(Self.nativeTag)
                     Text("ReAct (text)").tag(ConversationSettings.toolModeReAct)
@@ -155,7 +169,7 @@ struct ConversationToolsPopover: View {
                     .buttonStyle(TagButtonStyle())
             }
 
-            Text(servers.isEmpty && !builtIns.isEmpty
+            Text(servers.isEmpty && (!builtIns.isEmpty || !skills.isEmpty)
                  ? "Tool names, descriptions, arguments and results go to the model's provider."
                  : "Tool names, descriptions, arguments and results go to the model's provider, and arguments to the MCP server. Toggling starts and stops nothing: a server starts when you send, and runs until you press Stop in Settings > MCP or quit.")
                 .font(.caption)
@@ -164,6 +178,21 @@ struct ConversationToolsPopover: View {
         }
         .padding(14)
         .frame(width: 340)
+    }
+
+    /// The skills switched on in Settings > Skills, by name: the model sees these names and their
+    /// descriptions and loads one when a request matches it.
+    private func skillsRow(_ skills: [Skill]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Skills", isOn: usesSkills)
+                .toggleStyle(.checkbox)
+            Text(verbatim: skills.map { ToolDisplay.line($0.name) }.joined(separator: String(localized: ", ")))
+                .font(.caption)
+                .foregroundStyle(Hideout.inkSoft)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 20)
+        }
     }
 
     private func builtInRow(_ tools: [BuiltInTools.Tool]) -> some View {

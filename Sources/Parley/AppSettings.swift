@@ -26,6 +26,7 @@ final class AppSettings {
         static let builtInTools = "builtInTools"
         static let builtInFolderPath = "builtInFolderPath"
         static let builtInBrowseOtherSites = "builtInBrowseOtherSites"
+        static let disabledSkills = "disabledSkills"
     }
 
     static let defaultMaxToolRounds = 10
@@ -82,6 +83,12 @@ final class AppSettings {
     /// Off by default.
     var builtInBrowseOtherSites: Bool {
         didSet { defaults.set(builtInBrowseOtherSites, forKey: Key.builtInBrowseOtherSites) }
+    }
+
+    /// The names of the skills the user switched off in Settings > Skills. A skill is on unless it is
+    /// here: adding one to the skills folder is how the user asks for it.
+    var disabledSkills: [String] {
+        didSet { defaults.set(disabledSkills, forKey: Key.disabledSkills) }
     }
 
     var builtInToolSettings: BuiltInToolSettings {
@@ -333,6 +340,7 @@ final class AppSettings {
         let storedFolder = defaults.string(forKey: Key.builtInFolderPath) ?? ""
         self.builtInFolderPath = storedFolder.isEmpty ? nil : storedFolder
         self.builtInBrowseOtherSites = defaults.bool(forKey: Key.builtInBrowseOtherSites)
+        self.disabledSkills = defaults.stringArray(forKey: Key.disabledSkills) ?? []
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }
         self.learnedContextLengths = (defaults.dictionary(forKey: Key.learnedContextLengths) ?? [:])

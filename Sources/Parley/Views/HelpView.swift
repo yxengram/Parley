@@ -60,6 +60,14 @@ struct HelpView: View {
                     String(localized: "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address. That is why these tools have no Always Allow: check the arguments on each card, the address above all."),
                 ])
 
+                section(String(localized: "Skills"), "book.closed", [
+                    String(localized: "A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use."),
+                    String(localized: "Add skills in Settings > Skills with Import…, from a folder, a folder of skills, or a .zip or .skill file. Parley copies them into its own skills folder (~/Library/Application Support/Parley/Skills); a folder you put there yourself counts too. A skill is on once added, and you can switch each one off."),
+                    String(localized: "A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T)."),
+                    String(localized: "Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored."),
+                    String(localized: "The names and descriptions of the skills that are on go to the model's provider with every request, and a loaded skill's text goes there too. Its instructions tell the model what to do, so add only skills you trust."),
+                ])
+
                 section(String(localized: "Encryption"), "lock", [
                     String(localized: "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory."),
                     String(localized: "There is no way to recover a forgotten password."),

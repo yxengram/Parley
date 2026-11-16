@@ -89,7 +89,7 @@ struct ComposerView: View {
                 .help("Attach images or text files")
                 .accessibilityLabel("Attach Files")
 
-                if appState.settings.offersTools {
+                if appState.offersTools {
                     toolsButton
                 }
 

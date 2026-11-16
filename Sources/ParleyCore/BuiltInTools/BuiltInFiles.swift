@@ -25,24 +25,45 @@ struct BuiltInFiles {
     private static let footerRoom = 120
     private static let slash = UInt8(ascii: "/")
     private static let dot = UInt8(ascii: ".")
-    /// Says where to fix it, and no path or folder name: this goes to the model.
-    private static let folderUnavailable = "The shared folder is not available. The user can choose it again in Settings > Built-in Tools."
+    /// What the messages call the folder, and how they point at the other tool. They go to the
+    /// model, so they hold no path or folder name.
+    struct Wording: Sendable {
+        /// Starts a sentence: "The shared folder".
+        var folder: String
+        /// Mid-sentence: "the shared folder".
+        var folderInSentence: String
+        /// Says where to fix it.
+        var unavailable: String
+        var listHint: String
+        var readHint: String
+
+        static let sharedFolder = Wording(
+            folder: "The shared folder", folderInSentence: "the shared folder",
+            unavailable: "The shared folder is not available. The user can choose it again in Settings > Built-in Tools.",
+            listHint: "Use list_files to see what is in it.", readHint: "Use read_file to read it.")
+        static let skillFolder = Wording(
+            folder: "The skill's folder", folderInSentence: "the skill's folder",
+            unavailable: "The skill's folder is not available any more. The user may have removed the skill in Settings > Skills.",
+            listHint: "Ask for a file in it: the skill's files are listed when the skill is loaded.",
+            readHint: "Ask for it with the file argument.")
+    }
 
     let rootPath: String
+    var wording: Wording = .sharedFolder
 
     // MARK: list_files
 
     func list(path: String?, cancel: BuiltInCancelFlag) throws -> String {
-        let relative = try Self.components(of: path ?? ".")
+        let relative = try Self.components(of: path ?? ".", wording: wording)
         let target = try open(relative)
         defer { close(target.fd) }
-        guard target.isDirectory else { throw BuiltInRefusal("\(Self.shown(relative)) is a file. Use read_file to read it.") }
+        guard target.isDirectory else { throw BuiltInRefusal("\(shown(relative)) is a file. \(wording.readHint)") }
 
         // fdopendir owns what it is given and closes it with the stream.
         let duplicate = dup(target.fd)
         guard duplicate >= 0, let stream = fdopendir(duplicate) else {
             if duplicate >= 0 { close(duplicate) }
-            throw BuiltInRefusal("\(Self.shown(relative)) could not be listed.")
+            throw BuiltInRefusal("\(shown(relative)) could not be listed.")
         }
         defer { closedir(stream) }
 
@@ -84,15 +105,15 @@ struct BuiltInFiles {
     // MARK: read_file
 
     func read(path: String, startLine: Int, maxCharacters: Int, cancel: BuiltInCancelFlag) throws -> String {
-        let relative = try Self.components(of: path)
-        guard !relative.isEmpty else { throw BuiltInRefusal("The shared folder is a folder. Use list_files to see what is in it.") }
+        let relative = try Self.components(of: path, wording: wording)
+        guard !relative.isEmpty else { throw BuiltInRefusal("\(wording.folder) is a folder. \(wording.listHint)") }
         let target = try open(relative)
         defer { close(target.fd) }
-        if target.isDirectory { throw BuiltInRefusal("\(Self.shown(relative)) is a folder. Use list_files to see what is in it.") }
-        guard target.isRegular else { throw BuiltInRefusal("\(Self.shown(relative)) is not a regular file.") }
+        if target.isDirectory { throw BuiltInRefusal("\(shown(relative)) is a folder. \(wording.listHint)") }
+        guard target.isRegular else { throw BuiltInRefusal("\(shown(relative)) is not a regular file.") }
 
         let (data, wasCut) = try readCapped(target.fd, relative: relative, cancel: cancel)
-        guard let text = Self.decoded(data, wasCut: wasCut) else { throw BuiltInRefusal("\(Self.shown(relative)) is not a text file.") }
+        guard let text = Self.decoded(data, wasCut: wasCut) else { throw BuiltInRefusal("\(shown(relative)) is not a text file.") }
         return try Self.page(of: text, startLine: startLine, maxCharacters: maxCharacters, wasCut: wasCut)
     }
 
@@ -105,7 +126,7 @@ struct BuiltInFiles {
             let count = Darwin.read(fd, &buffer, wanted)
             if count < 0 {
                 if errno == EINTR { continue }
-                throw BuiltInRefusal("\(Self.shown(relative)) could not be read.")
+                throw BuiltInRefusal("\(shown(relative)) could not be read.")
             }
             if count == 0 { return (data, false) }
             data.append(buffer, count: count)
@@ -162,19 +183,19 @@ struct BuiltInFiles {
 
     /// The path's parts, for the checks that need no disk. "." and empty parts mean nothing, so
     /// "./a/" is "a" and "." is the folder itself.
-    static func components(of path: String) throws -> [String] {
+    static func components(of path: String, wording: Wording = .sharedFolder) throws -> [String] {
         if path.unicodeScalars.contains("\0") { throw BuiltInRefusal("The path holds a NUL character.") }
         if path.utf8.first == slash || path.utf8.first == UInt8(ascii: "~") {
-            throw BuiltInRefusal("Paths are relative to the shared folder, which is \".\". Absolute paths and ~ are refused.")
+            throw BuiltInRefusal("Paths are relative to \(wording.folderInSentence), which is \".\". Absolute paths and ~ are refused.")
         }
         let parts = path.utf8.split(separator: slash).map { String(Substring($0)) }.filter { $0 != "." }
-        if parts.contains("..") { throw BuiltInRefusal("\"..\" is refused: nothing outside the shared folder can be reached.") }
+        if parts.contains("..") { throw BuiltInRefusal("\"..\" is refused: nothing outside \(wording.folderInSentence) can be reached.") }
         if parts.contains(where: { $0.utf8.first == dot }) { throw BuiltInRefusal("Hidden files and folders cannot be read.") }
         return parts
     }
 
-    private static func shown(_ relative: [String]) -> String {
-        relative.isEmpty ? "The shared folder" : relative.joined(separator: "/")
+    private func shown(_ relative: [String]) -> String {
+        relative.isEmpty ? wording.folder : relative.joined(separator: "/")
     }
 
     private struct Target {
@@ -188,30 +209,30 @@ struct BuiltInFiles {
     private func open(_ relative: [String]) throws -> Target {
         let flags = O_RDONLY | O_NONBLOCK | O_CLOEXEC
         let root = Darwin.open(rootPath, flags | O_DIRECTORY)
-        guard root >= 0 else { throw BuiltInRefusal(Self.folderUnavailable) }
+        guard root >= 0 else { throw BuiltInRefusal(wording.unavailable) }
         defer { close(root) }
-        guard let rootReal = Self.realPath(root) else { throw BuiltInRefusal(Self.folderUnavailable) }
+        guard let rootReal = Self.realPath(root) else { throw BuiltInRefusal(wording.unavailable) }
 
         let fd = relative.isEmpty ? dup(root) : openat(root, relative.joined(separator: "/"), flags)
         guard fd >= 0 else {
-            let shown = Self.shown(relative)
+            let name = shown(relative)
             switch errno {
-            case ENOENT, ENOTDIR: throw BuiltInRefusal("\(shown) does not exist.")
-            case EACCES, EPERM: throw BuiltInRefusal("macOS refused access to \(shown).")
-            default: throw BuiltInRefusal("\(shown) could not be opened.")
+            case ENOENT, ENOTDIR: throw BuiltInRefusal("\(name) does not exist.")
+            case EACCES, EPERM: throw BuiltInRefusal("macOS refused access to \(name).")
+            default: throw BuiltInRefusal("\(name) could not be opened.")
             }
         }
         var keep = false
         defer { if !keep { close(fd) } }
 
         guard let real = Self.realPath(fd), let inside = Self.relativePart(of: real, root: rootReal) else {
-            throw BuiltInRefusal("\(Self.shown(relative)) leads outside the shared folder.")
+            throw BuiltInRefusal("\(shown(relative)) leads outside \(wording.folderInSentence).")
         }
         var info = stat()
-        guard fstat(fd, &info) == 0 else { throw BuiltInRefusal("\(Self.shown(relative)) could not be opened.") }
+        guard fstat(fd, &info) == 0 else { throw BuiltInRefusal("\(shown(relative)) could not be opened.") }
         // The descriptor's own flag cannot be swapped under the check; the folders above it go by path.
         if (!inside.isEmpty && Self.isFlaggedHidden(info)) || Self.isHidden(inside, below: root) {
-            throw BuiltInRefusal("\(Self.shown(relative)) leads to a hidden file or folder, which cannot be read.")
+            throw BuiltInRefusal("\(shown(relative)) leads to a hidden file or folder, which cannot be read.")
         }
         keep = true
         return Target(fd: fd, isDirectory: info.st_mode & S_IFMT == S_IFDIR, isRegular: info.st_mode & S_IFMT == S_IFREG)

@@ -159,6 +159,9 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     /// True: this conversation does not get the built-in tools switched on in Settings, for a model
     /// that cannot do tools. Set only when true, so a file gains no key unless the user asked.
     public var builtInToolsOff: Bool?
+    /// True: this conversation does not get the skills switched on in Settings > Skills. Set only when
+    /// true, like `builtInToolsOff`.
+    public var skillsOff: Bool?
 
     public static let toolModeReAct = "react"
 
@@ -168,6 +171,12 @@ public struct ConversationSettings: Codable, Hashable, Sendable {
     public var usesBuiltInTools: Bool {
         get { builtInToolsOff != true }
         set { builtInToolsOff = newValue ? nil : true }
+    }
+
+    /// For a checkbox, as `usesBuiltInTools`.
+    public var usesSkills: Bool {
+        get { skillsOff != true }
+        set { skillsOff = newValue ? nil : true }
     }
 
     public init(

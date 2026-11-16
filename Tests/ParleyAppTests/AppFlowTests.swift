@@ -169,8 +169,13 @@ final class Fixture {
         settings.defaultDirectoryPath = defaultDir.path
         let resolver = ShellPATHResolver(launchPATH: "/usr/bin:/bin", shell: "/usr/bin/true", home: NSTemporaryDirectory(), timeout: 2)
         let host = mcp ?? MCPConnectionManager(secrets: mcpSecrets, pathResolver: resolver, clientVersion: "test", stopGrace: 0.3)
-        state = AppState(settings: settings, mcp: host, mcpSecrets: mcpSecrets)
+        // An empty skills folder of its own (it does not exist until a test writes a skill there).
+        state = AppState(settings: settings, mcp: host, mcpSecrets: mcpSecrets,
+                         skillsRoot: root.appendingPathComponent("Skills", isDirectory: true))
     }
+
+    /// The fixture's skills folder. Never the user's.
+    var skillsRoot: URL { root.appendingPathComponent("Skills", isDirectory: true) }
 
     /// A directory other than the default one (created lazily by the app on first write).
     func customDirectory(_ name: String = "Custom") -> URL {

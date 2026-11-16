@@ -6,6 +6,7 @@
 "%@ at %@" = "%1$@（%2$@）";
 "%@ cached" = "已缓存 %@ 个 token";
 "%@ completion" = "生成 %@";
+"%@ could not be moved to the Trash: %@" = "无法将 %1$@ 移到废纸篓：%2$@";
 "%@ did not accept tools for %@, so they are not offered." = "%1$@ 不接受 %2$@ 的工具调用，因此不提供工具。";
 "%@ did not list any models. Choose a model at the top of the window, or set a default model in Settings." = "%@ 没有列出任何模型。请在窗口顶部选择一个模型，或在设置中设定默认模型。";
 "%@ didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; %@ has no such limit." = "%1$@未在 100 秒内开始回复（模型可能正在加载，或正忙于另一个请求）。请过一分钟再试；%2$@没有这个限制。";
@@ -64,6 +65,9 @@
 "A renewed sign-in could not be saved to the Keychain. It lasts until Parley quits." = "续期后的登录无法存储到钥匙串。它只在 Parley 退出前有效。";
 "A server" = "某个服务器";
 "A server with the specified hostname could not be found." = "未能找到使用指定主机名的服务器。";
+"A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use." = "技能是一个包含 SKILL.md 文件的文件夹：里面有名称、何时使用它的描述，以及完成某一类任务的说明，有时还附带参考文件、模板或脚本。Parley 读取的是其他 AI App 也在使用的 Agent Skills 格式。";
+"A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T)." = "已开启的技能会在每个对话中提供。模型会看到每个技能的名称和描述；当你的请求与某个技能相符时，它会用 activate_skill 工具载入该技能的说明，以及它需要的文件。这一步无需询问，但在 ReAct 模式下每次调用都会询问。若某个对话不想使用技能，请在扳手弹出菜单（⇧⌘T）中取消勾选“技能”。";
+"A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them." = "已开启的技能会在每个对话中提供：每次请求时，它的名称和描述都会发送给模型的提供商；模型载入某个技能时，它的说明和模型读取的文件也会发送过去。Parley 从不运行技能中的脚本或程序，技能也无法开启工具或跳过批准。导入会把技能复制到 Parley 的技能文件夹中；技能的文字会告诉模型该做什么，所以只添加你信任的技能。可以导入包含 SKILL.md 的文件夹、由这类文件夹组成的文件夹，或者它们的 .zip 或 .skill 文件。";
 "A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new." = "已打开的工具会在每个对话中提供，每次请求时它的名称和描述都会发送给模型的提供商。获批工具返回的内容也会发送过去。在 ReAct 模式下，每次调用都会询问。隐藏文件永远不会被列出或读取，模型也永远不会得知文件夹的位置。所有工具都关闭时，Parley 不读取任何文件，也不会联系任何新的地址。";
 "About %lld lines. Scroll to see all of them." = "约 %lld 行。滚动以查看全部内容。";
 "About Parley" = "关于 Parley";
@@ -74,6 +78,7 @@
 "Add Header" = "添加标头";
 "Add Provider" = "添加提供商";
 "Add Server" = "添加服务器";
+"Add skills in Settings > Skills with Import…, from a folder, a folder of skills, or a .zip or .skill file. Parley copies them into its own skills folder (~/Library/Application Support/Parley/Skills); a folder you put there yourself counts too. A skill is on once added, and you can switch each one off." = "在“设置”>“技能”中点“导入…”添加技能，可以选择一个文件夹、一个包含多个技能的文件夹，或者 .zip 或 .skill 文件。Parley 会把它们复制到自己的技能文件夹（~/Library/Application Support/Parley/Skills）；你自己放进去的文件夹也算。技能添加后即为开启状态，每个都可以单独关闭。";
 "Add Variable" = "添加变量";
 "Address" = "地址";
 "All of its parallel slots are in use. Retry in a moment." = "它的所有并行槽位都在使用中。请稍后重试。";
@@ -83,6 +88,7 @@
 "Always allowed" = "始终允许";
 "An SSL error has occurred and a secure connection to the server cannot be made." = "发生了 SSL 错误，无法与服务器建立安全连接。";
 "Another program is using the GPU memory" = "另一个程序正在占用 GPU 显存";
+"Another skill is already named %@." = "已有另一个名为 %@ 的技能。";
 "API key" = "API 密钥";
 "API keys are stored in your login Keychain and never synced. Local servers usually need no key." = "API 密钥存储在你的登录钥匙串中，从不同步。本地服务器通常不需要密钥。";
 "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices." = "API 密钥保存在钥匙串中。加密的对话只在内存中解密。“拷贝”按钮（以及从消息框中拷贝）不会让文本进入通用剪贴板；在其他地方选中并用 ⌘C 拷贝的文本使用普通剪贴板，“接力”可能会将其共享到你的其他设备。";
@@ -103,6 +109,15 @@
 "Basic" = "基本";
 "Browse Web Page" = "浏览网页";
 "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address." = "“浏览网页”用于只有在脚本运行后才显示文字的网页。每次调用都会在一个新的隐私浏览器中打开网页，结束后不保留任何东西：不会带入、也不会留下任何 Cookie、缓存或存储数据。网页加载的所有内容都要经过一道只放行公共地址的关卡，图片、视频、字体、弹出窗口和下载都会被阻止。默认情况下，网页只能从你批准的地址加载内容，因此有些网页显示的内容很少；结果会告诉模型有多少个对其他网站的请求被阻止。开启“允许‘浏览网页’从其他网站加载内容”后，网页的脚本可能会联系其他网站（例如 CDN），这些网站同样会看到你的 IP 地址。卡片会注明是哪种情况。如果网页跳转到另一个地址，Parley 会停止，需要新的卡片。“停止”“锁定”和“退出”会立即关闭网页。它不使用 Mac 的代理设置，因此在系统代理之后，网站看到的是这台 Mac 自己的 IP 地址。";
+"Built-in tool" = "内置工具";
+"Built-in tool, contacts %@" = "内置工具，将联系 %@";
+"Built-in tool, in folder %@" = "内置工具，位于文件夹 %@";
+"Built-in tool, in folder %@: %@" = "内置工具，位于文件夹 %1$@：%2$@";
+"Built-in tool, loads a skill" = "内置工具，载入技能";
+"Built-in tool, loads the skill %@" = "内置工具，载入技能 %@";
+"Built-in tool, opens %@ in a private browser, loading only from that site" = "内置工具，在隐私浏览器中打开 %@，只从该网站加载内容";
+"Built-in tool, opens %@ in a private browser; its scripts may contact other public sites" = "内置工具，在隐私浏览器中打开 %@；它的脚本可能会联系其他公共网站";
+"Built-in tool, reads %@ from the skill %@" = "内置工具，读取技能 %2$@ 中的 %1$@";
 "Built-in Tools" = "内置工具";
 "Built-in tools" = "内置工具";
 "Calculator" = "计算器";
@@ -125,6 +140,7 @@
 "Choose" = "选择";
 "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@" = "请从列表中选择一个模型（模型菜单中的“刷新模型列表”），或在 Strata App 中加载一个模型。Strata 返回：%@";
 "Choose a model to see its context length." = "选择一个模型以查看其上下文长度。";
+"Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file." = "选择一个技能文件夹（包含 SKILL.md）、一个包含多个技能的文件夹，或者 .zip 或 .skill 文件。";
 "Choose Model" = "选择模型";
 "Choose Parley conversation files" = "选择 Parley 对话文件";
 "Choose…" = "选择…";
@@ -294,6 +310,7 @@
 "Images are sent again with every message, so this conversation stays too large. Fork from a message before the first image, or start a new chat." = "每条消息都会重新发送图像，因此此对话会一直过大。请从第一张图像之前的消息分叉，或开始新的对话。";
 "Import" = "导入";
 "Import MCP Servers" = "导入 MCP 服务器";
+"Imported %@." = "已导入 %@。";
 "Import…" = "导入…";
 "In progress" = "进行中";
 "In use" = "已用";
@@ -308,12 +325,14 @@
 "It finishes running replies and takes no new ones. Retry in a moment." = "它会完成正在进行的回复，但不再接受新的请求。请稍后重试。";
 "it gave an answer Cloudflare could not read" = "它返回了 Cloudflare 无法读取的应答";
 "it is unreachable" = "无法访问它";
+"It lists allowed tools. Parley ignores that: tools still ask as they always do." = "它列出了预先允许的工具。Parley 会忽略这一项：工具仍会像平常一样先询问。";
 "It receives a request from this Mac for that information, and nothing else." = "它会收到这台 Mac 索取该信息的请求，除此之外不会收到任何内容。";
 "it refused the connection" = "它拒绝了连接";
 "It runs only as a task, which Parley does not support." = "它只能作为任务运行，而 Parley 不支持这种方式。";
 "It stops, and its arguments, URL, environment values and headers are removed from the Keychain." = "它会停止运行，其参数、URL、环境变量值和标头会从钥匙串中移除。";
 "it took too long" = "它耗时过长";
 "Its API key will be removed from the Keychain." = "它的 API 密钥将从钥匙串中移除。";
+"Its folder goes to the Trash, where you can get it back." = "它的文件夹会移到废纸篓，你可以从那里找回。";
 "Its name is too long, or has spaces or invisible characters." = "它的名称太长，或包含空格或不可见字符。";
 "Its shared port takes requests up to 12 MB, and images are sent again with every message. Remove images, or fork from a message before the first one, then retry." = "它的共享端口只接受不超过 12 MB 的请求，而每条消息都会重新发送图像。请移除图像，或从第一张图像之前的消息分叉，然后重试。";
 "Kept in memory only." = "仅保存在内存中。";
@@ -366,6 +385,7 @@
 "Model or endpoint not found" = "找不到模型或端点";
 "Model: %@" = "模型：%@";
 "Model: %@ · Provider: %@" = "模型：%@ · 提供商：%@";
+"Move %@ to the Trash?" = "要将 %@ 移到废纸篓吗？";
 "Move this conversation file to the Trash?" = "要将此对话文件移到废纸篓吗？";
 "Move to Trash" = "移到废纸篓";
 "Move to Trash…" = "移到废纸篓…";
@@ -389,6 +409,8 @@
 "No provider configured" = "未配置提供商";
 "No server selected" = "未选择服务器";
 "No servers found. Paste an object with mcpServers, or entries that have a command or a url." = "未找到服务器。请粘贴包含 mcpServers 的对象，或带有 command 或 url 的条目。";
+"No skill was found there. A skill is a folder with a SKILL.md file in it, or a zip of one." = "那里没有找到技能。技能是一个包含 SKILL.md 文件的文件夹，或者这种文件夹的 zip 压缩包。";
+"No skills yet. A skill is a folder with a SKILL.md file: instructions for one kind of task, sometimes with files that go with them. Import one to start." = "还没有技能。技能是一个包含 SKILL.md 文件的文件夹：里面是完成某一类任务的说明，有时还附带相关文件。导入一个技能即可开始。";
 "no usable answer came back" = "没有返回可用的应答";
 "No version path. Most servers expect it to end in /v1, e.g. %@." = "缺少版本路径。大多数服务器要求以 /v1 结尾，例如 %@。";
 "Nobody here but us" = "这里只有我们";
@@ -400,6 +422,7 @@
 "Not a Parley conversation: %@" = "不是 Parley 对话：%@";
 "Not available: %@" = "不可用：%@";
 "Not called" = "未调用";
+"Not Loaded" = "未载入";
 "Not on this wall" = "这面墙上没有";
 "Not sent" = "不发送";
 "Not shown to the model: %@." = "未提供给模型：%@。";
@@ -429,11 +452,14 @@
 "Parley can connect to MCP servers you add in Settings > MCP, by a local command or a remote URL, or by pasting a config from another MCP client. It offers their tools to the model, runs the calls the model makes, and sends the results back until the model answers." = "Parley 可以连接你在“设置”>“MCP”中添加的 MCP 服务器，添加方式可以是本地命令、远程 URL，或粘贴来自其他 MCP 客户端的配置。它会把这些服务器的工具提供给模型，执行模型发起的调用，并把结果发回，直到模型给出回答。";
 "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL." = "Parley 不会跟随重定向，因此没有向该地址发送任何内容。如果那是正确的地址，请在设置中将其设为基础 URL。";
 "Parley Help" = "Parley 帮助";
+"Parley loads at most 200 skills." = "Parley 最多载入 200 个技能。";
+"Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored." = "Parley 从不运行技能中的脚本或程序：模型可以读取它们，并告诉你该运行什么。技能无法开启工具或跳过批准，有些技能中的 allowed-tools 字段会被忽略。";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测，没有分析，没有远程图片。它不会自行查找服务器，也不会读取其他 App 的 MCP 配置。";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测。";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站。没有遥测；对话以文件形式保存在这台 Mac 上。";
 "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported." = "Parley 支持本地（stdio）和 Streamable HTTP 服务器，仅支持工具，可使用固定标头或在浏览器中登录。不支持资源（resources）、提示（prompts）、采样（sampling）、信息征询（elicitation）以及旧的 HTTP+SSE 传输方式。";
 "Parley will contact this sign-in provider, then open it in your browser:" = "Parley 将联系此登录提供商，然后在你的浏览器中打开它：";
+"Parley's skills folder could not be created." = "无法创建 Parley 的技能文件夹。";
 "Password" = "密码";
 "Passwords don't match." = "密码不一致。";
 "Paste a server config from another MCP client" = "粘贴来自其他 MCP 客户端的服务器配置";
@@ -484,6 +510,7 @@
 "Regenerate Last Reply" = "重新生成最后一条回复";
 "Regenerate this reply?" = "要重新生成这条回复吗？";
 "Regenerate…" = "重新生成…";
+"Reload" = "重新载入";
 "Reload %@ with %@ tokens?" = "要以 %2$@ 个 token 重新加载 %1$@ 吗？";
 "Reload failed" = "重新加载失败";
 "Reload failed: %@" = "重新加载失败：%@";
@@ -505,6 +532,8 @@
 "Rename" = "重命名";
 "Rename Conversation" = "重命名对话";
 "Rename…" = "重命名…";
+"Replace" = "替换";
+"Replace %@?" = "要替换 %@ 吗？";
 "reported by the server" = "由服务器报告";
 "Request too large for %@ (%@ of %@)" = "请求过大：%1$@的上限为 %3$@，此请求为 %2$@";
 "Reset All Approvals" = "重置所有批准";
@@ -559,8 +588,10 @@
 "Short passwords are easy to guess. Use at least 8 characters." = "短密码容易被猜到。请至少使用 8 个字符。";
 "Shortcuts: ⌘R regenerates the last reply, ⇧⌘C copies it, ⇧⌘E edits your last message, ⌘. or Esc stops a reply, ⌘I opens the conversation settings." = "快捷键：⌘R 重新生成最后一条回复，⇧⌘C 拷贝它，⇧⌘E 编辑你的上一条消息，⌘. 或 Esc 停止回复，⌘I 打开对话设置。";
 "Show in Finder" = "在访达中显示";
+"Show Instructions" = "显示说明";
 "Show Sidebar" = "显示边栏";
 "Show Sidebar (⌃⌘S)" = "显示边栏（⌃⌘S）";
+"Show Skills Folder" = "显示技能文件夹";
 "Show thinking" = "显示思考内容";
 "Show token usage under replies" = "在回复下方显示 token 用量";
 "Shows context details" = "显示上下文详细信息";
@@ -573,6 +604,11 @@
 "Signed in through" = "登录提供商";
 "Signing In…" = "正在登录…";
 "Site" = "网站";
+"SKILL.md could not be read as text, or is larger than 1 MB." = "SKILL.md 无法作为文本读取，或者大于 1 MB。";
+"SKILL.md has no description, so the model could not know when to use it." = "SKILL.md 没有描述，模型无从知道何时使用它。";
+"SKILL.md has no frontmatter: it must start with a line of three dashes, then name and description, then another line of three dashes." = "SKILL.md 没有 frontmatter：它必须以一行三个短横线开头，接着是 name 和 description，然后再是一行三个短横线。";
+"SKILL.md has no name, so the folder's name is used." = "SKILL.md 没有名称，因此使用文件夹的名称。";
+"Skills" = "技能";
 "Skin" = "皮肤";
 "Speed" = "速度";
 "Speed %@ tokens per second" = "速度为每秒 %@ 个 token";
@@ -628,6 +664,7 @@
 "The command contains a space. It is run as one program name; put arguments under args." = "命令包含空格。它会被当作一个程序名运行；请将参数放在 args 下。";
 "The command contains spaces. Put the program in Command and the rest under Arguments." = "命令包含空格。请把程序填在“命令”中，其余部分填在“参数”下。";
 "The command, an argument or an environment value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing." = "命令、某个参数或某个环境变量值包含 ${VAR} 之类的变量。Parley 会按原样保留，不会展开它：请在导入后到“设置”>“MCP”中替换它。";
+"The compatibility note is longer than 500 characters." = "兼容性说明超过 500 个字符。";
 "The connection closed before the server answered." = "服务器响应之前连接已关闭。";
 "The connection dropped before the reply finished" = "回复完成前连接已断开";
 "The connection through Cloudflare closed mid-reply: the server or the network went away." = "经由 Cloudflare 的连接在回复中途关闭：服务器或网络已断开。";
@@ -642,7 +679,9 @@
 "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read." = "对话将被保存为未加密的普通 JSON 文件，任何能访问该文件的人都可以读取。";
 "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard." = "“拷贝”按钮不会让文本进入通用剪贴板。你选中并用 ⌘C 拷贝的文本使用普通剪贴板。";
 "The date, time and time zone of this Mac. Runs without asking." = "这台 Mac 的日期、时间和时区。运行时不询问。";
+"The description is longer than 1,024 characters. The model sees only the first 1,024." = "描述超过 1,024 个字符。模型只会看到前 1,024 个字符。";
 "The file could not be written and is still encrypted. %@" = "无法写入文件，文件仍处于加密状态。%@";
+"The file is not a zip archive Parley can read." = "这个文件不是 Parley 能读取的 zip 压缩包。";
 "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory." = "文件将使用由此密码派生的密钥以 AES-256-GCM 加密，并且只会在内存中解密。";
 "The file will be re-encrypted with a key derived from the new password." = "文件将使用由新密码派生的密钥重新加密。";
 "The header %@ has an empty name or a line break, so it cannot be sent." = "标头 %@ 的名称为空或包含换行符，因此无法发送。";
@@ -654,6 +693,9 @@
 "The model wrote nothing after the tool results." = "模型在工具结果之后没有写任何内容。";
 "The model's context holds %@. Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself." = "模型的上下文只能容纳 %@ 个 token。请开始新的对话、从较早的消息分叉，或回退以丢弃最近的消息。更大的上下文只能在 Strata 中设置。";
 "The model's server did not accept tools, so this reply was written without them." = "模型的服务器不接受工具，因此这条回复是在没有工具的情况下写成的。";
+"The name does not match the folder's name, %@." = "名称与文件夹名称 %@ 不一致。";
+"The name should be at most 64 lowercase letters, digits and single hyphens." = "名称应当最多由 64 个小写字母、数字和单个短横线组成。";
+"The names and descriptions of the skills that are on go to the model's provider with every request, and a loaded skill's text goes there too. Its instructions tell the model what to do, so add only skills you trust." = "已开启技能的名称和描述会随每次请求发送给模型的提供商，已载入技能的文字也会发送过去。技能的说明会告诉模型该做什么，所以只添加你信任的技能。";
 "The network connection was lost." = "网络连接已中断。";
 "The new conversation could not be saved. %@" = "无法保存新对话。%@";
 "The previous unencrypted file was overwritten in place. On SSDs/APFS this is not a secure erase; older copies may exist in backups or snapshots." = "之前未加密的文件已被原地覆盖。在 SSD/APFS 上，这不是安全擦除；备份或快照中可能仍存有旧副本。";
@@ -690,6 +732,11 @@
 "The server's last overflow error named this size; your value, entered after it, is used instead." = "服务器上次的溢出错误给出了这个大小；现在改用你在那之后输入的值。";
 "The server's program cannot be run. Check it in Settings > MCP." = "无法运行此服务器的程序。请在“设置”>“MCP”中检查。";
 "The server's URL is not a valid http or https URL." = "服务器的 URL 不是有效的 http 或 https URL。";
+"The skill has more than 2,000 files." = "这个技能包含超过 2,000 个文件。";
+"The skill is larger than 100 MB." = "这个技能大于 100 MB。";
+"The skill's files could not be copied into Parley's skills folder." = "无法将技能的文件复制到 Parley 的技能文件夹中。";
+"The skill's folders are nested more than 16 levels deep." = "这个技能的文件夹嵌套超过 16 层。";
+"The skills already there go to the Trash." = "已有的同名技能会移到废纸篓。";
 "The text received so far is kept." = "已收到的文本会保留。";
 "The thinking budget is sent only to Strata." = "思考预算只会发送给 Strata。";
 "The thinking budget is sent only to Strata; this server does not get it." = "思考预算只会发送给 Strata；此服务器不会收到。";
@@ -698,6 +745,9 @@
 "The URL uses a variable, which Parley does not expand." = "此 URL 使用了变量，而 Parley 不会展开变量。";
 "The value the server reports takes precedence over yours." = "服务器报告的值优先于你的值。";
 "The wall is bare" = "墙上空空如也";
+"The zip holds a path that would land outside its folder, or the same path twice: %@" = "这个 zip 中有一个会落到文件夹之外的路径，或者同一路径出现了两次：%@";
+"The zip is damaged: a file in it does not match its checksum." = "这个 zip 已损坏：其中有文件与校验和不符。";
+"The zip is password-protected." = "这个 zip 受密码保护。";
 "There is no way to recover a forgotten password." = "忘记的密码无法找回。";
 "Thinking" = "思考";
 "Thinking Budget" = "思考预算";
@@ -736,6 +786,7 @@
 "This text is not JSON." = "此文本不是 JSON。";
 "This tool's description or parameters changed since you chose Always Allow." = "自你选择“始终允许”以来，此工具的描述或参数已更改。";
 "This URL looks like an older HTTP+SSE server, which Parley does not support. It may not connect." = "此 URL 看起来是较旧的 HTTP+SSE 服务器，Parley 不支持这种服务器。它可能无法连接。";
+"This zip uses a format Parley does not read (zip64, a split archive, or a compression other than Deflate)." = "这个 zip 使用了 Parley 不读取的格式（zip64、分卷压缩，或 Deflate 以外的压缩方式）。";
 "Thought for %@" = "思考用时：%@";
 "Thoughts" = "思考内容";
 "Timed out" = "已超时";

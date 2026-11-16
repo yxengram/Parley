@@ -52,6 +52,12 @@ anything that touches your files or the web asks you first, showing exactly what
 
 ![Parley asking before a tool runs](docs/images/en/tool-approval.jpg)
 
+**Skills.** Teach Parley new tricks with skills: small folders of instructions (and sometimes
+templates or reference files) for a particular kind of task, in the same Agent Skills format other
+AI apps use. Import one in **Settings → Skills**. The model sees each skill's name and description
+and loads the full instructions only when your request needs them. Parley never runs a skill's
+scripts.
+
 **Three hand-made looks.** Pick a skin in Settings: *Cardboard Fort* (kraft paper and lantern
 light), *Pillow Fort* (pink quilts and cushions) or *Treehouse* (leaves and fireflies). Each one
 has a light and a dark version that follows your Mac's appearance.
@@ -98,9 +104,9 @@ Requires macOS 14 Sonoma or later, on Apple silicon or Intel Macs.
    address is usually `http://localhost:1234/v1`; for OpenAI it's `https://api.openai.com/v1`
    with your API key.
 2. Click **New Chat**, choose a model at the top of the window, and start typing.
-3. Optional: turn on tools in **Settings → Built-in Tools** or add tool servers in
-   **Settings → MCP**, then pick which ones a conversation may use from the 🛠 button next to the
-   message box.
+3. Optional: turn on tools in **Settings → Built-in Tools**, add tool servers in
+   **Settings → MCP**, or import skills in **Settings → Skills**, then pick which ones a
+   conversation may use from the 🛠 button next to the message box.
 
 The **Help** menu inside Parley explains every feature in more detail.
 

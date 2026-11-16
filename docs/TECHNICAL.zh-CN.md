@@ -111,6 +111,16 @@ Parley 自带六个基础工具，不需要 MCP 服务器。**默认全部关闭
 - 没有写文件、运行命令或搜索的工具（搜索需要第三方服务）。
 - 全部关闭时，请求和以前逐字节相同，Parley 不读任何文件，也不会多联系任何地方（`BuiltInOffGoldenTests` 用改动之前录下的请求逐字节核对）。
 
+## 技能（Skills）
+- 格式：[Agent Skills](https://agentskills.io/specification)。一个技能是一个文件夹，里面有 `SKILL.md`（YAML frontmatter 写 `name` 和 `description`，后面是 Markdown 说明），还可以有 `references/`、`assets/`、`scripts/` 等文件。
+- 存放位置：`~/Library/Application Support/Parley/Skills`，每个技能一个文件夹。设置 → Skills 的 Import… 会把技能复制进来；你手动放进去的文件夹也算。Parley 不扫描 `~/.agents/skills`、`~/.claude/skills` 或其他应用的目录。
+- 导入：可以选技能文件夹、`SKILL.md`、装着多个技能的文件夹，或 `.zip` / `.skill` 压缩包。先复制到技能文件夹里的隐藏暂存目录，检查通过后再移到位，所以不会载入复制了一半的技能。只复制普通文件和文件夹：符号链接跳过不跟随，以点开头的名字和 `__MACOSX`、`node_modules`、`__pycache__` 不复制。上限 2000 个文件、100 MB、16 层目录。zip 由 Parley 自己解析：只支持存储和 Deflate，不支持加密、zip64 和分卷；绝对路径、盘符路径和含 `..` 的条目直接拒绝（防 zip slip），符号链接条目跳过，每个文件校验 CRC-32。同名技能已存在时先确认，旧的移到废纸篓。
+- 宽松校验（按客户端实现指南）：没有 frontmatter 或没有 description 的不载入，列在“未载入”里并说明原因；名称不合规范、与文件夹名不一致、描述超过 1024 字符、带 `allowed-tools` 等只在设置里显示警告，照常载入。`allowed-tools` 不授予任何权限。
+- 提供给模型的方式：作为内置工具 `builtin__activate_skill`，挂在 Parley 自己的合成服务器上。工具描述里列出已开启技能的名称和描述（按名称排序，最多 100 个，每条描述一行、最多 1024 字符），`name` 参数是这些名称的枚举。系统提示不变。模型调用它时返回 `SKILL.md` 正文（去掉 frontmatter），包在 `<skill_content>` 里，并在 `<skill_resources>` 里列出技能的其他文件；带 `file` 参数时读取其中一个文件（像 Read File 一样分页）。读取都限制在该技能文件夹内，隐藏文件和指向外面的链接都会拒绝。结果里不出现任何绝对路径。
+- 开关：每个技能在设置里可单独关闭（`disabledSkills`）；每个对话可在扳手弹窗取消勾选“技能”（`skillsOff`，分叉时保留）。没有技能时，请求与以前完全相同。
+- 批准：原生工具调用模式下无需批准（只读取你自己装的内容）；ReAct 模式下每次调用都要批准。
+- Parley 从不运行技能里的脚本或程序，技能也不能开启工具、跳过批准或修改系统提示。已开启技能的名称和描述会随每个请求发给模型的服务商，模型载入的技能内容也会发过去。
+
 ## Strata
 Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做了这些处理：
 - **识别方式**：Strata 桌面版“在网络上共享”的端口（默认 47832）的模型列表写着 `owned_by: "strata"`；直接运行的 Strata 引擎（`serve/server.py`，默认 8080）则通过不需要 key 的 `GET /health`（`"service":"strata"`）识别。识别后弹窗里的“Server”显示 Strata。共享端口只有 `/v1/models`、`/v1/chat/completions`、`/v1/messages` 三个接口，所以 Parley 不会再向它发送其他探测请求。

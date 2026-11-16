@@ -6,6 +6,7 @@
 "%@ at %@" = "%@ at %@";
 "%@ cached" = "%@ cached";
 "%@ completion" = "%@ completion";
+"%@ could not be moved to the Trash: %@" = "%@ could not be moved to the Trash: %@";
 "%@ did not accept tools for %@, so they are not offered." = "%@ did not accept tools for %@, so they are not offered.";
 "%@ did not list any models. Choose a model at the top of the window, or set a default model in Settings." = "%@ did not list any models. Choose a model at the top of the window, or set a default model in Settings.";
 "%@ didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; %@ has no such limit." = "%@ didn't start answering within 100 seconds (the model may be loading, or busy with another request). Try again in a minute; %@ has no such limit.";
@@ -64,6 +65,9 @@
 "A renewed sign-in could not be saved to the Keychain. It lasts until Parley quits." = "A renewed sign-in could not be saved to the Keychain. It lasts until Parley quits.";
 "A server" = "A server";
 "A server with the specified hostname could not be found." = "A server with the specified hostname could not be found.";
+"A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use." = "A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use.";
+"A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T)." = "A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T).";
+"A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them." = "A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them.";
 "A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new." = "A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new.";
 "About %lld lines. Scroll to see all of them." = "About %lld lines. Scroll to see all of them.";
 "About Parley" = "About Parley";
@@ -74,6 +78,7 @@
 "Add Header" = "Add Header";
 "Add Provider" = "Add Provider";
 "Add Server" = "Add Server";
+"Add skills in Settings > Skills with Import…, from a folder, a folder of skills, or a .zip or .skill file. Parley copies them into its own skills folder (~/Library/Application Support/Parley/Skills); a folder you put there yourself counts too. A skill is on once added, and you can switch each one off." = "Add skills in Settings > Skills with Import…, from a folder, a folder of skills, or a .zip or .skill file. Parley copies them into its own skills folder (~/Library/Application Support/Parley/Skills); a folder you put there yourself counts too. A skill is on once added, and you can switch each one off.";
 "Add Variable" = "Add Variable";
 "Address" = "Address";
 "All of its parallel slots are in use. Retry in a moment." = "All of its parallel slots are in use. Retry in a moment.";
@@ -83,6 +88,7 @@
 "Always allowed" = "Always allowed";
 "An SSL error has occurred and a secure connection to the server cannot be made." = "An SSL error has occurred and a secure connection to the server cannot be made.";
 "Another program is using the GPU memory" = "Another program is using the GPU memory";
+"Another skill is already named %@." = "Another skill is already named %@.";
 "API key" = "API key";
 "API keys are stored in your login Keychain and never synced. Local servers usually need no key." = "API keys are stored in your login Keychain and never synced. Local servers usually need no key.";
 "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices." = "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices.";
@@ -103,6 +109,15 @@
 "Basic" = "Basic";
 "Browse Web Page" = "Browse Web Page";
 "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address." = "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address.";
+"Built-in tool" = "Built-in tool";
+"Built-in tool, contacts %@" = "Built-in tool, contacts %@";
+"Built-in tool, in folder %@" = "Built-in tool, in folder %@";
+"Built-in tool, in folder %@: %@" = "Built-in tool, in folder %@: %@";
+"Built-in tool, loads a skill" = "Built-in tool, loads a skill";
+"Built-in tool, loads the skill %@" = "Built-in tool, loads the skill %@";
+"Built-in tool, opens %@ in a private browser, loading only from that site" = "Built-in tool, opens %@ in a private browser, loading only from that site";
+"Built-in tool, opens %@ in a private browser; its scripts may contact other public sites" = "Built-in tool, opens %@ in a private browser; its scripts may contact other public sites";
+"Built-in tool, reads %@ from the skill %@" = "Built-in tool, reads %@ from the skill %@";
 "Built-in Tools" = "Built-in Tools";
 "Built-in tools" = "Built-in tools";
 "Calculator" = "Calculator";
@@ -125,6 +140,7 @@
 "Choose" = "Choose";
 "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@" = "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@";
 "Choose a model to see its context length." = "Choose a model to see its context length.";
+"Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file." = "Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file.";
 "Choose Model" = "Choose Model";
 "Choose Parley conversation files" = "Choose Parley conversation files";
 "Choose…" = "Choose…";
@@ -294,6 +310,7 @@
 "Images are sent again with every message, so this conversation stays too large. Fork from a message before the first image, or start a new chat." = "Images are sent again with every message, so this conversation stays too large. Fork from a message before the first image, or start a new chat.";
 "Import" = "Import";
 "Import MCP Servers" = "Import MCP Servers";
+"Imported %@." = "Imported %@.";
 "Import…" = "Import…";
 "In progress" = "In progress";
 "In use" = "In use";
@@ -308,12 +325,14 @@
 "It finishes running replies and takes no new ones. Retry in a moment." = "It finishes running replies and takes no new ones. Retry in a moment.";
 "it gave an answer Cloudflare could not read" = "it gave an answer Cloudflare could not read";
 "it is unreachable" = "it is unreachable";
+"It lists allowed tools. Parley ignores that: tools still ask as they always do." = "It lists allowed tools. Parley ignores that: tools still ask as they always do.";
 "It receives a request from this Mac for that information, and nothing else." = "It receives a request from this Mac for that information, and nothing else.";
 "it refused the connection" = "it refused the connection";
 "It runs only as a task, which Parley does not support." = "It runs only as a task, which Parley does not support.";
 "It stops, and its arguments, URL, environment values and headers are removed from the Keychain." = "It stops, and its arguments, URL, environment values and headers are removed from the Keychain.";
 "it took too long" = "it took too long";
 "Its API key will be removed from the Keychain." = "Its API key will be removed from the Keychain.";
+"Its folder goes to the Trash, where you can get it back." = "Its folder goes to the Trash, where you can get it back.";
 "Its name is too long, or has spaces or invisible characters." = "Its name is too long, or has spaces or invisible characters.";
 "Its shared port takes requests up to 12 MB, and images are sent again with every message. Remove images, or fork from a message before the first one, then retry." = "Its shared port takes requests up to 12 MB, and images are sent again with every message. Remove images, or fork from a message before the first one, then retry.";
 "Kept in memory only." = "Kept in memory only.";
@@ -366,6 +385,7 @@
 "Model or endpoint not found" = "Model or endpoint not found";
 "Model: %@" = "Model: %@";
 "Model: %@ · Provider: %@" = "Model: %@ · Provider: %@";
+"Move %@ to the Trash?" = "Move %@ to the Trash?";
 "Move this conversation file to the Trash?" = "Move this conversation file to the Trash?";
 "Move to Trash" = "Move to Trash";
 "Move to Trash…" = "Move to Trash…";
@@ -389,6 +409,8 @@
 "No provider configured" = "No provider configured";
 "No server selected" = "No server selected";
 "No servers found. Paste an object with mcpServers, or entries that have a command or a url." = "No servers found. Paste an object with mcpServers, or entries that have a command or a url.";
+"No skill was found there. A skill is a folder with a SKILL.md file in it, or a zip of one." = "No skill was found there. A skill is a folder with a SKILL.md file in it, or a zip of one.";
+"No skills yet. A skill is a folder with a SKILL.md file: instructions for one kind of task, sometimes with files that go with them. Import one to start." = "No skills yet. A skill is a folder with a SKILL.md file: instructions for one kind of task, sometimes with files that go with them. Import one to start.";
 "no usable answer came back" = "no usable answer came back";
 "No version path. Most servers expect it to end in /v1, e.g. %@." = "No version path. Most servers expect it to end in /v1, e.g. %@.";
 "Nobody here but us" = "Nobody here but us";
@@ -400,6 +422,7 @@
 "Not a Parley conversation: %@" = "Not a Parley conversation: %@";
 "Not available: %@" = "Not available: %@";
 "Not called" = "Not called";
+"Not Loaded" = "Not Loaded";
 "Not on this wall" = "Not on this wall";
 "Not sent" = "Not sent";
 "Not shown to the model: %@." = "Not shown to the model: %@.";
@@ -429,11 +452,14 @@
 "Parley can connect to MCP servers you add in Settings > MCP, by a local command or a remote URL, or by pasting a config from another MCP client. It offers their tools to the model, runs the calls the model makes, and sends the results back until the model answers." = "Parley can connect to MCP servers you add in Settings > MCP, by a local command or a remote URL, or by pasting a config from another MCP client. It offers their tools to the model, runs the calls the model makes, and sends the results back until the model answers.";
 "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL." = "Parley does not follow redirects, so nothing was sent there. If that is the right address, put it in Settings as the base URL.";
 "Parley Help" = "Parley Help";
+"Parley loads at most 200 skills." = "Parley loads at most 200 skills.";
+"Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored." = "Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored.";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.";
 "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac.";
 "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported." = "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported.";
 "Parley will contact this sign-in provider, then open it in your browser:" = "Parley will contact this sign-in provider, then open it in your browser:";
+"Parley's skills folder could not be created." = "Parley's skills folder could not be created.";
 "Password" = "Password";
 "Passwords don't match." = "Passwords don't match.";
 "Paste a server config from another MCP client" = "Paste a server config from another MCP client";
@@ -484,6 +510,7 @@
 "Regenerate Last Reply" = "Regenerate Last Reply";
 "Regenerate this reply?" = "Regenerate this reply?";
 "Regenerate…" = "Regenerate…";
+"Reload" = "Reload";
 "Reload %@ with %@ tokens?" = "Reload %@ with %@ tokens?";
 "Reload failed" = "Reload failed";
 "Reload failed: %@" = "Reload failed: %@";
@@ -505,6 +532,8 @@
 "Rename" = "Rename";
 "Rename Conversation" = "Rename Conversation";
 "Rename…" = "Rename…";
+"Replace" = "Replace";
+"Replace %@?" = "Replace %@?";
 "reported by the server" = "reported by the server";
 "Request too large for %@ (%@ of %@)" = "Request too large for %@ (%@ of %@)";
 "Reset All Approvals" = "Reset All Approvals";
@@ -559,8 +588,10 @@
 "Short passwords are easy to guess. Use at least 8 characters." = "Short passwords are easy to guess. Use at least 8 characters.";
 "Shortcuts: ⌘R regenerates the last reply, ⇧⌘C copies it, ⇧⌘E edits your last message, ⌘. or Esc stops a reply, ⌘I opens the conversation settings." = "Shortcuts: ⌘R regenerates the last reply, ⇧⌘C copies it, ⇧⌘E edits your last message, ⌘. or Esc stops a reply, ⌘I opens the conversation settings.";
 "Show in Finder" = "Show in Finder";
+"Show Instructions" = "Show Instructions";
 "Show Sidebar" = "Show Sidebar";
 "Show Sidebar (⌃⌘S)" = "Show Sidebar (⌃⌘S)";
+"Show Skills Folder" = "Show Skills Folder";
 "Show thinking" = "Show thinking";
 "Show token usage under replies" = "Show token usage under replies";
 "Shows context details" = "Shows context details";
@@ -573,6 +604,11 @@
 "Signed in through" = "Signed in through";
 "Signing In…" = "Signing In…";
 "Site" = "Site";
+"SKILL.md could not be read as text, or is larger than 1 MB." = "SKILL.md could not be read as text, or is larger than 1 MB.";
+"SKILL.md has no description, so the model could not know when to use it." = "SKILL.md has no description, so the model could not know when to use it.";
+"SKILL.md has no frontmatter: it must start with a line of three dashes, then name and description, then another line of three dashes." = "SKILL.md has no frontmatter: it must start with a line of three dashes, then name and description, then another line of three dashes.";
+"SKILL.md has no name, so the folder's name is used." = "SKILL.md has no name, so the folder's name is used.";
+"Skills" = "Skills";
 "Skin" = "Skin";
 "Speed" = "Speed";
 "Speed %@ tokens per second" = "Speed %@ tokens per second";
@@ -628,6 +664,7 @@
 "The command contains a space. It is run as one program name; put arguments under args." = "The command contains a space. It is run as one program name; put arguments under args.";
 "The command contains spaces. Put the program in Command and the rest under Arguments." = "The command contains spaces. Put the program in Command and the rest under Arguments.";
 "The command, an argument or an environment value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing." = "The command, an argument or an environment value contains a variable such as ${VAR}. Parley keeps it literally and does not expand it: replace it in Settings > MCP after importing.";
+"The compatibility note is longer than 500 characters." = "The compatibility note is longer than 500 characters.";
 "The connection closed before the server answered." = "The connection closed before the server answered.";
 "The connection dropped before the reply finished" = "The connection dropped before the reply finished";
 "The connection through Cloudflare closed mid-reply: the server or the network went away." = "The connection through Cloudflare closed mid-reply: the server or the network went away.";
@@ -642,7 +679,9 @@
 "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read." = "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read.";
 "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard." = "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.";
 "The date, time and time zone of this Mac. Runs without asking." = "The date, time and time zone of this Mac. Runs without asking.";
+"The description is longer than 1,024 characters. The model sees only the first 1,024." = "The description is longer than 1,024 characters. The model sees only the first 1,024.";
 "The file could not be written and is still encrypted. %@" = "The file could not be written and is still encrypted. %@";
+"The file is not a zip archive Parley can read." = "The file is not a zip archive Parley can read.";
 "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory." = "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory.";
 "The file will be re-encrypted with a key derived from the new password." = "The file will be re-encrypted with a key derived from the new password.";
 "The header %@ has an empty name or a line break, so it cannot be sent." = "The header %@ has an empty name or a line break, so it cannot be sent.";
@@ -654,6 +693,9 @@
 "The model wrote nothing after the tool results." = "The model wrote nothing after the tool results.";
 "The model's context holds %@. Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself." = "The model's context holds %@. Start a new chat, fork from an earlier message, or roll back to drop recent messages. A larger context can only be set in Strata itself.";
 "The model's server did not accept tools, so this reply was written without them." = "The model's server did not accept tools, so this reply was written without them.";
+"The name does not match the folder's name, %@." = "The name does not match the folder's name, %@.";
+"The name should be at most 64 lowercase letters, digits and single hyphens." = "The name should be at most 64 lowercase letters, digits and single hyphens.";
+"The names and descriptions of the skills that are on go to the model's provider with every request, and a loaded skill's text goes there too. Its instructions tell the model what to do, so add only skills you trust." = "The names and descriptions of the skills that are on go to the model's provider with every request, and a loaded skill's text goes there too. Its instructions tell the model what to do, so add only skills you trust.";
 "The network connection was lost." = "The network connection was lost.";
 "The new conversation could not be saved. %@" = "The new conversation could not be saved. %@";
 "The previous unencrypted file was overwritten in place. On SSDs/APFS this is not a secure erase; older copies may exist in backups or snapshots." = "The previous unencrypted file was overwritten in place. On SSDs/APFS this is not a secure erase; older copies may exist in backups or snapshots.";
@@ -690,6 +732,11 @@
 "The server's last overflow error named this size; your value, entered after it, is used instead." = "The server's last overflow error named this size; your value, entered after it, is used instead.";
 "The server's program cannot be run. Check it in Settings > MCP." = "The server's program cannot be run. Check it in Settings > MCP.";
 "The server's URL is not a valid http or https URL." = "The server's URL is not a valid http or https URL.";
+"The skill has more than 2,000 files." = "The skill has more than 2,000 files.";
+"The skill is larger than 100 MB." = "The skill is larger than 100 MB.";
+"The skill's files could not be copied into Parley's skills folder." = "The skill's files could not be copied into Parley's skills folder.";
+"The skill's folders are nested more than 16 levels deep." = "The skill's folders are nested more than 16 levels deep.";
+"The skills already there go to the Trash." = "The skills already there go to the Trash.";
 "The text received so far is kept." = "The text received so far is kept.";
 "The thinking budget is sent only to Strata." = "The thinking budget is sent only to Strata.";
 "The thinking budget is sent only to Strata; this server does not get it." = "The thinking budget is sent only to Strata; this server does not get it.";
@@ -698,6 +745,9 @@
 "The URL uses a variable, which Parley does not expand." = "The URL uses a variable, which Parley does not expand.";
 "The value the server reports takes precedence over yours." = "The value the server reports takes precedence over yours.";
 "The wall is bare" = "The wall is bare";
+"The zip holds a path that would land outside its folder, or the same path twice: %@" = "The zip holds a path that would land outside its folder, or the same path twice: %@";
+"The zip is damaged: a file in it does not match its checksum." = "The zip is damaged: a file in it does not match its checksum.";
+"The zip is password-protected." = "The zip is password-protected.";
 "There is no way to recover a forgotten password." = "There is no way to recover a forgotten password.";
 "Thinking" = "Thinking";
 "Thinking Budget" = "Thinking Budget";
@@ -736,6 +786,7 @@
 "This text is not JSON." = "This text is not JSON.";
 "This tool's description or parameters changed since you chose Always Allow." = "This tool's description or parameters changed since you chose Always Allow.";
 "This URL looks like an older HTTP+SSE server, which Parley does not support. It may not connect." = "This URL looks like an older HTTP+SSE server, which Parley does not support. It may not connect.";
+"This zip uses a format Parley does not read (zip64, a split archive, or a compression other than Deflate)." = "This zip uses a format Parley does not read (zip64, a split archive, or a compression other than Deflate).";
 "Thought for %@" = "Thought for %@";
 "Thoughts" = "Thoughts";
 "Timed out" = "Timed out";

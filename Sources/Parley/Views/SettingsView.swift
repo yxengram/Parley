@@ -17,6 +17,10 @@ struct SettingsView: View {
                 .frame(width: 560, height: 600)
                 .settingsRoom()
                 .tabItem { Label("Built-in Tools", systemImage: "hammer") }
+            SkillsSettingsView()
+                .frame(width: 600, height: 600)
+                .settingsRoom()
+                .tabItem { Label("Skills", systemImage: "book.closed") }
             GeneralSettingsView()
                 .frame(width: 560, height: 620)
                 .settingsRoom()

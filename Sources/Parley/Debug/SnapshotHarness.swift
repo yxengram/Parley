@@ -145,6 +145,8 @@ enum SnapshotHarness {
     static var showsReloadConfirmation = false
 
     private static var root: URL?
+    /// The harness's own skills folder, with sample skills written at bootstrap. Never the user's.
+    static var skillsRoot: URL? { root?.appendingPathComponent("Skills", isDirectory: true) }
     private static var defaultDirectory: URL!
     private static var settingsSuiteName = ""
     private static var standardSuiteName = ""
@@ -200,6 +202,7 @@ enum SnapshotHarness {
         root = tmp
         defaultDirectory = tmp.appendingPathComponent("Conversations", isDirectory: true)
         try? fm.createDirectory(at: defaultDirectory, withIntermediateDirectories: true)
+        writeSampleSkills()
 
         if let out = outputDirectoryPath {
             try? fm.createDirectory(atPath: out, withIntermediateDirectories: true)
@@ -227,6 +230,60 @@ enum SnapshotHarness {
             exit(3)
         }
         log("bootstrap: tmp=\(tmp.path) bundle=\(Bundle.main.bundleIdentifier ?? "nil") mock=\(mockURL ?? "none") strata=\(strataURL ?? "none") languages=\(Bundle.main.preferredLocalizations) locale=\(Locale.current.identifier) handLettering=\(Hideout.handLettering)")
+    }
+
+    /// Three skills, one with a warning, and a folder that is not a usable skill.
+    private static func writeSampleSkills() {
+        guard let skillsRoot else { return }
+        let samples: [(folder: String, manifest: String, extra: [String: String])] = [
+            ("release-notes", """
+            ---
+            name: release-notes
+            description: Writes release notes from a list of changes, grouped into New, Improved and Fixed, in a plain and friendly voice. Use when the user asks for release notes or a changelog entry.
+            ---
+            # Release notes
+
+            1. Group the changes into New, Improved and Fixed.
+            2. One line per change, starting with a verb.
+            3. Use templates/notes.md for the layout.
+            """, ["templates/notes.md": "## New\n\n## Improved\n\n## Fixed\n"]),
+            ("travel-planner", """
+            ---
+            name: travel-planner
+            description: >
+              Plans a trip day by day with travel times, opening hours and a rainy-day option.
+              Use when the user asks for an itinerary.
+            license: MIT
+            ---
+            # Travel planner
+
+            Plan each day as morning, afternoon and evening. See references/checklist.md.
+            """, ["references/checklist.md": "- Passport\n- Chargers\n"]),
+            ("Code_Review", """
+            ---
+            name: Code Review
+            description: "Reviews a diff for bugs first, style last: correctness, then tests, then naming."
+            allowed-tools: Bash(git:*)
+            ---
+            Review the diff in this order: correctness, tests, naming.
+            """, [:]),
+            ("broken-skill", """
+            ---
+            name: broken-skill
+            ---
+            No description here.
+            """, [:]),
+        ]
+        for sample in samples {
+            let folder = skillsRoot.appendingPathComponent(sample.folder, isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try? Data(sample.manifest.utf8).write(to: folder.appendingPathComponent("SKILL.md"))
+            for (path, text) in sample.extra {
+                let url = folder.appendingPathComponent(path)
+                try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? Data(text.utf8).write(to: url)
+            }
+        }
     }
 
     /// Makes `UserDefaults.standard` (and AppKit's internal use of it: window frames, split
@@ -1142,7 +1199,7 @@ enum SnapshotHarness {
             return
         }
         hideWindows()
-        let tabNames = ["providers", "mcp", "built-in-tools", "general"]
+        let tabNames = ["providers", "mcp", "built-in-tools", "skills", "general"]
         if let tabs = window.contentViewController as? NSTabViewController {
             for (i, name) in tabNames.enumerated() where i < tabs.tabViewItems.count {
                 tabs.selectedTabViewItemIndex = i

@@ -6,17 +6,23 @@ import Foundation
 public final class BuiltInToolRouter: MCPToolHost, Sendable {
     private let host: MCPToolHost
     private let runner: BuiltInToolRunner
+    /// The skills that are on, for activate_skill's definition. Apart from `settings`, which is read
+    /// only when a call runs (a test holds that read to the call itself).
+    private let skills: @Sendable () async -> [SkillSummary]
 
     /// `settings` is read on every call, so a change in Settings applies to the next one. `pageLoader`
     /// is the app's WebKit side of `browse_url`; without one that tool reports it is not available.
     public convenience init(wrapping host: MCPToolHost, settings: @escaping @Sendable () async -> BuiltInToolSettings,
+                            skills: @escaping @Sendable () async -> [SkillSummary] = { [] },
                             pageLoader: BuiltInPageLoader? = nil) {
-        self.init(wrapping: host, runner: BuiltInToolRunner(settings: settings, browser: pageLoader.map(BuiltInBrowser.init(loader:))))
+        self.init(wrapping: host, runner: BuiltInToolRunner(settings: settings, browser: pageLoader.map(BuiltInBrowser.init(loader:))),
+                  skills: skills)
     }
 
-    init(wrapping host: MCPToolHost, runner: BuiltInToolRunner) {
+    init(wrapping host: MCPToolHost, runner: BuiltInToolRunner, skills: @escaping @Sendable () async -> [SkillSummary] = { [] }) {
         self.host = host
         self.runner = runner
+        self.skills = skills
     }
 
     private static func isBuiltIn(_ id: UUID) -> Bool { id == BuiltInTools.serverID }
@@ -25,7 +31,7 @@ public final class BuiltInToolRouter: MCPToolHost, Sendable {
         let real = servers.filter { !Self.isBuiltIn($0.id) }
         let listed = real.isEmpty ? MCPToolCatalog() : await host.catalog(for: real)
         guard let config = servers.first(where: { Self.isBuiltIn($0.id) && $0.isEnabled }) else { return listed }
-        let own = BuiltInTools.bindings(for: config, avoiding: Set(listed.bindings.map(\.exposedName)))
+        let own = BuiltInTools.bindings(for: config, avoiding: Set(listed.bindings.map(\.exposedName)), skills: await skills())
         return MCPToolCatalog(bindings: listed.bindings + own, unavailable: listed.unavailable)
     }
 
@@ -39,7 +45,8 @@ public final class BuiltInToolRouter: MCPToolHost, Sendable {
 
     public func connect(_ server: MCPServerConfig) async -> MCPServerSnapshot {
         guard Self.isBuiltIn(server.id) else { return await host.connect(server) }
-        return MCPServerSnapshot(serverID: server.id, state: .ready, tools: BuiltInTools.bindings(for: server).map(\.tool), isRunning: true)
+        return MCPServerSnapshot(serverID: server.id, state: .ready,
+                                 tools: BuiltInTools.bindings(for: server, skills: await skills()).map(\.tool), isRunning: true)
     }
 
     public func stop(serverID: UUID) async {

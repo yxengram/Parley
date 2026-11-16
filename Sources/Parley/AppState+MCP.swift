@@ -30,12 +30,13 @@ extension AppState {
     }
 
     /// The servers this conversation lists that exist and are switched on, then the built-in tools
-    /// when one is on and the conversation has not opted out. A stale id is ignored. Empty is the
+    /// when one is on (or a skill is) and the conversation has not opted out. A stale id is ignored. Empty is the
     /// path with no tools at all.
     func enabledServers(for conversation: ConversationSettings) -> [MCPServerConfig] {
         let ids = conversation.mcpServerIDs ?? []
         var servers = ids.isEmpty ? [] : settings.mcpServers.filter { $0.isEnabled && ids.contains($0.id) }
-        if conversation.usesBuiltInTools, let builtIn = BuiltInTools.serverConfig(settings.builtInToolSettings) {
+        if let builtIn = BuiltInTools.serverConfig(builtInToolSettings, tools: conversation.usesBuiltInTools,
+                                                    skills: conversation.usesSkills) {
             servers.append(builtIn)
         }
         return servers
@@ -51,7 +52,7 @@ extension AppState {
         }
         let named = MCPToolNamer.assign(listed)
         let builtIn = servers.first { $0.kind == MCPServerConfig.kindBuiltIn }
-            .map { BuiltInTools.bindings(for: $0, avoiding: Set(named.map(\.exposedName))) } ?? []
+            .map { BuiltInTools.bindings(for: $0, avoiding: Set(named.map(\.exposedName)), skills: builtInToolSettings.skills) } ?? []
         guard !listed.isEmpty || !builtIn.isEmpty else { return 0 }
         // A chat with only built-in tools leaves them out for such a model, without a word
         // (ReplyTarget.offersOnlyBuiltIns), so nothing would explain the number.

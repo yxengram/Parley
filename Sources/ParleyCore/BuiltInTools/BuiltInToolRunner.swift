@@ -46,6 +46,9 @@ final class BuiltInToolRunner: Sendable {
     }
 
     private func run(_ tool: MCPTool, arguments: [String: JSONValue], timeout: TimeInterval, maxCharacters: Int) async -> ToolCallResult {
+        if tool.name == BuiltInTools.skillToolName {
+            return await skill(tool, arguments: arguments, timeout: timeout, maxCharacters: maxCharacters)
+        }
         guard let builtIn = BuiltInTools.Tool(rawValue: tool.name) else {
             return ToolCallResult(status: .notCalled, text: ToolResultText.unknownTool(tool.name))
         }
@@ -94,6 +97,98 @@ final class BuiltInToolRunner: Sendable {
             "content": .array([.object(["type": .string("text"), "text": .string(text)])]),
             "isError": .bool(isError),
         ]), maxCharacters: maxCharacters)
+    }
+
+    // MARK: activate_skill
+
+    private func skill(_ tool: MCPTool, arguments: [String: JSONValue], timeout: TimeInterval, maxCharacters: Int) async -> ToolCallResult {
+        let current = await settings()
+        // Skills switched off, or all removed, since the reply began.
+        guard !current.skills.isEmpty else { return ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff) }
+        // One that this reply offered (its definition's enum) but that is off or gone now.
+        if let name = arguments["name"]?.stringValue, !current.skills.contains(where: { $0.name == name }),
+           Self.offeredSkillNames(tool).contains(name) {
+            return ToolCallResult(status: .notCalled, text: ToolResultText.turnedOff)
+        }
+        if Task.isCancelled { return ToolCallResult(status: .notCalled, text: ToolResultText.notRun) }
+        let answer: BuiltInAnswer
+        if let name = arguments["name"]?.stringValue, let found = current.skills.first(where: { $0.name == name }) {
+            answer = await Self.race(timeout: timeout) { await Self.onOwnThread { cancel in
+                Self.skillAnswer(found, arguments: arguments, maxCharacters: maxCharacters, cancel: cancel)
+            } }
+        } else if arguments["name"]?.stringValue == nil {
+            answer = .error("`name` must be a string: one of the skills listed in this tool's description.")
+        } else {
+            let names = current.skills.map(\.name).sorted().prefix(BuiltInTools.maxListedSkills).joined(separator: ", ")
+            answer = .error("There is no skill named \"\(arguments["name"]?.stringValue ?? "")\". The skills are: \(names).")
+        }
+        switch answer {
+        case .text(let text): return project(text, isError: false, maxCharacters: maxCharacters)
+        case .error(let text): return project(text, isError: true, maxCharacters: maxCharacters)
+        case .cancelled: return ToolCallResult(status: .cancelled, text: ToolResultText.interrupted)
+        case .timedOut: return ToolCallResult(status: .timedOut, text: ToolResultText.timedOut(seconds: timeout))
+        }
+    }
+
+    /// The names in the definition the reply offered: the `name` parameter's enum.
+    static func offeredSkillNames(_ tool: MCPTool) -> Set<String> {
+        let names = tool.inputSchema.objectValue?["properties"]?.objectValue?["name"]?.objectValue?["enum"]?.arrayValue ?? []
+        return Set(names.compactMap(\.stringValue))
+    }
+
+    /// SKILL.md's instructions (frontmatter left out) with the list of the skill's other files, or one
+    /// of those files. Everything is read through BuiltInFiles rooted at the skill's folder, so a link
+    /// in a skill the user put there by hand cannot lead out of it.
+    static func skillAnswer(_ skill: SkillSummary, arguments: [String: JSONValue], maxCharacters: Int,
+                            cancel: BuiltInCancelFlag) -> BuiltInAnswer {
+        var files = BuiltInFiles(rootPath: skill.directoryPath)
+        files.wording = .skillFolder
+        do {
+            if let value = arguments["file"], !value.isNull {
+                guard let path = value.stringValue else { return .error("`file` must be a string.") }
+                if !path.isEmpty {
+                    var startLine = 1
+                    if let value = arguments["start_line"], !value.isNull {
+                        guard let number = value.intValue, number >= 1, number <= Int32.max else {
+                            return .error("`start_line` must be a whole number, 1 or more.")
+                        }
+                        startLine = Int(number)
+                    }
+                    return .text(try files.read(path: path, startLine: startLine, maxCharacters: maxCharacters, cancel: cancel))
+                }
+            }
+            // The whole of SKILL.md (one page as large as the result may be), then its body.
+            let text = try files.read(path: SkillManifest.fileName, startLine: 1, maxCharacters: Int.max / 2, cancel: cancel)
+            let body = SkillManifest.parse(text)?.body ?? text
+            if cancel.isSet { return .cancelled }
+            let (resources, more) = SkillLibrary.resources(of: skill.directoryPath)
+            return .text(skillText(name: skill.name, body: body, resources: resources, more: more))
+        } catch let refusal as BuiltInRefusal {
+            return .error(refusal.message)
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            return .error("The skill could not be read.")
+        }
+    }
+
+    /// The wrapping the Agent Skills client guide suggests, so the model can tell the skill's text
+    /// from the rest of the conversation. The folder's path is not given: files are asked for by name.
+    static func skillText(name: String, body: String, resources: [String], more: Bool) -> String {
+        let attribute = name.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+        var out = "<skill_content name=\"\(attribute)\">\n\(body)\n\n"
+        if resources.isEmpty {
+            out += "[Parley cannot run scripts or programs.]\n"
+        } else {
+            out += "[The skill's files are listed below, relative to its folder. To read one, call activate_skill again "
+                + "with this name and file set to its path. Parley cannot run scripts or programs: read a script to see "
+                + "what it does, or tell the user what to run.]\n\n<skill_resources>\n"
+            out += resources.map { "<file>\($0)</file>" }.joined(separator: "\n")
+            if more { out += "\n[More files are not listed.]" }
+            out += "\n</skill_resources>\n"
+        }
+        return out + "</skill_content>"
     }
 
     // MARK: The tools that need no waiting

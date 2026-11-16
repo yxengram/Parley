@@ -118,33 +118,91 @@ public enum BuiltInTools {
     }
 
     /// Every definition, in `Tool.allCases` order. Independent of settings: nothing in them comes from
-    /// the user, the shared folder's path and name least of all.
+    /// the user, the shared folder's path and name least of all. (activate_skill is the one tool whose
+    /// definition holds something of the user's: the names and descriptions of their skills.)
     public static var definitions: [MCPTool] { Tool.allCases.map(\.definition) }
 
-    /// The synthetic server, or nil when no tool is on. A tool that is off is in `disabledTools`, so
+    // MARK: Skills
+
+    /// Loads one of the user's skills (see SkillManifest). Not a `Tool` case: it has no switch in
+    /// Settings > Built-in Tools, and it is offered when a skill is on, not when a tool is.
+    public static let skillToolName = "activate_skill"
+    /// The catalog in its description lists at most this many skills, sorted by name.
+    public static let maxListedSkills = 100
+
+    /// activate_skill for these skills, which must not be empty. The catalog is in the description,
+    /// as the Agent Skills client guide allows, so the system prompt stays the user's own; the names
+    /// are an enum, so the model cannot ask for one that does not exist.
+    public static func skillDefinition(_ skills: [SkillSummary]) -> MCPTool {
+        let listed = skills.sorted { $0.name < $1.name }.prefix(maxListedSkills)
+        let catalog = listed.map { "- \($0.name): \(SkillManifest.catalogDescription($0.description))" }.joined(separator: "\n")
+        let description = "Loads a skill: instructions the user installed for a particular kind of task, sometimes with "
+            + "files that go with them. When a request matches a skill's description below, call this with the skill's "
+            + "name before you answer, then follow the instructions it returns. To read one of the skill's files, call "
+            + "it again with the same name and file set to the file's path. Parley cannot run a skill's scripts or "
+            + "programs.\n\nAvailable skills:\n" + catalog
+        let schema: JSONValue = .object([
+            "type": .string("object"),
+            "properties": .object([
+                "name": .object([
+                    "type": .string("string"),
+                    "description": .string("The skill's name, as listed."),
+                    "enum": .array(listed.map { .string($0.name) }),
+                ]),
+                "file": .object([
+                    "type": .string("string"),
+                    "description": .string("One of the skill's files, relative to its folder, as listed when the skill was loaded. Leave it out to load the skill's instructions."),
+                ]),
+                "start_line": .object([
+                    "type": .string("integer"),
+                    "description": .string("For a long file: the first line to return, counted from 1."),
+                ]),
+            ]),
+            "required": .array([.string("name")]),
+        ])
+        return MCPTool(name: skillToolName, description: description, inputSchema: MCPSchema.normalized(schema))
+    }
+
+    /// True for an activate_skill call.
+    public static func isSkillCall(_ binding: MCPToolBinding) -> Bool {
+        binding.serverID == serverID && binding.tool.name == skillToolName
+    }
+
+    /// The synthetic server, or nil when nothing is on. A tool that is off is in `disabledTools`, so
     /// a reply that was already running sees it go the way it sees any other tool switched off.
-    public static func serverConfig(_ settings: BuiltInToolSettings) -> MCPServerConfig? {
-        let on = settings.effectiveTools
-        guard !on.isEmpty else { return nil }
+    /// `tools` and `skills` are the conversation's own choices (the wrench popover). activate_skill is
+    /// named in `disabledTools` only while there are skills, so with none the config is what it was
+    /// before skills existed.
+    public static func serverConfig(_ settings: BuiltInToolSettings, tools: Bool = true, skills: Bool = true) -> MCPServerConfig? {
+        let on = tools ? settings.effectiveTools : []
+        let skillsOn = skills && !settings.skills.isEmpty
+        guard !on.isEmpty || skillsOn else { return nil }
+        var disabled = Tool.allCases.filter { !on.contains($0) }.map(\.rawValue)
+        if !settings.skills.isEmpty, !skillsOn { disabled.append(skillToolName) }
         return MCPServerConfig(id: serverID, name: serverName, kind: MCPServerConfig.kindBuiltIn, isEnabled: true,
-                               disabledTools: Tool.allCases.filter { !on.contains($0) }.map(\.rawValue),
-                               callTimeout: callTimeout)
+                               disabledTools: disabled, callTimeout: callTimeout)
     }
 
     /// What `config` offers, under the fixed prefix. A real server's names must not depend on these
     /// switches, so on a clash with `taken` the built-in moves, to a form no server can get: a slug
     /// never starts with "_". "parley" keeps it apart in `binding(forFunctionName:)`, which ignores "_".
-    public static func bindings(for config: MCPServerConfig, avoiding taken: Set<String> = []) -> [MCPToolBinding] {
-        definitions.filter { !config.disabledTools.contains($0.name) }.map {
+    /// activate_skill comes last, and only with `skills`.
+    public static func bindings(for config: MCPServerConfig, avoiding taken: Set<String> = [],
+                                skills: [SkillSummary] = []) -> [MCPToolBinding] {
+        var tools = definitions.filter { !config.disabledTools.contains($0.name) }
+        if !skills.isEmpty, !config.disabledTools.contains(skillToolName) { tools.append(skillDefinition(skills)) }
+        return tools.map {
             let plain = namePrefix + "__" + $0.name
             let name = taken.contains(plain) ? namePrefix + "___parley_" + $0.name : plain
             return MCPToolBinding(exposedName: name, serverID: serverID, serverName: serverName, tool: $0)
         }
     }
 
-    /// True only for a call of a tool that may never be remembered as allowed.
+    /// True only for a call of a tool that may never be remembered as allowed. activate_skill reads
+    /// only what the user installed, and runs without asking (in ReAct every call asks anyway).
     public static func asksEveryTime(_ binding: MCPToolBinding) -> Bool {
         guard binding.serverID == serverID else { return false }
+        if binding.tool.name == skillToolName { return false }
         return Tool(rawValue: binding.tool.name)?.asksEveryTime ?? true
     }
 
@@ -164,21 +222,31 @@ public enum BuiltInTools {
     /// For `browse_url` it says whether the page's scripts may reach other sites (`browseOtherSites`).
     public static func approvalDetail(toolName: String, arguments: [String: JSONValue], folderPath: String?,
                                       browseOtherSites: Bool = false) -> String {
-        let plain = "Built-in tool"
+        // In the interface language: the card is the one place this is shown.
+        let plain = String(localized: "Built-in tool")
+        if toolName == skillToolName {
+            guard let name = arguments["name"]?.stringValue, !name.isEmpty else { return String(localized: "Built-in tool, loads a skill") }
+            guard let file = arguments["file"]?.stringValue, !file.isEmpty else {
+                return String(localized: "Built-in tool, loads the skill \(name)")
+            }
+            return String(localized: "Built-in tool, reads \(file) from the skill \(name)")
+        }
         switch Tool(rawValue: toolName) {
         case .fetchURL?:
             guard let text = arguments["url"]?.stringValue, let host = BuiltInFetcher.parse(text)?.host else { return plain }
-            return "\(plain), contacts \(host)"
+            return String(localized: "Built-in tool, contacts \(host)")
         case .browseURL?:
             guard let text = arguments["url"]?.stringValue, let host = BuiltInFetcher.parse(text)?.host else { return plain }
             return browseOtherSites
-                ? "\(plain), opens \(host) in a private browser; its scripts may contact other public sites"
-                : "\(plain), opens \(host) in a private browser, loading only from that site"
+                ? String(localized: "Built-in tool, opens \(host) in a private browser; its scripts may contact other public sites")
+                : String(localized: "Built-in tool, opens \(host) in a private browser, loading only from that site")
         case let tool? where tool.needsFolder:
             guard let folderPath, !folderPath.isEmpty else { return plain }
-            let folder = "\(plain), in folder \(URL(fileURLWithPath: folderPath).lastPathComponent)"
-            guard let path = arguments["path"]?.stringValue, !path.isEmpty else { return folder }
-            return "\(folder): \(path)"
+            let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
+            guard let path = arguments["path"]?.stringValue, !path.isEmpty else {
+                return String(localized: "Built-in tool, in folder \(folderName)")
+            }
+            return String(localized: "Built-in tool, in folder \(folderName): \(path)")
         default:
             return plain
         }
@@ -192,11 +260,14 @@ public struct BuiltInToolSettings: Sendable, Equatable {
     public var folderPath: String?
     /// Browse Web Page may load from other public sites, not only the approved one. Off by default.
     public var browseOtherSites: Bool
+    /// The skills switched on in Settings > Skills. Empty: activate_skill is not offered.
+    public var skills: [SkillSummary]
 
-    public init(enabled: [String] = [], folderPath: String? = nil, browseOtherSites: Bool = false) {
+    public init(enabled: [String] = [], folderPath: String? = nil, browseOtherSites: Bool = false, skills: [SkillSummary] = []) {
         self.enabled = enabled
         self.folderPath = folderPath
         self.browseOtherSites = browseOtherSites
+        self.skills = skills
     }
 
     public static let off = BuiltInToolSettings()

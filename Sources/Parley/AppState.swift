@@ -13,10 +13,11 @@ final class AppState {
         // Debug snapshot mode (PARLEY_SNAPSHOT_DIR): isolated settings, temp folder, sample data.
         if let settings = SnapshotHarness.isolatedSettingsIfActive() {
             let services = SnapshotHarness.mcpServices()
-            return AppState(settings: settings, mcp: services.host, mcpSecrets: services.secrets)
+            return AppState(settings: settings, mcp: services.host, mcpSecrets: services.secrets,
+                            skillsRoot: SnapshotHarness.skillsRoot)
         }
         #endif
-        return AppState()
+        return AppState(skillsRoot: SkillLibrary.defaultRoot)
     }()
 
     let settings: AppSettings
@@ -161,15 +162,35 @@ final class AppState {
     /// tools out and say so. Per AppState instance, like `thinkingOffRejections`.
     private(set) var toolRejections: [ContextKey: ToolsRefusal] = [:]
 
-    init(settings: AppSettings? = nil, mcp: MCPToolHost? = nil, mcpSecrets: MCPSecretStore? = nil) {
+    /// Parley's skills folder (see SkillLibrary). Nil: no skills, which is what tests get unless they
+    /// pass a folder of their own, so none of them reads the user's.
+    let skillsRoot: URL?
+    /// What the skills folder held at the last look (launch, Settings > Skills, an import or removal).
+    internal(set) var skills: [Skill] = []
+    internal(set) var skillProblems: [SkillProblem] = []
+    /// The same list for the tool host, which reads it off the main actor on every call.
+    @ObservationIgnored let skillCatalog = SkillCatalog()
+    /// Settings > Skills is on screen: an import staged after it closed is thrown away, not kept.
+    @ObservationIgnored var skillsSettingsVisible = false
+
+    init(settings: AppSettings? = nil, mcp: MCPToolHost? = nil, mcpSecrets: MCPSecretStore? = nil, skillsRoot: URL? = nil) {
         self.settings = settings ?? AppSettings()
         let secrets = mcpSecrets ?? KeychainMCPSecretStore()
         self.mcpSecrets = secrets
         self.mcp = mcp ?? MCPConnectionManager(secrets: secrets)
+        self.skillsRoot = skillsRoot
         let appSettings = self.settings
-        self.toolHost = BuiltInToolRouter(wrapping: self.mcp, settings: { await appSettings.builtInToolSettings },
-                                          pageLoader: pageLoader)
+        let catalog = skillCatalog
+        self.toolHost = BuiltInToolRouter(wrapping: self.mcp, settings: {
+            await MainActor.run { catalog.toolSettings(appSettings) }
+        }, skills: {
+            await MainActor.run { catalog.toolSettings(appSettings).skills }
+        }, pageLoader: pageLoader)
         drainMCPUpdates()
+        if let skillsRoot {
+            SkillLibrary.removeLeftoverImports(in: skillsRoot)
+            reloadSkills()
+        }
     }
 
     /// Weak, so a test's AppState goes away; the stream ends at `shutdownSync`.
