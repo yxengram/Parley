@@ -10,8 +10,9 @@ import WebKit
 /// storage or history outlives the call, and none from the user's other web views comes in. All its
 /// connections go through the call's loopback proxy (`proxyConfigurations`, failover off), and the
 /// content rules block what WebKit would connect to without asking the proxy. The view is never in a
-/// window. It is torn down before `load` returns, on every path: done, failed, timed out, cancelled
-/// (Stop, Lock, a conversation closing), and at quit (`cancelAll`).
+/// window. It is stopped and cut off from Parley before `load` returns, on every path: done, failed,
+/// timed out, cancelled (Stop, Lock, a conversation closing), and at quit (`cancelAll`); the view
+/// itself is freed on the next turn of the main loop (see `PageVisit.finish`).
 final class WebPageLoader: BuiltInPageLoader, @unchecked Sendable {
     /// Main thread only.
     @MainActor private var live: Set<PageVisit> = []
@@ -85,6 +86,67 @@ private final class VisitHandle: @unchecked Sendable {
             let visit = self.lock.withLock { self.visit }
             visit?.finish(.cancelled)
         }
+    }
+}
+
+/// The delegate of a web view whose visit has ended, until the view is freed: every navigation,
+/// download, window, dialog and device request is refused. WebKit holds delegates weakly, hence the
+/// one shared instance.
+@MainActor
+private final class ClosedPage: NSObject, WKNavigationDelegate, WKUIDelegate {
+    static let shared = ClosedPage()
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 preferences: WKWebpagePreferences, decisionHandler: @escaping @MainActor (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+        decisionHandler(.cancel, preferences)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                 decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
+        decisionHandler(.cancel)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        download.cancel(nil)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        download.cancel(nil)
+    }
+
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge,
+                 completionHandler: @escaping @MainActor (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.cancelAuthenticationChallenge, nil)
+    }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        nil
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor () -> Void) {
+        completionHandler()
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (Bool) -> Void) {
+        completionHandler(false)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
+        completionHandler(nil)
+    }
+
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
+                 type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
+        decisionHandler(.deny)
+    }
+
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping @MainActor ([URL]?) -> Void) {
+        completionHandler(nil)
     }
 }
 
@@ -187,7 +249,8 @@ private final class PageVisit: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.load(load)
     }
 
-    /// Ends the visit: the caller gets `outcome`, once, and the web view is gone.
+    /// Ends the visit: the caller gets `outcome`, once, and the web view is stopped, cut off from this
+    /// visit, and freed on the next turn of the main loop.
     func finish(_ outcome: BuiltInBrowseOutcome) {
         guard let completion else { return }
         self.completion = nil
@@ -197,11 +260,19 @@ private final class PageVisit: NSObject, WKNavigationDelegate, WKUIDelegate {
             // The rules and scripts stay on until the page is gone: removing them now would lift the
             // only guard on loopback while the page's timers can still run.
             webView.stopLoading()
-            webView.navigationDelegate = nil
-            webView.uiDelegate = nil
+            // Until the view is freed, a delegate that refuses everything: with none, WebKit would
+            // allow any navigation the page starts in the meantime.
+            webView.navigationDelegate = ClosedPage.shared
+            webView.uiDelegate = ClosedPage.shared
             webView.removeFromSuperview()
+            // The last reference goes on the next turn of the main loop, never inside the WebKit
+            // callback that ended the visit. A response with Cross-Origin-Opener-Policy (a
+            // Cloudflare check page is one) moves the page to a new web process; freeing the view
+            // while WebKit is still deciding that response tears down the page's visited-link store
+            // with the new process still on it, and WebKit stops the app (VisitedLinkStore assert).
+            // WebKit ends the page's process once no view holds it.
+            DispatchQueue.main.async { withExtendedLifetime(webView) {} }
         }
-        // The last reference: WebKit ends the page's process once no view holds it.
         webView = nil
         completion(self, outcome)
     }

@@ -203,6 +203,33 @@ private func error(_ answer: BuiltInAnswer) -> String {
         #expect(loader.openPages == 0)
     }
 
+    /// A response with Cross-Origin-Opener-Policy moves the page to a new web process (Cloudflare's
+    /// check page is a 403 with it). Ending the visit inside WebKit's decision on that response used
+    /// to free the view there and then, and WebKit stopped the app (VisitedLinkStore assert): the
+    /// first three cases each crashed the test process before the fix. The last is a control: a COOP
+    /// page that loads normally is still read.
+    @Test func aResponseThatMovesToANewProcessEndsTheVisitSafely() async throws {
+        let coop = "Cross-Origin-Opener-Policy: same-origin"
+        web.route("/check", status: "403 Forbidden", type: "text/html", headers: [coop, "Cross-Origin-Embedder-Policy: require-corp"],
+                  body: "<html><body>Just a moment…</body></html>")
+        #expect(error(await browse("/check")) == "The server answered HTTP 403.")
+        await waitUntilClosed()
+
+        web.route("/file.bin", type: "application/octet-stream", headers: [coop], body: String(repeating: "x", count: 4096))
+        #expect(error(await browse("/file.bin")) == "Not a web page: application/octet-stream. Nothing was downloaded or kept.")
+        await waitUntilClosed()
+
+        web.page("/", "<html><body>Here<script>setTimeout(() => { location.href = '/gone'; }, 50);</script></body></html>", headers: [coop])
+        web.route("/gone", status: "404 Not Found", type: "text/html", body: "<html><body>Not here</body></html>")
+        #expect(error(await browse("/")) == "The server answered HTTP 404.")
+        await waitUntilClosed()
+
+        web.page("/fine", "<html><body>A fine page</body></html>", headers: [coop])
+        #expect(text(await browse("/fine")).contains("A fine page"))
+        await waitUntilClosed()
+        #expect(loader.openPages == 0)
+    }
+
     @Test func waitsForAStubThatMovesOnToItsRealPage() async throws {
         web.page("/stub", "<html><head><meta http-equiv=\"refresh\" content=\"0;url=/real\"></head><body>Redirecting…</body></html>")
         web.page("/js", "<html><body>Loading…<script>setTimeout(() => location.replace('/real'), 200);</script></body></html>")
