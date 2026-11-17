@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-/// `list_files` and `read_file`, inside the one folder chosen in Settings.
+/// `list_files`, `read_file` and `write_file`, inside the one folder chosen in Settings.
 ///
 /// What the model sees is relative to that folder, always: no absolute path, user name or folder name
 /// in a result or an error. Each call opens the folder anew and asks the kernel where a descriptor
@@ -16,10 +16,16 @@ import Foundation
 /// Hidden means what the user means by it: a name starting with a dot, or Finder's hidden flag, which
 /// is how ~/Library is hidden. A folder the user chose is theirs, so only what is below it counts.
 ///
+/// Writing never follows a link: see `write`.
+///
 /// Blocking and meant for a thread of its own (a file on a network mount or in iCloud can take as
 /// long as it likes). `cancel` is checked between reads.
 struct BuiltInFiles {
     static let maxReadBytes = 4 * 1024 * 1024
+    static let maxWriteBytes = 4 * 1024 * 1024
+    /// Moves a file to the Trash. A parameter, so no test touches the real one.
+    typealias Trasher = @Sendable (URL) throws -> Void
+    static let moveToTrash: Trasher = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
     static let maxEntries = 500
     /// Room kept for the footer inside the character budget.
     private static let footerRoom = 120
@@ -50,6 +56,7 @@ struct BuiltInFiles {
 
     let rootPath: String
     var wording: Wording = .sharedFolder
+    var trash: Trasher = BuiltInFiles.moveToTrash
 
     // MARK: list_files
 
@@ -179,18 +186,176 @@ struct BuiltInFiles {
         return out
     }
 
+    // MARK: write_file
+
+    /// Writes `content` as UTF-8 at `path`, creating the folders on the way. A file already there is
+    /// replaced, and its old version moved to the Trash first; nothing is written if that fails.
+    ///
+    /// Never through a link: each folder on the way is opened from the one above it with
+    /// `O_NOFOLLOW`, so a symlink, even one that leads back inside, is refused, and the descriptors
+    /// held are what the kernel says they are whatever is renamed meanwhile. The text goes to a hidden
+    /// temporary file in the target's folder, then `renameatx_np(RENAME_EXCL)` puts it in place, so
+    /// a half-written file is never seen under the real name and nothing that appeared there
+    /// meanwhile is overwritten. The Trash is given the folder's real path (`F_GETPATH`).
+    ///
+    /// `cancel` is checked until the file is put in place; after that it is written.
+    func write(path: String, content: String, cancel: BuiltInCancelFlag) throws -> String {
+        let relative = try Self.components(of: path, wording: wording, action: "written")
+        guard let name = relative.last else {
+            throw BuiltInRefusal("\(wording.folder) is a folder. Give a file's path, such as notes.txt.")
+        }
+        let data = Data(content.utf8)
+        guard data.count <= Self.maxWriteBytes else {
+            throw BuiltInRefusal("The content is \(data.count) bytes. Parley writes at most 4 MiB to one file.")
+        }
+        let folder = try openFolderForWriting(Array(relative.dropLast()))
+        defer { close(folder) }
+        if cancel.isSet { throw CancellationError() }
+
+        let shownPath = shown(relative)
+        var existing = stat()
+        var replacing = false
+        var mode: mode_t = 0o644
+        if fstatat(folder, name, &existing, AT_SYMLINK_NOFOLLOW) == 0 {
+            switch existing.st_mode & S_IFMT {
+            case S_IFREG: break
+            case S_IFDIR: throw BuiltInRefusal("\(shownPath) is a folder.")
+            case S_IFLNK: throw BuiltInRefusal("\(shownPath) is a symlink. Parley does not write through or replace links.")
+            default: throw BuiltInRefusal("\(shownPath) is not a regular file.")
+            }
+            if Self.isFlaggedHidden(existing) { throw BuiltInRefusal("\(shownPath) is hidden, so it cannot be written.") }
+            replacing = true
+            mode = existing.st_mode & 0o777
+        } else if errno != ENOENT {
+            throw Self.writeRefusal(errno, shownPath)
+        }
+
+        let temporary = ".parley-write-\(UUID().uuidString)"
+        let fd = openat(folder, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode)
+        guard fd >= 0 else { throw Self.writeRefusal(errno, shownPath) }
+        var placed = false
+        defer { if !placed { unlinkat(folder, temporary, 0) } }
+        do {
+            defer { close(fd) }
+            try data.withUnsafeBytes { raw in
+                var written = 0
+                while written < raw.count {
+                    if cancel.isSet { throw CancellationError() }
+                    let count = Darwin.write(fd, raw.baseAddress! + written, min(1 << 20, raw.count - written))
+                    if count < 0 {
+                        if errno == EINTR { continue }
+                        throw Self.writeRefusal(errno, shownPath)
+                    }
+                    written += count
+                }
+            }
+            guard fsync(fd) == 0 else { throw Self.writeRefusal(errno, shownPath) }
+        }
+        if cancel.isSet { throw CancellationError() }
+
+        if replacing {
+            // Still the file that was looked at: not swapped for a link or another file meanwhile.
+            var now = stat()
+            guard fstatat(folder, name, &now, AT_SYMLINK_NOFOLLOW) == 0, now.st_mode & S_IFMT == S_IFREG,
+                  now.st_ino == existing.st_ino, now.st_dev == existing.st_dev, let real = Self.realPath(folder) else {
+                throw BuiltInRefusal("\(shownPath) changed while it was being written. Nothing was written.")
+            }
+            do {
+                try trash(URL(fileURLWithPath: real, isDirectory: true).appendingPathComponent(name))
+            } catch {
+                throw BuiltInRefusal("\(shownPath) exists, and its old version could not be moved to the Trash, so nothing was written.")
+            }
+        }
+        guard Self.renameIntoPlace(folder, temporary, name) == 0 else {
+            let failure = errno
+            if replacing {
+                throw BuiltInRefusal("The old version of \(shownPath) was moved to the Trash, but the new one could not be put in its place.")
+            }
+            if failure == EEXIST { throw BuiltInRefusal("\(shownPath) appeared while it was being written. Nothing was written.") }
+            throw Self.writeRefusal(failure, shownPath)
+        }
+        placed = true
+        let size = data.count == 1 ? "1 byte" : "\(data.count) bytes"
+        return replacing
+            ? "Wrote \(shownPath) (\(size)). The old version was moved to the Trash."
+            : "Created \(shownPath) (\(size))."
+    }
+
+    /// `renameatx_np(RENAME_EXCL)`. A volume that does not have it (some network or FAT volumes
+    /// answer ENOTSUP or EINVAL) gets a plain rename, after a check that the name is still free.
+    private static func renameIntoPlace(_ folder: Int32, _ temporary: String, _ name: String) -> Int32 {
+        if renameatx_np(folder, temporary, folder, name, UInt32(RENAME_EXCL)) == 0 { return 0 }
+        guard errno == ENOTSUP || errno == EINVAL else { return -1 }
+        var info = stat()
+        guard fstatat(folder, name, &info, AT_SYMLINK_NOFOLLOW) != 0, errno == ENOENT else {
+            errno = EEXIST
+            return -1
+        }
+        return renameat(folder, temporary, folder, name)
+    }
+
+    /// The folder `relative` names, made where missing, as a descriptor the caller closes. Every step
+    /// is opened from the one before with `O_NOFOLLOW`; the chosen folder itself may be reached
+    /// through a link, as it is for reading.
+    private func openFolderForWriting(_ relative: [String]) throws -> Int32 {
+        var current = Darwin.open(rootPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard current >= 0 else { throw BuiltInRefusal(wording.unavailable) }
+        var walked: [String] = []
+        for part in relative {
+            walked.append(part)
+            let flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+            var next = openat(current, part, flags)
+            if next < 0, errno == ENOENT {
+                if mkdirat(current, part, 0o755) != 0, errno != EEXIST {
+                    let failure = errno
+                    close(current)
+                    throw Self.writeRefusal(failure, shown(walked))
+                }
+                next = openat(current, part, flags)
+            }
+            guard next >= 0 else {
+                let failure = errno
+                // A link fails as "not a folder" (or ELOOP): which it was, from the entry itself.
+                var entry = stat()
+                let isLink = fstatat(current, part, &entry, AT_SYMLINK_NOFOLLOW) == 0 && entry.st_mode & S_IFMT == S_IFLNK
+                close(current)
+                if isLink || failure == ELOOP { throw BuiltInRefusal("\(shown(walked)) is a symlink. Parley does not write through links.") }
+                if failure == ENOTDIR { throw BuiltInRefusal("\(shown(walked)) is a file, not a folder.") }
+                throw Self.writeRefusal(failure, shown(walked))
+            }
+            close(current)
+            current = next
+            var info = stat()
+            guard fstat(current, &info) == 0, !Self.isFlaggedHidden(info) else {
+                close(current)
+                throw BuiltInRefusal("\(shown(walked)) is hidden, so nothing can be written in it.")
+            }
+        }
+        return current
+    }
+
+    private static func writeRefusal(_ code: Int32, _ name: String) -> BuiltInRefusal {
+        switch code {
+        case EACCES, EPERM: return BuiltInRefusal("macOS refused to write \(name).")
+        case EROFS: return BuiltInRefusal("\(name) is on a disk that cannot be written to.")
+        case ENOSPC, EDQUOT: return BuiltInRefusal("There is not enough disk space to write \(name).")
+        case ENAMETOOLONG: return BuiltInRefusal("The name \(name) is too long.")
+        default: return BuiltInRefusal("\(name) could not be written.")
+        }
+    }
+
     // MARK: Staying inside
 
     /// The path's parts, for the checks that need no disk. "." and empty parts mean nothing, so
     /// "./a/" is "a" and "." is the folder itself.
-    static func components(of path: String, wording: Wording = .sharedFolder) throws -> [String] {
+    static func components(of path: String, wording: Wording = .sharedFolder, action: String = "read") throws -> [String] {
         if path.unicodeScalars.contains("\0") { throw BuiltInRefusal("The path holds a NUL character.") }
         if path.utf8.first == slash || path.utf8.first == UInt8(ascii: "~") {
             throw BuiltInRefusal("Paths are relative to \(wording.folderInSentence), which is \".\". Absolute paths and ~ are refused.")
         }
         let parts = path.utf8.split(separator: slash).map { String(Substring($0)) }.filter { $0 != "." }
         if parts.contains("..") { throw BuiltInRefusal("\"..\" is refused: nothing outside \(wording.folderInSentence) can be reached.") }
-        if parts.contains(where: { $0.utf8.first == dot }) { throw BuiltInRefusal("Hidden files and folders cannot be read.") }
+        if parts.contains(where: { $0.utf8.first == dot }) { throw BuiltInRefusal("Hidden files and folders cannot be \(action).") }
         return parts
     }
 

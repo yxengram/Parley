@@ -23,6 +23,16 @@ struct ConversationToolServices {
     var builtInFolderPath: () -> String? = { nil }
     /// For the card of Browse Web Page, which says whether other sites may be reached.
     var builtInBrowseOtherSites: () -> Bool = { false }
+    /// Settings > General > Tool calls. Read for each call, so a change applies to the next one.
+    var approval: () -> ToolApprovalMode = { .manual }
+}
+
+/// Whether tool calls wait for the user. Manual: the card as each tool has it (Always Allow where a
+/// tool offers it, every call in ReAct). Automatic: no card for any call, the file, web and ReAct ones
+/// included; the call still shows in the conversation, and Stop still stops it.
+enum ToolApprovalMode: String, CaseIterable {
+    case manual
+    case automatic
 }
 
 enum ToolAllowance {
@@ -769,6 +779,8 @@ final class ConversationSession: Identifiable {
     /// Runs one round's calls one after another, which keeps approvals and side effects predictable.
     /// `fromText`: ReAct. Every call shows the card, whatever was stored for the tool: text can be an
     /// echo of tool output, so Always Allow, which is about structured calls, does not reach it.
+    /// With Automatic approval (`ToolApprovalMode`) no call shows a card, these included: the user
+    /// chose that in Settings.
     private func runCalls(_ callIDs: [String], messageID: UUID, catalog: MCPToolCatalog,
                           tools: ConversationToolServices, target: ReplyTarget, fromText: Bool) async {
         for callID in callIDs {
@@ -791,7 +803,7 @@ final class ConversationSession: Identifiable {
             let allowance = tools.allowance(binding)
             let folderOnCard = tools.builtInFolderPath()
             let otherSitesOnCard = tools.builtInBrowseOtherSites()
-            if allowance != .always || fromText {
+            if tools.approval() == .manual, allowance != .always || fromText {
                 replyPhase = .awaitingApproval
                 let approval = PendingToolApproval(
                     id: callID,

@@ -82,8 +82,8 @@ private func calculate(_ text: String) throws -> Double {
 }
 
 @Suite struct BuiltInDefinitionTests {
-    @Test func theToolsAreTheSixOfTheDesign() {
-        #expect(BuiltInTools.definitions.map(\.name) == ["current_time", "calculate", "list_files", "read_file", "fetch_url", "browse_url"])
+    @Test func theToolsAreTheSevenOfTheDesign() {
+        #expect(BuiltInTools.definitions.map(\.name) == ["current_time", "calculate", "list_files", "read_file", "write_file", "fetch_url", "browse_url"])
     }
 
     @Test func nothingIsOnByDefault() {
@@ -111,7 +111,7 @@ private func calculate(_ text: String) throws -> Double {
         #expect(config.kind == MCPServerConfig.kindBuiltIn)
         #expect(config.name == "Parley")
         #expect(config.isEnabled)
-        #expect(config.disabledTools == ["current_time", "list_files", "read_file", "fetch_url", "browse_url"])
+        #expect(config.disabledTools == ["current_time", "list_files", "read_file", "write_file", "fetch_url", "browse_url"])
         #expect(BuiltInTools.bindings(for: config).map(\.exposedName) == ["builtin__calculate"])
     }
 
@@ -120,6 +120,8 @@ private func calculate(_ text: String) throws -> Double {
         #expect(!BuiltInTools.asksEveryTime(try binding(.calculate)))
         #expect(BuiltInTools.asksEveryTime(try binding(.listFiles)))
         #expect(BuiltInTools.asksEveryTime(try binding(.readFile)))
+        #expect(BuiltInTools.asksEveryTime(try binding(.writeFile)))
+        #expect(BuiltInTools.readsFolder(try binding(.writeFile)))
         #expect(BuiltInTools.asksEveryTime(try binding(.fetchURL)))
         #expect(BuiltInTools.asksEveryTime(try binding(.browseURL)))
         let real = MCPToolBinding(exposedName: "a__b", serverID: UUID(), serverName: "a",
@@ -225,7 +227,7 @@ private func calculate(_ text: String) throws -> Double {
 
         let config = try #require(BuiltInTools.serverConfig(allOn()))
         let catalog = await route.catalog(for: [config])
-        #expect(catalog.bindings.count == 6)
+        #expect(catalog.bindings.count == 7)
         _ = await route.call(try binding(.calculate), arguments: ["expression": .string("1+1")], timeout: 5, maxCharacters: 100)
         _ = await route.connect(config)
         await route.stop(serverID: config.id)

@@ -157,7 +157,7 @@ private func firstCall(_ message: Message) throws -> ToolCallRecord {
             let server = try #require(servers.first)
             #expect(servers.count == 1)
             #expect(server.id == BuiltInTools.serverID && server.kind == MCPServerConfig.kindBuiltIn)
-            #expect(Set(server.disabledTools) == ["current_time", "calculate", "fetch_url", "browse_url"])
+            #expect(Set(server.disabledTools) == ["current_time", "calculate", "write_file", "fetch_url", "browse_url"])
             #expect(fx.settings.offersTools)
         }
     }
@@ -224,9 +224,10 @@ private func firstCall(_ message: Message) throws -> ToolCallRecord {
             #expect(allowance["calculate"] == .always)
             #expect(allowance["list_files"] == .ask)
             #expect(allowance["read_file"] == .ask)
+            #expect(allowance["write_file"] == .ask)
             #expect(allowance["fetch_url"] == .ask)
             #expect(allowance["browse_url"] == .ask)
-            #expect(allowance.count == 6)
+            #expect(allowance.count == 7)
 
             // Nothing can be stored for them, and nothing is.
             let before = fx.settings.mcpServers
@@ -934,6 +935,115 @@ struct BuiltInLoopTests {
             let flat = try await sentMessages(fx).compactMap { $0["content"] as? String }.joined(separator: "\n")
             #expect(flat.contains("42"), "the rounds went flattened, as for a server that is gone")
             for session in relaunched.sessions.values { session.close(saving: false) }
+        }
+    }
+}
+
+
+// MARK: - Write File, and Settings > General > Tool Calls
+
+private func isApprovalPhase(_ phase: ConversationSession.ReplyPhase) -> Bool {
+    if case .awaitingApproval = phase { return true }
+    return false
+}
+
+/// No app test replaces a file: that would use the real Trash. BuiltInWriteFileTests covers it.
+@Suite(.serialized, .enabled(if: FileManager.default.isExecutableFile(atPath: python3Path)))
+@MainActor struct WriteFileAndApprovalTests {
+    @Test func manualIsTheDefaultAndTheChoiceIsKept() async throws {
+        let fx = try Fixture(baseURL: "http://127.0.0.1:9/v1", defaultModel: "m", mcp: FakeToolHost())
+        defer { fx.cleanup() }
+        #expect(fx.settings.toolApproval == .manual)
+        #expect(fx.defaults.object(forKey: "toolApproval") == nil, "nothing stored until chosen")
+        fx.settings.toolApproval = .automatic
+        #expect(AppSettings(defaults: fx.defaults).toolApproval == .automatic)
+        fx.defaults.set("sometimes", forKey: "toolApproval")
+        #expect(AppSettings(defaults: fx.defaults).toolApproval == .manual, "an unknown value is Manual")
+    }
+
+    @Test func writeFileAsksAndTheCardSaysWhatAndWhere() async throws {
+        try await withBuiltIns([.writeFile]) { fx, session, _ in
+            start(ask("write_file", args: #"{"path":"drafts/new.txt","content":"hello"}"#), fx, session)
+            let approval = try await waitForApproval(session)
+            #expect(approval.asksEveryTime && !approval.offersAlwaysAllow)
+            #expect(approval.serverDetail == "Built-in tool, writes drafts/new.txt (5 bytes) in folder Shared-folder")
+            session.answerApproval(.allowOnce)
+            try await fx.waitForReply(session)
+            let call = try firstCall(try reply(session))
+            #expect(call.result?.text == "Created drafts/new.txt (5 bytes).")
+            #expect(ToolDisplay.title(call) == "Parley › write_file: drafts/new.txt")
+            let folder = try #require(fx.settings.builtInFolderPath)
+            #expect(try String(contentsOfFile: folder + "/drafts/new.txt", encoding: .utf8) == "hello")
+        }
+    }
+
+    @Test func aDeniedWriteWritesNothing() async throws {
+        try await withBuiltIns([.writeFile]) { fx, session, _ in
+            start(ask("write_file", args: #"{"path":"no.txt","content":"x"}"#), fx, session)
+            _ = try await waitForApproval(session)
+            session.answerApproval(.deny)
+            try await fx.waitForReply(session)
+            #expect(try firstCall(try reply(session)).result?.callStatus == .denied)
+            let folder = try #require(fx.settings.builtInFolderPath)
+            #expect(!FileManager.default.fileExists(atPath: folder + "/no.txt"))
+        }
+    }
+
+    @Test func automaticRunsFileCallsWithNoCard() async throws {
+        try await withBuiltIns([.readFile, .writeFile]) { fx, session, _ in
+            fx.settings.toolApproval = .automatic
+            start(ask("read_file", args: #"{"path":"notes.txt"}"#), fx, session)
+            #expect(!(await phasesUntilDone(session)).contains(where: isApprovalPhase))
+            #expect(try firstCall(try reply(session)).result?.text == "the file's text")
+
+            start(ask("write_file", args: #"{"path":"auto.md","content":"written"}"#), fx, session)
+            #expect(!(await phasesUntilDone(session)).contains(where: isApprovalPhase))
+            #expect(try firstCall(try reply(session)).result?.text == "Created auto.md (7 bytes).")
+            let folder = try #require(fx.settings.builtInFolderPath)
+            #expect(try String(contentsOfFile: folder + "/auto.md", encoding: .utf8) == "written")
+
+            // Back to Manual: the next call asks again.
+            fx.settings.toolApproval = .manual
+            start(ask("read_file", args: #"{"path":"notes.txt"}"#), fx, session)
+            _ = try await waitForApproval(session)
+            session.answerApproval(.deny)
+            try await fx.waitForReply(session)
+        }
+    }
+
+    @Test func automaticCoversReActToo() async throws {
+        try await withBuiltIns([.readFile], model: "mock-react", react: true) { fx, session, _ in
+            fx.settings.toolApproval = .automatic
+            start(ask("read_file", args: #"{"path":"notes.txt"}"#), fx, session)
+            let phases = await phasesUntilDone(session)
+            #expect(!phases.contains(where: isApprovalPhase))
+            let text = try firstCall(try reply(session)).result?.text
+            #expect(text == "the file's text")
+        }
+    }
+
+    @Test func automaticCoversAnMCPToolNeverAllowed() async throws {
+        let host = FakeToolHost()
+        try await withFixture(model: "mock-tools", mcp: host) { fx in
+            _ = try addServer(fx)
+            fx.settings.toolApproval = .automatic
+            let session = try await fx.create()
+            start("call tool=mock__echo args={\"text\":\"hi\"}", fx, session)
+            #expect(!(await phasesUntilDone(session)).contains(where: isApprovalPhase))
+            #expect(host.calls.map(\.tool) == ["echo"])
+            #expect(fx.settings.mcpServers.allSatisfy { $0.alwaysAllowedTools.isEmpty }, "nothing is stored by it")
+        }
+    }
+
+    @Test func aChineseRowHasNoSpaceAfterItsFullStop() {
+        #expect(BuiltInToolsSettingsView.joined("这台 Mac 的日期、时间和时区。", "运行时不询问。") == "这台 Mac 的日期、时间和时区。运行时不询问。")
+        #expect(BuiltInToolsSettingsView.joined("Works out arithmetic.", "Runs without asking.") == "Works out arithmetic. Runs without asking.")
+    }
+
+    @Test func theSettingsRowsFollowTheChoice() {
+        for tool in BuiltInTools.Tool.allCases {
+            #expect(BuiltInToolsSettingsView.explanation(tool, approval: .automatic)
+                .hasSuffix("Runs without asking: tool calls are set to run automatically in Settings > General."), "\(tool)")
         }
     }
 }

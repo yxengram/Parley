@@ -232,6 +232,18 @@ private final class SharedFolder {
         }
     }
 
+    @Test func gbkAndUTF16FilesAreText() throws {
+        let folder = try SharedFolder()
+        let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringConvertIANACharSetNameToEncoding("gb18030" as CFString)))
+        try folder.write("gbk.txt", data: "第一行\n朱镕基喆 €\n".data(using: gb18030)!)
+        try folder.write("utf16.txt", data: Data([0xFF, 0xFE]) + "中文\nline".data(using: .utf16LittleEndian)!)
+        #expect(try folder.read("gbk.txt") == "第一行\n朱镕基喆 €")
+        #expect(try folder.read("utf16.txt") == "中文\nline")
+        // GB18030 by its byte rules, but with control characters: still not text.
+        try folder.write("bin", data: Data([0x01, 0xB0, 0xA1, 0x02, 0x7F]))
+        #expect(folder.refusal { try folder.read("bin") } == "bin is not a text file.")
+    }
+
     @Test func exactlyTheCapIsAWholeFile() throws {
         let folder = try SharedFolder()
         let line = String(repeating: "a", count: 1023) + "\n"
@@ -546,5 +558,191 @@ private final class SharedFolder {
             return await runner.call(BuiltInTools.Tool.readFile.definition, arguments: ["path": .string("a")], timeout: 5, maxCharacters: 100)
         }
         #expect(await task.value.callStatus == .notCalled)
+    }
+}
+
+/// write_file. The Trash is a folder in the test's own scratch space: nothing here touches the real one.
+@Suite struct BuiltInWriteFileTests {
+    /// Moves to `bin`, as the Trash would, keeping each file under a new name.
+    fileprivate final class Bin: @unchecked Sendable {
+        let url: URL
+        private let lock = NSLock()
+        private(set) var moved: [String] = []
+        var fails = false
+
+        init(_ folder: SharedFolder) throws {
+            url = folder.scratch.url.appendingPathComponent("Bin")
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+
+        var trasher: BuiltInFiles.Trasher {
+            { [self] item in
+                if fails { throw CocoaError(.fileWriteNoPermission) }
+                try lock.withLock {
+                    moved.append(item.path)
+                    try FileManager.default.moveItem(at: item, to: url.appendingPathComponent("\(moved.count)-\(item.lastPathComponent)"))
+                }
+            }
+        }
+
+        func contents(_ index: Int, _ name: String) throws -> String {
+            try String(contentsOf: url.appendingPathComponent("\(index)-\(name)"), encoding: .utf8)
+        }
+    }
+
+    private func files(_ folder: SharedFolder, _ bin: Bin) -> BuiltInFiles {
+        var files = folder.files
+        files.trash = bin.trasher
+        return files
+    }
+
+    private func write(_ folder: SharedFolder, _ bin: Bin, _ path: String, _ content: String, cancel: BuiltInCancelFlag = BuiltInCancelFlag()) throws -> String {
+        try files(folder, bin).write(path: path, content: content, cancel: cancel)
+    }
+
+    private func names(in url: URL) -> [String] {
+        (try? FileManager.default.contentsOfDirectory(atPath: url.path).sorted()) ?? []
+    }
+
+    @Test func createsAFileAndTheFoldersOnTheWay() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        #expect(try write(folder, bin, "notes/2026/summary.md", "# 总结\nline\n") == "Created notes/2026/summary.md (14 bytes).")
+        #expect(try String(contentsOf: folder.url("notes/2026/summary.md"), encoding: .utf8) == "# 总结\nline\n")
+        #expect(try write(folder, bin, "./one.txt", "x") == "Created one.txt (1 byte).")
+        #expect(names(in: folder.root) == ["notes", "one.txt"], "no temporary file is left")
+        #expect(names(in: folder.url("notes/2026")) == ["summary.md"])
+        #expect(bin.moved.isEmpty)
+        #expect(try folder.read("notes/2026/summary.md") == "# 总结\nline")
+    }
+
+    @Test func replacingMovesTheOldVersionToTheTrashFirst() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        let target = try folder.write("a.txt", "old text")
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
+        #expect(try write(folder, bin, "a.txt", "new text") == "Wrote a.txt (8 bytes). The old version was moved to the Trash.")
+        #expect(try String(contentsOf: target, encoding: .utf8) == "new text")
+        #expect(try bin.contents(1, "a.txt") == "old text")
+        #expect(bin.moved.count == 1 && bin.moved[0].hasSuffix("/Shared/a.txt"))
+        let mode = try FileManager.default.attributesOfItem(atPath: target.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600, "the permissions are kept")
+        #expect(names(in: folder.root) == ["a.txt"])
+    }
+
+    @Test func whenTheTrashFailsNothingIsWritten() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        bin.fails = true
+        try folder.write("a.txt", "old text")
+        #expect(folder.refusal { try write(folder, bin, "a.txt", "new") }
+            == "a.txt exists, and its old version could not be moved to the Trash, so nothing was written.")
+        #expect(try folder.read("a.txt") == "old text")
+        #expect(names(in: folder.root) == ["a.txt"], "the temporary file is gone")
+    }
+
+    @Test(arguments: ["/tmp/x", "~/x", "../x", "a/../../x", ".env", "a/.git/config", "", ".", "a\0b"])
+    func refusedPaths(_ path: String) throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        #expect(throws: BuiltInRefusal.self) { try write(folder, bin, path, "x") }
+        #expect(names(in: folder.root).isEmpty)
+        #expect(names(in: folder.scratch.url).sorted() == ["Bin", "Shared"], "nothing written beside the folder")
+    }
+
+    @Test func hiddenNamesSayWritten() throws {
+        let folder = try SharedFolder()
+        #expect(folder.refusal { try BuiltInFiles.components(of: "a/.ssh/x", action: "written").joined() } == "Hidden files and folders cannot be written.")
+    }
+
+    @Test func neverThroughALinkEvenOneThatStaysInside() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        let outside = folder.scratch.url.appendingPathComponent("Outside")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try "outside".write(to: outside.appendingPathComponent("f.txt"), atomically: true, encoding: .utf8)
+        try folder.write("real/f.txt", "inside")
+        try folder.link("out", to: outside.path)
+        try folder.link("in", to: folder.url("real").path)
+        try folder.link("f-link.txt", to: outside.appendingPathComponent("f.txt").path)
+
+        #expect(folder.refusal { try write(folder, bin, "out/f.txt", "x") } == "out is a symlink. Parley does not write through links.")
+        #expect(folder.refusal { try write(folder, bin, "out/new.txt", "x") } == "out is a symlink. Parley does not write through links.")
+        #expect(folder.refusal { try write(folder, bin, "in/f.txt", "x") } == "in is a symlink. Parley does not write through links.")
+        #expect(folder.refusal { try write(folder, bin, "f-link.txt", "x") } == "f-link.txt is a symlink. Parley does not write through or replace links.")
+        #expect(try String(contentsOf: outside.appendingPathComponent("f.txt"), encoding: .utf8) == "outside")
+        #expect(names(in: outside) == ["f.txt"])
+        #expect(try folder.read("real/f.txt") == "inside")
+        #expect(bin.moved.isEmpty)
+    }
+
+    @Test func aFolderOrAFileOnTheWayIsRefused() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        try folder.write("dir/x.txt", "x")
+        try folder.write("file.txt", "x")
+        #expect(folder.refusal { try write(folder, bin, "dir", "x") } == "dir is a folder.")
+        #expect(folder.refusal { try write(folder, bin, "file.txt/inner.txt", "x") } == "file.txt is a file, not a folder.")
+        #expect(folder.refusal { try write(folder, bin, ".", "x") } == "The shared folder is a folder. Give a file's path, such as notes.txt.")
+    }
+
+    @Test func finderHiddenItemsAreNotWritten() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        try folder.write("Library/x.txt", "x")
+        try hide(folder.url("Library"))
+        try folder.write("secret.txt", "old")
+        try hide(folder.url("secret.txt"))
+        #expect(folder.refusal { try write(folder, bin, "Library/y.txt", "x") } == "Library is hidden, so nothing can be written in it.")
+        #expect(folder.refusal { try write(folder, bin, "secret.txt", "x") } == "secret.txt is hidden, so it cannot be written.")
+        #expect(!FileManager.default.fileExists(atPath: folder.url("Library/y.txt").path))
+    }
+
+    @Test func tooMuchIsRefusedBeforeAnythingIsMade() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        let big = String(repeating: "x", count: BuiltInFiles.maxWriteBytes + 1)
+        #expect(folder.refusal { try write(folder, bin, "new/big.txt", big) }
+            == "The content is \(BuiltInFiles.maxWriteBytes + 1) bytes. Parley writes at most 4 MiB to one file.")
+        #expect(names(in: folder.root).isEmpty)
+    }
+
+    @Test func aCancelledWriteLeavesNothing() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        try folder.write("a.txt", "old")
+        let cancel = BuiltInCancelFlag()
+        cancel.cancel()
+        #expect(throws: CancellationError.self) { try write(folder, bin, "a.txt", "new", cancel: cancel) }
+        #expect(try folder.read("a.txt") == "old")
+        #expect(names(in: folder.root) == ["a.txt"])
+        #expect(bin.moved.isEmpty)
+    }
+
+    @Test func theFolderGoneIsSaidWithoutItsPath() throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        try FileManager.default.removeItem(at: folder.root)
+        #expect(folder.refusal { try write(folder, bin, "a.txt", "x") } == BuiltInFiles.Wording.sharedFolder.unavailable)
+    }
+
+    @Test func throughTheRunner() async throws {
+        let folder = try SharedFolder()
+        let bin = try Bin(folder)
+        let path = folder.root.path
+        let runner = BuiltInToolRunner(settings: { BuiltInToolSettings(enabled: ["write_file"], folderPath: path) }, trash: bin.trasher)
+        let tool = BuiltInTools.Tool.writeFile.definition
+        let made = await runner.call(tool, arguments: ["path": .string("a.txt"), "content": .string("hi")], timeout: 5, maxCharacters: 1000)
+        #expect(made.callStatus == .completed && made.text == "Created a.txt (2 bytes).")
+        let replaced = await runner.call(tool, arguments: ["path": .string("a.txt"), "content": .string("hello")], timeout: 5, maxCharacters: 1000)
+        #expect(replaced.text == "Wrote a.txt (5 bytes). The old version was moved to the Trash.")
+        let noContent = await runner.call(tool, arguments: ["path": .string("b.txt")], timeout: 5, maxCharacters: 1000)
+        #expect(noContent.callStatus == .toolError && noContent.text == "The tool reported an error:\n`content` must be a string.")
+        #expect(try bin.contents(1, "a.txt") == "hi")
+
+        let off = BuiltInToolRunner(settings: { BuiltInToolSettings(enabled: ["read_file"], folderPath: path) }, trash: bin.trasher)
+        let refused = await off.call(tool, arguments: ["path": .string("c.txt"), "content": .string("x")], timeout: 5, maxCharacters: 1000)
+        #expect(refused.callStatus == .notCalled)
+        #expect(!FileManager.default.fileExists(atPath: folder.url("c.txt").path))
     }
 }

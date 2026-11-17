@@ -1215,6 +1215,11 @@ enum SnapshotHarness {
                     tabs.selectedTabViewItemIndex = index
                     return true
                 }
+                await captureAutomaticApproval(appearance, tabNames: tabNames) { fresh, index in
+                    guard let tabs = fresh.contentViewController as? NSTabViewController, index < tabs.tabViewItems.count else { return false }
+                    tabs.selectedTabViewItemIndex = index
+                    return true
+                }
             }
         } else if let toolbar = window.toolbar, !toolbar.items.isEmpty {
             log("settings: no NSTabViewController (\(String(describing: window.contentViewController))); using the toolbar")
@@ -1229,6 +1234,13 @@ enum SnapshotHarness {
             if let index = tabNames.firstIndex(of: "built-in-tools"), index < toolbar.items.count {
                 window.close()
                 await captureBuiltInToolsOn(appearance) { fresh in
+                    guard let toolbar = fresh.toolbar, index < toolbar.items.count else { return false }
+                    let item = toolbar.items[index]
+                    toolbar.selectedItemIdentifier = item.itemIdentifier
+                    if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
+                    return true
+                }
+                await captureAutomaticApproval(appearance, tabNames: tabNames) { fresh, index in
                     guard let toolbar = fresh.toolbar, index < toolbar.items.count else { return false }
                     let item = toolbar.items[index]
                     toolbar.selectedItemIdentifier = item.itemIdentifier
@@ -1272,6 +1284,36 @@ enum SnapshotHarness {
                 capture(appearance, "settings-built-in-tools-on-end", window: fresh)
             } else {
                 skip("\(appearance) settings-built-in-tools-on-end (no scroll view)")
+            }
+            fresh.close()
+            await wait(0.4)
+        }
+    }
+
+    /// Tool Calls set to Run Automatically: General shows the caution notice, and the Built-in Tools
+    /// rows say they run without asking. Set before a fresh window opens, then put back to Manual.
+    private static func captureAutomaticApproval(_ appearance: String, tabNames: [String],
+                                                 select: @escaping (NSWindow, Int) -> Bool) async {
+        let settings = AppState.shared.settings
+        let before = settings.toolApproval
+        settings.toolApproval = .automatic
+        defer { settings.toolApproval = before }
+        await withBuiltInTools {
+            openSettingsWindow()
+            await waitFor(seconds: 3) { settingsWindow != nil }
+            await wait(0.6)
+            guard let fresh = settingsWindow else {
+                skip("\(appearance) settings-*-automatic (the window did not reopen)")
+                return
+            }
+            hideWindows()
+            for name in ["general", "built-in-tools"] {
+                guard let index = tabNames.firstIndex(of: name), select(fresh, index) else {
+                    skip("\(appearance) settings-\(name)-automatic (no such tab)")
+                    continue
+                }
+                await wait(0.8)
+                capture(appearance, "settings-\(name)-automatic", window: fresh)
             }
             fresh.close()
             await wait(0.4)

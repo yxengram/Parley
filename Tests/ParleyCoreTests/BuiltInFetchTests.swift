@@ -512,3 +512,103 @@ private func error(_ answer: BuiltInAnswer, sourceLocation: SourceLocation = #_s
         #expect(Date().timeIntervalSince(start) < 2)
     }
 }
+
+/// Pages in GBK, GB2312 or GB18030 that say so only inside the page, or not at all. Many Chinese
+/// sites send `text/html` with no charset and put it in a `<meta>`.
+@Suite struct BuiltInFetchCharsetTests {
+    private static let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringConvertIANACharSetNameToEncoding("gb18030" as CFString)))
+
+    private static func gbk(_ text: String) -> Data { text.data(using: gb18030)! }
+
+    private static func page(head: String, body: String) -> Data {
+        var data = Data("<!DOCTYPE html><html><head>\(head)<title>".utf8)
+        data.append(gbk("新闻"))
+        data.append(Data("</title></head><body><p>".utf8))
+        data.append(gbk(body))
+        data.append(Data("</p></body></html>".utf8))
+        return data
+    }
+
+    @Test func aMetaCharsetIsRead() async throws {
+        let web = try LoopbackWeb()
+        web.route("/a", type: "text/html", body: Self.page(head: "<meta charset=\"gb2312\">", body: "朱镕基喆中文"))
+        web.route("/b", type: "text/html", body: Self.page(head: "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=GBK\">", body: "欢迎光临"))
+        web.route("/c", type: "text/html", body: Self.page(head: "<!-- <meta charset=\"big5\"> --><meta http-equiv=content-type content='text/html;charset=gb18030'>", body: "价格€"))
+        #expect(text(await onLoopback.fetch(web.origin + "/a")).hasSuffix("新闻\n\n朱镕基喆中文"))
+        #expect(text(await onLoopback.fetch(web.origin + "/b")).hasSuffix("新闻\n\n欢迎光临"))
+        #expect(text(await onLoopback.fetch(web.origin + "/c")).hasSuffix("新闻\n\n价格€"))
+    }
+
+    @Test func anXMLDeclarationIsRead() async throws {
+        let web = try LoopbackWeb()
+        var feed = Data("<?xml version=\"1.0\" encoding=\"gb2312\"?>\n<rss><channel><title>".utf8)
+        feed.append(Self.gbk("今日要闻"))
+        feed.append(Data("</title></channel></rss>".utf8))
+        web.route("/feed", type: "application/rss+xml", body: feed)
+        #expect(text(await onLoopback.fetch(web.origin + "/feed")).contains("<title>今日要闻</title>"))
+    }
+
+    @Test func anUndeclaredPageThatIsNotUTF8IsTriedAsGB18030() async throws {
+        let web = try LoopbackWeb()
+        web.route("/gbk", type: "text/html", body: Self.page(head: "", body: "没有声明编码的网页"))
+        web.route("/utf8", type: "text/html", "<html><body><p>没有声明的 UTF-8</p></body></html>")
+        #expect(text(await onLoopback.fetch(web.origin + "/gbk")).hasSuffix("新闻\n\n没有声明编码的网页"))
+        #expect(text(await onLoopback.fetch(web.origin + "/utf8")).hasSuffix("没有声明的 UTF-8"))
+    }
+
+    @Test func theGBKFamilyIsReadAsGB18030() {
+        // 0x80 is € in GBK as browsers read it, and not in Foundation's own GBK.
+        let body = Self.gbk("€价格") + Data([0x80])
+        for label in ["gbk", "GBK", "gb2312", "x-gbk", "cp936", "gb18030", "\"GB2312\""] {
+            #expect(BuiltInFetcher.decode(body, charset: label, wasCut: false) == "€价格€", "\(label)")
+        }
+    }
+
+    @Test func aByteOrderMarkComesFirst() {
+        var body = Data([0xEF, 0xBB, 0xBF])
+        body.append(Data("<meta charset=\"gbk\">中文".utf8))
+        #expect(BuiltInFetcher.decode(body, charset: "gbk", type: "text/html", wasCut: false) == "<meta charset=\"gbk\">中文")
+        var utf16 = Data([0xFF, 0xFE])
+        utf16.append("中文".data(using: .utf16LittleEndian)!)
+        #expect(BuiltInFetcher.decode(utf16, charset: nil, wasCut: false) == "中文")
+    }
+
+    @Test func theHeaderWinsUnlessItsBytesAreNotThatEncoding() {
+        // A server that says UTF-8 for every page, on a page that is GBK and says so.
+        let gbkPage = Self.page(head: "<meta charset=\"gbk\">", body: "中文")
+        #expect(HTMLText.plain(BuiltInFetcher.decode(gbkPage, charset: "utf-8", type: "text/html", wasCut: false)).hasSuffix("中文"))
+        // Valid in both: the header is believed.
+        let utf8Page = Data("<meta charset=\"gbk\"><p>abc</p>".utf8)
+        #expect(BuiltInFetcher.decode(utf8Page, charset: "utf-8", type: "text/html", wasCut: false) == "<meta charset=\"gbk\"><p>abc</p>")
+    }
+
+    @Test func aUTF8PageCutInsideACharacterIsStillUTF8() {
+        var body = Data("<p>中文".utf8)
+        body.append(contentsOf: Array("文".utf8).prefix(2))
+        #expect(BuiltInFetcher.decode(body, charset: nil, type: "text/html", wasCut: true) == "<p>中文")
+    }
+
+    @Test func latin1KeepsEveryByteAsBrowsersDo() {
+        // 0x81 is undefined in Windows-1252; browsers show it as U+0081 rather than lose the line.
+        let body = Data([0x3C, 0x70, 0x3E, 0x63, 0x61, 0x66, 0xE9, 0x81, 0x80, 0x3C, 0x2F, 0x70, 0x3E])
+        for label in ["iso-8859-1", "latin1", "windows-1252"] {
+            #expect(BuiltInFetcher.decode(body, charset: label, wasCut: false) == "<p>caf\u{E9}\u{81}\u{20AC}</p>", "\(label)")
+        }
+    }
+
+    @Test func brokenUTF16LosesOnlyTheBrokenUnit() {
+        // A BOM, then "<p>中</p>" in UTF-16LE with one lone surrogate and a stray last byte.
+        var body = Data([0xFF, 0xFE])
+        body.append("<p>中".data(using: .utf16LittleEndian)!)
+        body.append(contentsOf: [0x00, 0xD8])
+        body.append("</p>".data(using: .utf16LittleEndian)!)
+        body.append(0x41)
+        #expect(BuiltInFetcher.decode(body, charset: nil, type: "text/html", wasCut: false) == "<p>中\u{FFFD}</p>")
+    }
+
+    @Test func binaryLookingBytesAreNotTakenForGB18030() {
+        // Valid GB18030 by its byte rules, but with control characters no text has.
+        let bytes = Data([0x01, 0x02, 0xB0, 0xA1, 0x03, 0x04, 0x05])
+        #expect(BuiltInFetcher.decode(bytes, charset: nil, wasCut: false) == String(decoding: bytes, as: UTF8.self))
+    }
+}

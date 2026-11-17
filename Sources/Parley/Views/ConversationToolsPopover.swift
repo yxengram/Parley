@@ -112,7 +112,7 @@ struct ConversationToolsPopover: View {
                 .pickerStyle(.menu)
                 .controlSize(.small)
                 if usesReAct {
-                    Text("For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow.")
+                    Text("For models and servers without tool support. Tools go to the model as text in the system prompt. In Manual Approval every call asks first, even for a tool you always allow.")
                         .font(.caption)
                         .foregroundStyle(Hideout.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)

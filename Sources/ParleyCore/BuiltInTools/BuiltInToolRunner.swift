@@ -25,13 +25,16 @@ final class BuiltInToolRunner: Sendable {
     private let browser: BuiltInBrowser?
     private let now: @Sendable () -> Date
     private let timeZone: @Sendable () -> TimeZone
+    /// Where `write_file` puts the old version of a file it replaces.
+    private let trash: BuiltInFiles.Trasher
 
     init(settings: @escaping @Sendable () async -> BuiltInToolSettings, fetcher: BuiltInFetcher = BuiltInFetcher(),
-         browser: BuiltInBrowser? = nil,
+         browser: BuiltInBrowser? = nil, trash: @escaping BuiltInFiles.Trasher = BuiltInFiles.moveToTrash,
          now: @escaping @Sendable () -> Date = { Date() }, timeZone: @escaping @Sendable () -> TimeZone = { TimeZone.current }) {
         self.settings = settings
         self.fetcher = fetcher
         self.browser = browser
+        self.trash = trash
         self.now = now
         self.timeZone = timeZone
     }
@@ -65,8 +68,8 @@ final class BuiltInToolRunner: Sendable {
             answer = .text(Self.timeText(now(), zone: timeZone()))
         case .calculate:
             answer = Self.calculate(arguments)
-        case .listFiles, .readFile:
-            let files = BuiltInFiles(rootPath: current.folderPath ?? "")
+        case .listFiles, .readFile, .writeFile:
+            let files = BuiltInFiles(rootPath: current.folderPath ?? "", trash: trash)
             answer = await Self.race(timeout: timeout) { await Self.onOwnThread { cancel in
                 Self.fileAnswer(builtIn, files: files, arguments: arguments, maxCharacters: maxCharacters, cancel: cancel)
             } }
@@ -222,6 +225,10 @@ final class BuiltInToolRunner: Sendable {
                 return .text(try files.list(path: arguments["path"]?.stringValue, cancel: cancel))
             }
             guard let path = arguments["path"]?.stringValue else { return .error("`path` must be a string.") }
+            if tool == .writeFile {
+                guard let content = arguments["content"]?.stringValue else { return .error("`content` must be a string.") }
+                return .text(try files.write(path: path, content: content, cancel: cancel))
+            }
             var startLine = 1
             if let value = arguments["start_line"], !value.isNull {
                 guard let number = value.intValue, number >= 1, number <= Int32.max else {
@@ -235,7 +242,7 @@ final class BuiltInToolRunner: Sendable {
         } catch is CancellationError {
             return .cancelled
         } catch {
-            return .error("The file could not be read.")
+            return .error(tool == .writeFile ? "The file could not be written." : "The file could not be read.")
         }
     }
 

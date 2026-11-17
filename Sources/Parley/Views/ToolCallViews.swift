@@ -83,10 +83,16 @@ enum ToolDisplay {
     }
 
     /// "filesystem › read_file", or the name the model used when it matches no tool.
-    /// An activate_skill call also names the skill (and the file it reads), so a row says which.
+    /// An activate_skill call also names the skill (and the file it reads), and a write_file call the
+    /// file it writes, so a row says which even when no card asked first.
     static func title(_ call: ToolCallRecord) -> String {
         let tool = line(call.toolName ?? call.name)
         let base = call.serverName.map { "\(short(line($0))) › \(tool)" } ?? tool
+        if call.serverID == BuiltInTools.serverID, call.toolName == BuiltInTools.Tool.writeFile.rawValue,
+           case .object(let arguments)? = JSONValue(jsonText: call.arguments),
+           let path = arguments["path"]?.stringValue, !path.isEmpty {
+            return "\(base): \(line(path))"
+        }
         guard call.serverID == BuiltInTools.serverID, call.toolName == BuiltInTools.skillToolName,
               case .object(let arguments)? = JSONValue(jsonText: call.arguments),
               let name = arguments["name"]?.stringValue, !name.isEmpty else { return base }

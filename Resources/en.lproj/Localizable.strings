@@ -68,7 +68,7 @@
 "A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use." = "A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use.";
 "A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T)." = "A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T).";
 "A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them." = "A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them.";
-"A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new." = "A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new.";
+"A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks, unless tool calls run automatically (Settings > General). Hidden files are never listed, read or written, and the model is never told where the folder is. With every tool off, Parley reads no file, writes none and contacts nothing new." = "A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks, unless tool calls run automatically (Settings > General). Hidden files are never listed, read or written, and the model is never told where the folder is. With every tool off, Parley reads no file, writes none and contacts nothing new.";
 "About %lld lines. Scroll to see all of them." = "About %lld lines. Scroll to see all of them.";
 "About Parley" = "About Parley";
 "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use %@, or a hostname without an Access policy that requires sign-in." = "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use %@, or a hostname without an Access policy that requires sign-in.";
@@ -92,12 +92,15 @@
 "API key" = "API key";
 "API keys are stored in your login Keychain and never synced. Local servers usually need no key." = "API keys are stored in your login Keychain and never synced. Local servers usually need no key.";
 "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices." = "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices.";
+"Approval" = "Approval";
 "Arguments" = "Arguments";
 "Arguments and environment values go to your login Keychain." = "Arguments and environment values go to your login Keychain.";
 "Arguments, one per line" = "Arguments, one per line";
 "Arguments, the URL, environment values and headers are stored in your login Keychain (not synced)." = "Arguments, the URL, environment values and headers are stored in your login Keychain (not synced).";
 "Ask %@ again" = "Ask %@ again";
 "Ask the model to answer this message" = "Ask the model to answer this message";
+"Asks every time and shows the host." = "Asks every time and shows the host.";
+"Asks every time." = "Asks every time.";
 "Assistant" = "Assistant";
 "Assistant, %@, %@" = "Assistant, %@, %@";
 "Assistant, unknown model, %@" = "Assistant, unknown model, %@";
@@ -118,6 +121,8 @@
 "Built-in tool, opens %@ in a private browser, loading only from that site" = "Built-in tool, opens %@ in a private browser, loading only from that site";
 "Built-in tool, opens %@ in a private browser; its scripts may contact other public sites" = "Built-in tool, opens %@ in a private browser; its scripts may contact other public sites";
 "Built-in tool, reads %@ from the skill %@" = "Built-in tool, reads %@ from the skill %@";
+"Built-in tool, writes %@ (%@) in folder %@" = "Built-in tool, writes %@ (%@) in folder %@";
+"Built-in tool, writes in folder %@" = "Built-in tool, writes in folder %@";
 "Built-in Tools" = "Built-in Tools";
 "Built-in tools" = "Built-in tools";
 "Calculator" = "Calculator";
@@ -217,8 +222,9 @@
 "Couldn't load models from %@: %@" = "Couldn't load models from %@: %@";
 "Couldn't load models: %@" = "Couldn't load models: %@";
 "Create" = "Create";
+"Creates or replaces text files in the folder above, as UTF-8. A file it replaces goes to the Trash first." = "Creates or replaces text files in the folder above, as UTF-8. A file it replaces goes to the Trash first.";
 "Current Time" = "Current Time";
-"Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks." = "Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks.";
+"Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Write File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks. With Tool Calls set to Run Automatically in Settings > General, no call asks, these and ReAct calls included." = "Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Write File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks. With Tool Calls set to Run Automatically in Settings > General, no call asks, these and ReAct calls included.";
 "Custom Model ID" = "Custom Model ID";
 "Custom Model ID…" = "Custom Model ID…";
 "Default" = "Default";
@@ -242,6 +248,7 @@
 "e.g. 16384" = "e.g. 16384";
 "e.g. 32768" = "e.g. 32768";
 "e.g. qwen3-14b-instruct" = "e.g. qwen3-14b-instruct";
+"Each call that reads or writes files, contacts a website or uses an MCP tool waits for your Allow, except MCP tools you have set to Always Allow. In ReAct mode every call asks." = "Each call that reads or writes files, contacts a website or uses an MCP tool waits for your Allow, except MCP tools you have set to Always Allow. In ReAct mode every call asks.";
 "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat." = "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat.";
 "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not." = "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not.";
 "Each skin has an afternoon and a lights-out look, which follow the system appearance." = "Each skin has an afternoon and a lights-out look, which follow the system appearance.";
@@ -274,8 +281,9 @@
 "Environment" = "Environment";
 "Error: %@" = "Error: %@";
 "Estimated from the text; the server's count replaces it after the next reply." = "Estimated from the text; the server's count replaces it after the next reply.";
-"Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call." = "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call.";
+"Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General." = "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General.";
 "Every MCP server is switched off. Turn one on in Settings > MCP." = "Every MCP server is switched off. Turn one on in Settings > MCP.";
+"Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash." = "Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash.";
 "Failed" = "Failed";
 "Fetch Web Page" = "Fetch Web Page";
 "Fetch Web Page contacts the website directly from this Mac, so the site sees your IP address. It runs no scripts, loads no images, and sends no cookies, API keys or MCP headers. Private and local addresses are refused, and a redirect to another address is reported to the model instead of followed, so a new address means a new card." = "Fetch Web Page contacts the website directly from this Mac, so the site sees your IP address. It runs no scripts, loads no images, and sends no cookies, API keys or MCP headers. Private and local addresses are refused, and a redirect to another address is reported to the model instead of followed, so a new address means a new card.";
@@ -283,7 +291,7 @@
 "Files" = "Files";
 "Finished" = "Finished";
 "Folder" = "Folder";
-"For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow." = "For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow.";
+"For models and servers without tool support. Tools go to the model as text in the system prompt. In Manual Approval every call asks first, even for a tool you always allow." = "For models and servers without tool support. Tools go to the model as text in the system prompt. In Manual Approval every call asks first, even for a tool you always allow.";
 "Forgotten passwords can't be recovered." = "Forgotten passwords can't be recovered.";
 "Fork" = "Fork";
 "Fork copies the conversation up to that message into a new file. Roll Back deletes everything after the message." = "Fork copies the conversation up to that message into a new file. Roll Back deletes everything after the message.";
@@ -293,7 +301,7 @@
 "From the server: " = "From the server: ";
 "General" = "General";
 "Get Reply" = "Get Reply";
-"Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host." = "Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host.";
+"Gets one public web page, directly from this Mac, so the site sees your IP address." = "Gets one public web page, directly from this Mac, so the site sees your IP address.";
 "Getting started" = "Getting started";
 "Headers" = "Headers";
 "Hide Details" = "Hide Details";
@@ -351,7 +359,7 @@
 "Let's build the fort" = "Let's build the fort";
 "Limit" = "Limit";
 "List Files" = "List Files";
-"List Files and Read File work inside the one folder you choose in Settings, and only after you choose it. They read, never write. Hidden files are never listed or read, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it." = "List Files and Read File work inside the one folder you choose in Settings, and only after you choose it. They read, never write. Hidden files are never listed or read, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it.";
+"List Files, Read File and Write File work inside the one folder you choose in Settings, and only after you choose it. Read File reads text in UTF-8, UTF-16, and GBK or other Chinese encodings. Write File creates or replaces text files, as UTF-8, and makes folders on the way; a file it replaces is moved to the Trash first. It never writes through a link. Hidden files are never listed, read or written, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it." = "List Files, Read File and Write File work inside the one folder you choose in Settings, and only after you choose it. Read File reads text in UTF-8, UTF-16, and GBK or other Chinese encodings. Write File creates or replaces text files, as UTF-8, and makes folders on the way; a file it replaces is moved to the Trash first. It never writes through a link. Hidden files are never listed, read or written, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it.";
 "LM Studio can load this model with up to %@ tokens." = "LM Studio can load this model with up to %@ tokens.";
 "LM Studio can reload this model with a different context length." = "LM Studio can reload this model with a different context length.";
 "LM Studio on %@ unloads the model and loads it again. This affects every app using the model on that server: replies in progress are cut off and the prompt cache is cleared. Loading can take a while; if memory runs out, the model stays unloaded. A model loaded this way may stay in memory until it is unloaded in LM Studio." = "LM Studio on %@ unloads the model and loads it again. This affects every app using the model on that server: replies in progress are cut off and the prompt cache is cleared. Loading can take a while; if memory runs out, the model stays unloaded. A model loaded this way may stay in memory until it is unloaded in LM Studio.";
@@ -371,6 +379,7 @@
 "Lower Max tokens in Conversation Settings (⌘I), or turn it off so Strata uses the room left." = "Lower Max tokens in Conversation Settings (⌘I), or turn it off so Strata uses the room left.";
 "Lower Max tokens to at most %@ in Conversation Settings (⌘I), or turn it off so Strata uses the room left." = "Lower Max tokens to at most %@ in Conversation Settings (⌘I), or turn it off so Strata uses the room left.";
 "Make Default" = "Make Default";
+"Manual Approval" = "Manual Approval";
 "max %@" = "max %@";
 "Max Tokens" = "Max Tokens";
 "Max tokens does not fit in the model's context" = "Max tokens does not fit in the model's context";
@@ -390,7 +399,7 @@
 "Move to Trash" = "Move to Trash";
 "Move to Trash…" = "Move to Trash…";
 "Name" = "Name";
-"Names and sizes in the folder above, one level at a time. Asks every time." = "Names and sizes in the folder above, one level at a time. Asks every time.";
+"Names and sizes in the folder above, one level at a time." = "Names and sizes in the folder above, one level at a time.";
 "Native" = "Native";
 "New Chat" = "New Chat";
 "New Chat (⌘N)" = "New Chat (⌘N)";
@@ -445,7 +454,7 @@
 "Open this link in your browser?" = "Open this link in your browser?";
 "OpenAI-compatible API" = "OpenAI-compatible API";
 "Opening sends the whole address to this site, including anything a model put in it." = "Opening sends the whole address to this site, including anything a model put in it.";
-"Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host." = "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host.";
+"Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards." = "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards.";
 "optional" = "optional";
 "Parameters" = "Parameters";
 "Parley" = "Parley";
@@ -454,9 +463,9 @@
 "Parley Help" = "Parley Help";
 "Parley loads at most 200 skills." = "Parley loads at most 200 skills.";
 "Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored." = "Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored.";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac.";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config.";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically. No telemetry; conversations stay in files on this Mac." = "Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically. No telemetry; conversations stay in files on this Mac.";
 "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported." = "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported.";
 "Parley will contact this sign-in provider, then open it in your browser:" = "Parley will contact this sign-in provider, then open it in your browser:";
 "Parley's skills folder could not be created." = "Parley's skills folder could not be created.";
@@ -555,6 +564,7 @@
 "Roll back to here" = "Roll back to here";
 "Roll Back to Here…" = "Roll Back to Here…";
 "Roll back to this message?" = "Roll back to this message?";
+"Run Automatically" = "Run Automatically";
 "Running %@…" = "Running %@…";
 "Running…" = "Running…";
 "Runs a shell command line rather than a program." = "Runs a shell command line rather than a program.";
@@ -563,6 +573,8 @@
 "Runs on your Mac with your permissions. One argument per line." = "Runs on your Mac with your permissions. One argument per line.";
 "Runs this program on your Mac with your permissions." = "Runs this program on your Mac with your permissions.";
 "Runs with sudo: the server would have administrator rights." = "Runs with sudo: the server would have administrator rights.";
+"Runs without asking." = "Runs without asking.";
+"Runs without asking: tool calls are set to run automatically in Settings > General." = "Runs without asking: tool calls are set to run automatically in Settings > General.";
 "Save" = "Save";
 "Save Key" = "Save Key";
 "Saved" = "Saved";
@@ -582,7 +594,7 @@
 "Server (its own claim)" = "Server (its own claim)";
 "Server: %@" = "Server: %@";
 "Sets %@=%@, which changes what code runs." = "Sets %@=%@, which changes what code runs.";
-"Settings > Built-in Tools has six tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file and contacts nothing new." = "Settings > Built-in Tools has six tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file and contacts nothing new.";
+"Settings > Built-in Tools has seven tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file, writes none and contacts nothing new." = "Settings > Built-in Tools has seven tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file, writes none and contacts nothing new.";
 "Settings that are off use the server's default." = "Settings that are off use the server's default.";
 "Settings…" = "Settings…";
 "Short passwords are easy to guess. Use at least 8 characters." = "Short passwords are easy to guess. Use at least 8 characters.";
@@ -651,7 +663,7 @@
 "System Prompt" = "System Prompt";
 "Temperature" = "Temperature";
 "Test Connection" = "Test Connection";
-"Text files in the folder above. Asks every time." = "Text files in the folder above. Asks every time.";
+"Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings)." = "Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings).";
 "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request." = "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request.";
 "The %lld messages after this one will be deleted from the conversation." = "The %lld messages after this one will be deleted from the conversation.";
 "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it." = "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it.";
@@ -678,7 +690,7 @@
 "The conversation plus Max tokens (%@) is more than the context (%@ tokens)." = "The conversation plus Max tokens (%@) is more than the context (%@ tokens).";
 "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read." = "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read.";
 "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard." = "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard.";
-"The date, time and time zone of this Mac. Runs without asking." = "The date, time and time zone of this Mac. Runs without asking.";
+"The date, time and time zone of this Mac." = "The date, time and time zone of this Mac.";
 "The description is longer than 1,024 characters. The model sees only the first 1,024." = "The description is longer than 1,024 characters. The model sees only the first 1,024.";
 "The file could not be written and is still encrypted. %@" = "The file could not be written and is still encrypted. %@";
 "The file is not a zip archive Parley can read." = "The file is not a zip archive Parley can read.";
@@ -796,7 +808,8 @@
 "Tokens" = "Tokens";
 "Too many requests" = "Too many requests";
 "Tool calling" = "Tool calling";
-"Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. Every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model." = "Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. Every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model.";
+"Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. In Manual Approval every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote; with Run Automatically it runs without asking. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model." = "Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. In Manual Approval every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote; with Run Automatically it runs without asking. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model.";
+"Tool Calls" = "Tool Calls";
 "Tool definitions take about %@ tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T)." = "Tool definitions take about %@ tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T).";
 "Tool definitions: about %@ tokens per request." = "Tool definitions: about %@ tokens per request.";
 "Tool error" = "Tool error";
@@ -847,13 +860,14 @@
 "Waiting for your approval" = "Waiting for your approval";
 "Waiting for your approval of a tool call" = "Waiting for your approval of a tool call";
 "Web" = "Web";
-"What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address. That is why these tools have no Always Allow: check the arguments on each card, the address above all." = "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address. That is why these tools have no Always Allow: check the arguments on each card, the address above all.";
+"What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away." = "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away.";
 "Where files live" = "Where files live";
 "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image." = "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image.";
 "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back." = "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back.";
 "Working folder" = "Working folder";
 "Working folder: %@" = "Working folder: %@";
-"Works out arithmetic on this Mac. Runs without asking." = "Works out arithmetic on this Mac. Runs without asking.";
+"Works out arithmetic on this Mac." = "Works out arithmetic on this Mac.";
+"Write File" = "Write File";
 "Wrong password, or the file has been tampered with." = "Wrong password, or the file has been tampered with.";
 "Yesterday" = "Yesterday";
 "Your context length in tokens" = "Your context length in tokens";

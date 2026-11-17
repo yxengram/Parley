@@ -178,7 +178,7 @@ struct BuiltInFetcher: Sendable {
             return .done(.error("Not a text page: \(type.isEmpty ? "no content type" : type), \(size). Nothing was read."))
         }
 
-        let decoded = Self.decode(body, charset: http.textEncodingName, wasCut: wasCut)
+        let decoded = Self.decode(body, charset: http.textEncodingName, type: type, wasCut: wasCut)
         let isHTML = type == "text/html" || type == "application/xhtml+xml"
         var out = "URL: \(url.absoluteString)\nType: \(type)\n"
         if wasCut { out += "Note: this page is larger than 2 MiB. Only the start was read.\n" }
@@ -256,28 +256,45 @@ struct BuiltInFetcher: Sendable {
             || ["application/json", "application/xml", "application/xhtml+xml"].contains(type)
     }
 
-    /// By the charset header, else UTF-8, where a bad byte becomes U+FFFD. A page's own <meta> is not read.
-    static func decode(_ data: Data, charset: String?, wasCut: Bool) -> String {
-        if let charset {
-            // GB2312 is how GBK pages usually label themselves, and browsers read it as GBK.
-            let name = charset.lowercased() == "gb2312" ? "gbk" : charset
-            let encoding = CFStringConvertIANACharSetNameToEncoding(name as CFString)
-            if encoding != kCFStringEncodingInvalidId {
-                let declared = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding))
-                if let text = String(data: data, encoding: declared) { return text }
-                // That is all or nothing, and the cap alone can cut a character. Stay in the declared
-                // encoding: read as UTF-8, one bad byte would turn the whole page into U+FFFD.
-                if declared != .utf8 {
-                    if wasCut {
-                        for cut in 1...3 where cut < data.count {
-                            if let text = String(data: data.dropLast(cut), encoding: declared) { return text }
-                        }
-                    }
-                    return decodeInPieces(data, encoding: declared)
-                }
-            }
+    /// In order: a byte order mark; the charset header; the page's own `<meta>` (HTML) or XML
+    /// declaration. A declared encoding is used if the bytes really are that encoding, the next one
+    /// is tried if not (a server that labels every page UTF-8, on a GBK page that says GBK), and the
+    /// first one is kept, piece by piece, if none fits. With nothing declared: UTF-8, then GB18030
+    /// (`TextDecoding.guessedGB18030`), then UTF-8 with U+FFFD for each bad byte.
+    static func decode(_ data: Data, charset: String?, type: String = "", wasCut: Bool) -> String {
+        if let (encoding, length) = TextDecoding.byteOrderMark(data) {
+            let body = data.dropFirst(length)
+            return TextDecoding.strict(body, encoding, wasCut: wasCut) ?? lossy(body, encoding: encoding)
         }
+        let isHTML = type == "text/html" || type == "application/xhtml+xml"
+        var declared: [String.Encoding] = []
+        for label in [charset, TextDecoding.declaredLabel(in: data, isHTML: isHTML)] {
+            // A page cannot be UTF-16 and also have readable ASCII in it: browsers read that label as UTF-8.
+            guard let label, var encoding = TextDecoding.encoding(forLabel: label) else { continue }
+            if label != charset, encoding == .utf16LittleEndian || encoding == .utf16BigEndian { encoding = .utf8 }
+            if !declared.contains(encoding) { declared.append(encoding) }
+        }
+        for encoding in declared {
+            if let text = TextDecoding.strict(data, encoding, wasCut: wasCut) { return text }
+        }
+        if let first = declared.first {
+            // Stay in the declared encoding: read as UTF-8, one bad byte would turn the whole page into U+FFFD.
+            return lossy(data, encoding: first)
+        }
+        if let text = TextDecoding.strict(data, .utf8, wasCut: wasCut) { return text }
+        if let text = TextDecoding.guessedGB18030(data, wasCut: wasCut) { return text }
         return String(decoding: data, as: UTF8.self)
+    }
+
+    /// What will not decode strictly, in its own encoding: UTF-8 and UTF-16 with U+FFFD for each bad
+    /// sequence, any other piece by piece.
+    private static func lossy(_ data: Data, encoding: String.Encoding) -> String {
+        switch encoding {
+        case .utf8: return String(decoding: data, as: UTF8.self)
+        case .utf16LittleEndian: return TextDecoding.lossyUTF16(data, bigEndian: false)
+        case .utf16BigEndian: return TextDecoding.lossyUTF16(data, bigEndian: true)
+        default: return decodeInPieces(data, encoding: encoding)
+        }
     }
 
     /// Keeps a bad byte to its own line or text node. `<`, `>` and newline are never part of a character

@@ -541,6 +541,19 @@ private func pixelSize(of data: Data) -> (Int, Int)? {
 }
 
 @Suite struct AttachmentLoaderTests {
+    @Test func aGBKTextFileIsAttachedAsText() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringConvertIANACharSetNameToEncoding("gb18030" as CFString)))
+        for name in ["笔记.txt", "readme"] {
+            let url = dir.appendingPathComponent(name)
+            try "会议记录：明天十点\n".data(using: gb18030)!.write(to: url)
+            #expect(AttachmentLoader.isSupported(url: url), "\(name)")
+            let a = try AttachmentLoader.load(url: url)
+            #expect(a.kind == .text && a.text == "会议记录：明天十点\n", "\(name)")
+        }
+    }
+
     @Test func smallPNGWithAlphaStaysPNG() throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

@@ -20,6 +20,7 @@ public enum BuiltInTools {
         case calculate
         case listFiles = "list_files"
         case readFile = "read_file"
+        case writeFile = "write_file"
         case fetchURL = "fetch_url"
         case browseURL = "browse_url"
 
@@ -30,16 +31,19 @@ public enum BuiltInTools {
             case .calculate: return "Calculator"
             case .listFiles: return "List Files"
             case .readFile: return "Read File"
+            case .writeFile: return "Write File"
             case .fetchURL: return "Fetch Web Page"
             case .browseURL: return "Browse Web Page"
             }
         }
 
         /// Does nothing until a folder is chosen in Settings.
-        public var needsFolder: Bool { self == .listFiles || self == .readFile }
+        public var needsFolder: Bool { self == .listFiles || self == .readFile || self == .writeFile }
 
-        /// Reads the user's files or contacts a website, so there is no Always Allow: a page or file
-        /// can tell the model to send what it read somewhere, and each card is where that stops.
+        /// Reads or writes the user's files or contacts a website, so there is no Always Allow: a page
+        /// or file can tell the model to send what it read somewhere, or to write over a file, and in
+        /// Manual approval each card is where that stops. (Automatic approval, a setting the user
+        /// chooses, runs every call without a card: see `ToolApprovalMode`.)
         public var asksEveryTime: Bool { needsFolder || contactsWebsites }
 
         /// Fetch and Browse: the card names the host.
@@ -55,15 +59,20 @@ public enum BuiltInTools {
                     + "Angles are in radians; log is base 10, ln is natural."
             case .listFiles:
                 return "Lists one folder inside the folder the user shared, not recursively. Paths are relative to that "
-                    + "folder, whose own path is \".\". Hidden files are never shown. The user approves every call."
+                    + "folder, whose own path is \".\". Hidden files are never shown. The user may be asked to approve each call."
             case .readFile:
-                return "Reads a UTF-8 text file inside the folder the user shared. Paths are relative to that folder. "
+                return "Reads a text file (UTF-8, UTF-16 or GB18030/GBK) inside the folder the user shared. Paths are relative to that folder. "
                     + "A long file comes back in parts: the result says how to ask for the next one. Hidden files "
-                    + "cannot be read. The user approves every call."
+                    + "cannot be read. The user may be asked to approve each call."
+            case .writeFile:
+                return "Writes a text file, as UTF-8, inside the folder the user shared. Paths are relative to that folder; "
+                    + "folders missing on the way are created. If the file exists it is replaced, and the old version is "
+                    + "moved to the user's Trash. Hidden files, symlinks and folders cannot be written. At most 4 MiB. "
+                    + "The user may be asked to approve each call."
             case .fetchURL:
                 return "Fetches one public web page over http or https and returns its text. Scripts are not run and "
                     + "images are not loaded. Private and local addresses are refused. A redirect to another address "
-                    + "is reported, not followed. The user approves every call."
+                    + "is reported, not followed. The user may be asked to approve each call."
             case .browseURL:
                 return "Opens one public web page over http or https in a private browser that runs its scripts, waits for "
                     + "the page to render, and returns its address, title and visible text. Use it for a page that "
@@ -71,7 +80,7 @@ public enum BuiltInTools {
                     + "video and fonts are not loaded, and nothing is kept afterwards. The page may load only from its "
                     + "own site unless the user has allowed other sites in Settings; the result says what was blocked. "
                     + "Private and local addresses are refused, for the page and for everything it loads. Going to "
-                    + "another address is reported, not followed. The user approves every call."
+                    + "another address is reported, not followed. The user may be asked to approve each call."
             }
         }
 
@@ -96,6 +105,10 @@ public enum BuiltInTools {
                     "description": .string("The first line to return, counted from 1. Leave it out to start at the top."),
                 ])
                 required = ["path"]
+            case .writeFile:
+                properties["path"] = string("The file, relative to the shared folder, for example notes/summary.md.")
+                properties["content"] = string("The whole text of the file.")
+                required = ["path", "content"]
             case .fetchURL:
                 properties["url"] = string("The full http or https address.")
                 required = ["url"]
@@ -206,7 +219,8 @@ public enum BuiltInTools {
         return Tool(rawValue: binding.tool.name)?.asksEveryTime ?? true
     }
 
-    /// True for a call that works in the shared folder, whose Allow means the folder its card named.
+    /// True for a call that works in the shared folder (reading or writing), whose Allow means the
+    /// folder its card named.
     public static func readsFolder(_ binding: MCPToolBinding) -> Bool {
         binding.serverID == serverID && Tool(rawValue: binding.tool.name)?.needsFolder == true
     }
@@ -240,6 +254,15 @@ public enum BuiltInTools {
             return browseOtherSites
                 ? String(localized: "Built-in tool, opens \(host) in a private browser; its scripts may contact other public sites")
                 : String(localized: "Built-in tool, opens \(host) in a private browser, loading only from that site")
+        case .writeFile?:
+            guard let folderPath, !folderPath.isEmpty else { return plain }
+            let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
+            guard let path = arguments["path"]?.stringValue, !path.isEmpty else {
+                return String(localized: "Built-in tool, writes in folder \(folderName)")
+            }
+            let size = ByteCountFormatter.string(fromByteCount: Int64(arguments["content"]?.stringValue?.utf8.count ?? 0), countStyle: .file)
+            // Short, with the path early: the card's line holds two lines and cuts in the middle.
+            return String(localized: "Built-in tool, writes \(path) (\(size)) in folder \(folderName)")
         case let tool? where tool.needsFolder:
             guard let folderPath, !folderPath.isEmpty else { return plain }
             let folderName = URL(fileURLWithPath: folderPath).lastPathComponent

@@ -756,6 +756,35 @@ private struct SkinCard: View {
     }
 }
 
+/// Settings > General > Tool calls: Manual approval or Automatic (`ToolApprovalMode`).
+struct ToolApprovalSection: View {
+    @Environment(AppState.self) private var appState
+
+    static let manualExplanation = String(localized: "Each call that reads or writes files, contacts a website or uses an MCP tool waits for your Allow, except MCP tools you have set to Always Allow. In ReAct mode every call asks.")
+    static let automaticWarning = String(localized: "Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash.")
+
+    var body: some View {
+        @Bindable var settings = appState.settings
+        SettingsSection("Tool Calls", seed: 44) {
+            Picker(selection: $settings.toolApproval) {
+                Text("Manual Approval").tag(ToolApprovalMode.manual)
+                Text("Run Automatically").tag(ToolApprovalMode.automatic)
+            } label: {
+                Text("Approval")
+            }
+            .pickerStyle(.segmented)
+            if settings.toolApproval == .automatic {
+                SettingsNotice(.caution, Self.automaticWarning, systemImage: "exclamationmark.triangle")
+            } else {
+                Text(verbatim: Self.manualExplanation)
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 private struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
 
@@ -810,6 +839,8 @@ private struct GeneralSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            ToolApprovalSection()
+
             SettingsSection("Display", seed: 42) {
                 SettingsSwitchRow(isOn: $settings.showTokenUsage) {
                     Text("Show token usage under replies")
@@ -818,7 +849,7 @@ private struct GeneralSettingsView: View {
 
             SettingsSection("Privacy", seed: 43, tape: Hideout.rose) {
                 Label {
-                    Text("Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.")
+                    Text("Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry.")
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "hand.raised.fill").foregroundStyle(Hideout.brass)

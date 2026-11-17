@@ -68,7 +68,7 @@
 "A skill is a folder with a SKILL.md file: a name, a description of when to use it, and instructions for one kind of task, sometimes with reference files, templates or scripts. Parley reads skills in the Agent Skills format that other AI apps use." = "技能是一个包含 SKILL.md 文件的文件夹：里面有名称、何时使用它的描述，以及完成某一类任务的说明，有时还附带参考文件、模板或脚本。Parley 读取的是其他 AI App 也在使用的 Agent Skills 格式。";
 "A skill that is on is offered in every conversation. The model sees each skill's name and description, and when your request matches one, it loads that skill's instructions, and any of its files it needs, with the activate_skill tool. This runs without asking, except in ReAct mode, where every call asks. To leave skills out of one conversation, untick Skills in the wrench popover (⇧⌘T)." = "已开启的技能会在每个对话中提供。模型会看到每个技能的名称和描述；当你的请求与某个技能相符时，它会用 activate_skill 工具载入该技能的说明，以及它需要的文件。这一步无需询问，但在 ReAct 模式下每次调用都会询问。若某个对话不想使用技能，请在扳手弹出菜单（⇧⌘T）中取消勾选“技能”。";
 "A skill that is on is offered in every conversation: its name and description go to the model's provider with each request, and when the model loads a skill, its instructions and the files it reads go there too. Parley never runs a skill's scripts or programs, and a skill cannot switch tools on or skip an approval. Import copies a skill into Parley's skills folder; add only skills you trust, since their text tells the model what to do. Import takes a folder with a SKILL.md, a folder of such folders, or a .zip or .skill file of them." = "已开启的技能会在每个对话中提供：每次请求时，它的名称和描述都会发送给模型的提供商；模型载入某个技能时，它的说明和模型读取的文件也会发送过去。Parley 从不运行技能中的脚本或程序，技能也无法开启工具或跳过批准。导入会把技能复制到 Parley 的技能文件夹中；技能的文字会告诉模型该做什么，所以只添加你信任的技能。可以导入包含 SKILL.md 的文件夹、由这类文件夹组成的文件夹，或者它们的 .zip 或 .skill 文件。";
-"A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new." = "已打开的工具会在每个对话中提供，每次请求时它的名称和描述都会发送给模型的提供商。获批工具返回的内容也会发送过去。在 ReAct 模式下，每次调用都会询问。隐藏文件永远不会被列出或读取，模型也永远不会得知文件夹的位置。所有工具都关闭时，Parley 不读取任何文件，也不会联系任何新的地址。";
+"A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks, unless tool calls run automatically (Settings > General). Hidden files are never listed, read or written, and the model is never told where the folder is. With every tool off, Parley reads no file, writes none and contacts nothing new." = "已打开的工具会在每个对话中提供，每次请求时它的名称和描述都会发送给模型的提供商。获批工具返回的内容也会发送过去。在 ReAct 模式下，每次调用都会询问，除非工具调用设为自动放行（“设置”>“通用”）。隐藏文件永远不会被列出、读取或写入，模型也永远不会得知文件夹的位置。所有工具都关闭时，Parley 不读取也不写入任何文件，也不会联系任何新的地址。";
 "About %lld lines. Scroll to see all of them." = "约 %lld 行。滚动以查看全部内容。";
 "About Parley" = "关于 Parley";
 "Access wants a sign-in in a browser, which Parley can't do (it never follows redirects, so nothing was sent to the sign-in page). Use %@, or a hostname without an Access policy that requires sign-in." = "Access 要求在浏览器中登录，而 Parley 无法做到（它从不跟随重定向，因此没有向登录页面发送任何内容）。请使用%@，或使用一个没有要求登录的 Access 策略的主机名。";
@@ -92,12 +92,15 @@
 "API key" = "API 密钥";
 "API keys are stored in your login Keychain and never synced. Local servers usually need no key." = "API 密钥存储在你的登录钥匙串中，从不同步。本地服务器通常不需要密钥。";
 "API keys live in the Keychain. Encrypted conversations are decrypted only in memory. The Copy buttons (and copying from the message box) keep text off Universal Clipboard; selected text copied with ⌘C elsewhere uses the normal clipboard, which Handoff may share with your other devices." = "API 密钥保存在钥匙串中。加密的对话只在内存中解密。“拷贝”按钮（以及从消息框中拷贝）不会让文本进入通用剪贴板；在其他地方选中并用 ⌘C 拷贝的文本使用普通剪贴板，“接力”可能会将其共享到你的其他设备。";
+"Approval" = "批准方式";
 "Arguments" = "参数";
 "Arguments and environment values go to your login Keychain." = "参数和环境变量值会存入你的登录钥匙串。";
 "Arguments, one per line" = "参数，每行一个";
 "Arguments, the URL, environment values and headers are stored in your login Keychain (not synced)." = "参数、URL、环境变量值和标头存储在你的登录钥匙串中（不同步）。";
 "Ask %@ again" = "重新询问 %@";
 "Ask the model to answer this message" = "让模型回复这条消息";
+"Asks every time and shows the host." = "每次都会询问，并显示主机。";
+"Asks every time." = "每次都会询问。";
 "Assistant" = "助手";
 "Assistant, %@, %@" = "助手，%@，%@";
 "Assistant, unknown model, %@" = "助手，未知模型，%@";
@@ -118,6 +121,8 @@
 "Built-in tool, opens %@ in a private browser, loading only from that site" = "内置工具，在隐私浏览器中打开 %@，只从该网站加载内容";
 "Built-in tool, opens %@ in a private browser; its scripts may contact other public sites" = "内置工具，在隐私浏览器中打开 %@；它的脚本可能会联系其他公共网站";
 "Built-in tool, reads %@ from the skill %@" = "内置工具，读取技能 %2$@ 中的 %1$@";
+"Built-in tool, writes %@ (%@) in folder %@" = "内置工具，写入 %1$@（%2$@），在文件夹 %3$@ 中";
+"Built-in tool, writes in folder %@" = "内置工具，在文件夹 %@ 中写入";
 "Built-in Tools" = "内置工具";
 "Built-in tools" = "内置工具";
 "Calculator" = "计算器";
@@ -217,8 +222,9 @@
 "Couldn't load models from %@: %@" = "无法从 %@ 获取模型列表：%@";
 "Couldn't load models: %@" = "无法获取模型列表：%@";
 "Create" = "创建";
+"Creates or replaces text files in the folder above, as UTF-8. A file it replaces goes to the Trash first." = "在上方文件夹中新建或替换文本文件，以 UTF-8 保存。被替换的文件会先移到废纸篓。";
 "Current Time" = "当前时间";
-"Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks." = "“当前时间”和“计算器”运行时无需询问，因为它们不读取你的任何内容，也不联系任何地方。“列出文件”“读取文件”“获取网页”和“浏览网页”每次都会询问，并且只能允许一次。在 ReAct 模式下，每次调用都会询问。";
+"Current Time and Calculator run without asking, because they read nothing of yours and contact nothing. List Files, Read File, Write File, Fetch Web Page and Browse Web Page ask every time and can only be allowed once. In ReAct mode every call asks. With Tool Calls set to Run Automatically in Settings > General, no call asks, these and ReAct calls included." = "“当前时间”和“计算器”运行时无需询问，因为它们不读取你的任何内容，也不联系任何地方。“列出文件”“读取文件”“写入文件”“获取网页”和“浏览网页”每次都会询问，并且只能允许一次。在 ReAct 模式下，每次调用都会询问。如果在“设置”>“通用”中把“工具调用”设为“自动放行”，所有调用都不再询问，包括这些工具和 ReAct 模式下的调用。";
 "Custom Model ID" = "自定模型 ID";
 "Custom Model ID…" = "自定模型 ID…";
 "Default" = "默认";
@@ -242,6 +248,7 @@
 "e.g. 16384" = "例如 16384";
 "e.g. 32768" = "例如 32768";
 "e.g. qwen3-14b-instruct" = "例如 qwen3-14b-instruct";
+"Each call that reads or writes files, contacts a website or uses an MCP tool waits for your Allow, except MCP tools you have set to Always Allow. In ReAct mode every call asks." = "每次读写文件、联系网站或使用 MCP 工具的调用都会等你批准，已设为“始终允许”的 MCP 工具除外。在 ReAct 模式下，每次调用都会询问。";
 "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat." = "每个对话是一个以随机 ID 命名的 JSON 文件，默认位于 ~/Library/Application Support/Parley/Conversations（不会被 iCloud 同步）。你可以在“设置”>“通用”中更改默认文件夹，也可以为每个新对话选择文件夹。";
 "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not." = "每个对话都存储为一个以随机 ID 命名的 JSON 文件。新对话可以选择自己的文件夹。“桌面”和“文稿”可能会被 iCloud 同步，~/Library/CloudStorage 中的文件夹可能会被 Dropbox、OneDrive 或 Google Drive 同步；位于 Application Support 中的默认位置则不会。";
 "Each skin has an afternoon and a lights-out look, which follow the system appearance." = "每款皮肤都有“午后”和“熄灯”两种外观，跟随系统外观切换。";
@@ -274,8 +281,9 @@
 "Environment" = "环境变量";
 "Error: %@" = "错误：%@";
 "Estimated from the text; the server's count replaces it after the next reply." = "根据文本估算；下次回复后将以服务器的计数为准。";
-"Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call." = "每次调用都会先询问你，并显示确切的参数。你可以选择“拒绝”“允许一次”或“始终允许此工具”；“始终允许”会一直有效，直到该工具的定义，或服务器的命令、参数、URL、工作文件夹或 PATH 发生变化。即使服务器已停止，也可以在“设置”>“MCP”中撤销。“停止”（Esc 或 ⌘.）会取消正在运行的调用。";
+"Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General." = "每次调用都会先询问你，并显示确切的参数。你可以选择“拒绝”“允许一次”或“始终允许此工具”；“始终允许”会一直有效，直到该工具的定义，或服务器的命令、参数、URL、工作文件夹或 PATH 发生变化。即使服务器已停止，也可以在“设置”>“MCP”中撤销。“停止”（Esc 或 ⌘.）会取消正在运行的调用。如果不想让任何调用询问，请在“设置”>“通用”中把“工具调用”设为“自动放行”。";
 "Every MCP server is switched off. Turn one on in Settings > MCP." = "所有 MCP 服务器都已关闭。请在“设置”>“MCP”中打开一个。";
+"Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash." = "所有工具调用都不再询问：共享文件夹里的文件会被直接读取和写入，网页会被直接获取，MCP 工具会直接运行，ReAct 模式下也一样。模型读到的网页或文件可能会指使它去做别的事，例如把某个文件的内容发到某个网站，或者覆盖某个文件，而这时不会有任何步骤停下来问你。调用仍会显示在对话里，“停止”可以中止它们。被替换的文件会移到废纸篓。";
 "Failed" = "失败";
 "Fetch Web Page" = "获取网页";
 "Fetch Web Page contacts the website directly from this Mac, so the site sees your IP address. It runs no scripts, loads no images, and sends no cookies, API keys or MCP headers. Private and local addresses are refused, and a redirect to another address is reported to the model instead of followed, so a new address means a new card." = "“获取网页”会直接从这台 Mac 联系网站，因此网站会看到你的 IP 地址。它不运行脚本、不加载图片，也不发送 Cookie、API 密钥或 MCP 标头。私有地址和本地地址会被拒绝；重定向到另一个地址时，会报告给模型而不会跟随，因此新地址意味着新的卡片。";
@@ -283,7 +291,7 @@
 "Files" = "文件";
 "Finished" = "已结束";
 "Folder" = "文件夹";
-"For models and servers without tool support. Tools go to the model as text in the system prompt. Every call asks first, even for a tool you always allow." = "适用于不支持工具的模型和服务器。工具以文本形式放在系统提示词中发送给模型。每次调用都会先询问，即使是你始终允许的工具也一样。";
+"For models and servers without tool support. Tools go to the model as text in the system prompt. In Manual Approval every call asks first, even for a tool you always allow." = "适用于不支持工具的模型和服务器。工具以文本形式放在系统提示词中发送给模型。在“手动批准”下，每次调用都会先询问，即使是你始终允许的工具也一样。";
 "Forgotten passwords can't be recovered." = "忘记的密码无法找回。";
 "Fork" = "分叉";
 "Fork copies the conversation up to that message into a new file. Roll Back deletes everything after the message." = "分叉会把对话中截至该消息的内容复制到一个新文件中。回退会删除该消息之后的所有内容。";
@@ -293,7 +301,7 @@
 "From the server: " = "来自服务器：";
 "General" = "通用";
 "Get Reply" = "获取回复";
-"Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host." = "直接从这台 Mac 获取一个公开网页，因此该网站会看到你的 IP 地址。每次都会询问，并显示主机。";
+"Gets one public web page, directly from this Mac, so the site sees your IP address." = "直接从这台 Mac 获取一个公开网页，因此该网站会看到你的 IP 地址。";
 "Getting started" = "入门";
 "Headers" = "标头";
 "Hide Details" = "隐藏详细信息";
@@ -351,7 +359,7 @@
 "Let's build the fort" = "一起来搭堡垒吧";
 "Limit" = "上限";
 "List Files" = "列出文件";
-"List Files and Read File work inside the one folder you choose in Settings, and only after you choose it. They read, never write. Hidden files are never listed or read, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it." = "“列出文件”和“读取文件”只在你于“设置”中选择的那一个文件夹内工作，并且只有在你选择之后才能使用。它们只读取，从不写入。隐藏文件永远不会被列出或读取，模型也永远不会被告知该文件夹的位置。文件夹内指向文件夹外的链接会被拒绝。硬链接无法与普通文件区分，因此指向文件夹外某个文件的硬链接可以被读取。在同步到 iCloud 或其他云服务的文件夹中，读取尚未存放在这台 Mac 上的文件会将其下载。";
+"List Files, Read File and Write File work inside the one folder you choose in Settings, and only after you choose it. Read File reads text in UTF-8, UTF-16, and GBK or other Chinese encodings. Write File creates or replaces text files, as UTF-8, and makes folders on the way; a file it replaces is moved to the Trash first. It never writes through a link. Hidden files are never listed, read or written, and the model is never told where the folder is. A link inside the folder that leads out of it is refused. A hard link cannot be told from an ordinary file, so one to a file outside the folder can be read. In a folder synced to iCloud or another cloud service, reading a file that is not on this Mac yet downloads it." = "“列出文件”“读取文件”和“写入文件”只在你于“设置”中选择的那一个文件夹内工作，并且只有在你选择之后才能使用。“读取文件”能读取 UTF-8、UTF-16 以及 GBK 等中文编码的文本。“写入文件”以 UTF-8 新建或替换文本文件，并会创建路径上缺少的文件夹；被替换的文件会先移到废纸篓。它从不通过链接写入。隐藏文件永远不会被列出、读取或写入，模型也永远不会被告知该文件夹的位置。文件夹内指向文件夹外的链接会被拒绝。硬链接无法与普通文件区分，因此指向文件夹外某个文件的硬链接可以被读取。在同步到 iCloud 或其他云服务的文件夹中，读取尚未存放在这台 Mac 上的文件会将其下载。";
 "LM Studio can load this model with up to %@ tokens." = "LM Studio 最多可以用 %@ 个 token 加载此模型。";
 "LM Studio can reload this model with a different context length." = "LM Studio 可以用不同的上下文长度重新加载此模型。";
 "LM Studio on %@ unloads the model and loads it again. This affects every app using the model on that server: replies in progress are cut off and the prompt cache is cleared. Loading can take a while; if memory runs out, the model stays unloaded. A model loaded this way may stay in memory until it is unloaded in LM Studio." = "%@ 上的 LM Studio 会卸载此模型，然后重新加载。这会影响该服务器上使用此模型的所有 App：正在进行的回复会被中断，提示词缓存会被清除。加载可能需要一段时间；如果内存不足，模型将保持卸载状态。以这种方式加载的模型可能会一直留在内存中，直到在 LM Studio 中将其卸载。";
@@ -371,6 +379,7 @@
 "Lower Max tokens in Conversation Settings (⌘I), or turn it off so Strata uses the room left." = "请在对话设置（⌘I）中调低最大 token 数，或将其关闭，让 Strata 使用剩余空间。";
 "Lower Max tokens to at most %@ in Conversation Settings (⌘I), or turn it off so Strata uses the room left." = "请在对话设置（⌘I）中将最大 token 数调低到不超过 %@，或将其关闭，让 Strata 使用剩余空间。";
 "Make Default" = "设为默认";
+"Manual Approval" = "手动批准";
 "max %@" = "最大 %@";
 "Max Tokens" = "最大 token 数";
 "Max tokens does not fit in the model's context" = "最大 token 数超出了模型的上下文";
@@ -390,7 +399,7 @@
 "Move to Trash" = "移到废纸篓";
 "Move to Trash…" = "移到废纸篓…";
 "Name" = "名称";
-"Names and sizes in the folder above, one level at a time. Asks every time." = "上方文件夹中的名称和大小，每次一层。每次都会询问。";
+"Names and sizes in the folder above, one level at a time." = "上方文件夹中的名称和大小，每次一层。";
 "Native" = "原生";
 "New Chat" = "新对话";
 "New Chat (⌘N)" = "新对话（⌘N）";
@@ -445,7 +454,7 @@
 "Open this link in your browser?" = "要在浏览器中打开此链接吗？";
 "OpenAI-compatible API" = "兼容 OpenAI 的 API";
 "Opening sends the whole address to this site, including anything a model put in it." = "打开链接会将完整地址发送给此网站，包括模型放入其中的任何内容。";
-"Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host." = "在一个会运行网页脚本的私密浏览器中打开一个公开网页，用于“获取网页”读取为空的网页。除非打开了下方的开关，否则它只从你批准的网站加载内容。它会忽略 Mac 的代理设置。不加载图片，不下载，结束后不保留任何内容。每次都会询问，并显示主机。";
+"Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards." = "在一个会运行网页脚本的私密浏览器中打开一个公开网页，用于“获取网页”读取为空的网页。除非打开了下方的开关，否则它只从你批准的网站加载内容。它会忽略 Mac 的代理设置。不加载图片，不下载，结束后不保留任何内容。";
 "optional" = "可选";
 "Parameters" = "参数定义";
 "Parley" = "Parley";
@@ -454,9 +463,9 @@
 "Parley Help" = "Parley 帮助";
 "Parley loads at most 200 skills." = "Parley 最多载入 200 个技能。";
 "Parley never runs a skill's scripts or programs: the model can read them, and can tell you what to run. A skill cannot switch tools on or skip an approval, and the allowed-tools field some skills have is ignored." = "Parley 从不运行技能中的脚本或程序：模型可以读取它们，并告诉你该运行什么。技能无法开启工具或跳过批准，有些技能中的 allowed-tools 字段会被忽略。";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测，没有分析，没有远程图片。它不会自行查找服务器，也不会读取其他 App 的 MCP 配置。";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测。";
-"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call. No telemetry; conversations stay in files on this Mac." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站。没有遥测；对话以文件形式保存在这台 Mac 上。";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry, no analytics, no remote images. It looks for no servers on its own and reads no other app's MCP config." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站；如果“工具调用”设为“自动放行”，则是模型要求访问的任何公共网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测，没有分析，没有远程图片。它不会自行查找服务器，也不会读取其他 App 的 MCP 配置。";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically (and, only if you allow it, the other public sites a browsed page's scripts load from). No telemetry." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站；如果“工具调用”设为“自动放行”，则是模型要求访问的任何公共网站（并且仅在你允许时，还会联系被浏览网页的脚本从中加载内容的其他公共网站）。没有遥测。";
+"Parley only contacts the API endpoints and MCP servers you configure, sign-in providers you approve and, if you turn on Fetch Web Page or Browse Web Page, each website you approve for one call, or any public website the model asks for if Tool Calls is set to Run Automatically. No telemetry; conversations stay in files on this Mac." = "Parley 只会联系你配置的 API 端点和 MCP 服务器、你批准的登录提供商，以及（如果你开启了“获取网页”或“浏览网页”）你为单次调用批准的每个网站；如果“工具调用”设为“自动放行”，则是模型要求访问的任何公共网站。没有遥测；对话以文件形式保存在这台 Mac 上。";
 "Parley supports local (stdio) and Streamable HTTP servers, tools only, with fixed headers or a sign-in in your browser. Resources, prompts, sampling, elicitation and the old HTTP+SSE transport are not supported." = "Parley 支持本地（stdio）和 Streamable HTTP 服务器，仅支持工具，可使用固定标头或在浏览器中登录。不支持资源（resources）、提示（prompts）、采样（sampling）、信息征询（elicitation）以及旧的 HTTP+SSE 传输方式。";
 "Parley will contact this sign-in provider, then open it in your browser:" = "Parley 将联系此登录提供商，然后在你的浏览器中打开它：";
 "Parley's skills folder could not be created." = "无法创建 Parley 的技能文件夹。";
@@ -555,6 +564,7 @@
 "Roll back to here" = "回退到此处";
 "Roll Back to Here…" = "回退到此处…";
 "Roll back to this message?" = "要回退到这条消息吗？";
+"Run Automatically" = "自动放行";
 "Running %@…" = "正在运行 %@…";
 "Running…" = "正在运行…";
 "Runs a shell command line rather than a program." = "运行一条 shell 命令行，而不是一个程序。";
@@ -563,6 +573,8 @@
 "Runs on your Mac with your permissions. One argument per line." = "以你的权限在你的 Mac 上运行。每行一个参数。";
 "Runs this program on your Mac with your permissions." = "以你的权限在你的 Mac 上运行此程序。";
 "Runs with sudo: the server would have administrator rights." = "使用 sudo 运行：该服务器将拥有管理员权限。";
+"Runs without asking." = "运行时不询问。";
+"Runs without asking: tool calls are set to run automatically in Settings > General." = "运行时不询问：已在“设置”>“通用”中把工具调用设为自动放行。";
 "Save" = "保存";
 "Save Key" = "保存密钥";
 "Saved" = "已保存";
@@ -582,7 +594,7 @@
 "Server (its own claim)" = "服务器（自称）";
 "Server: %@" = "服务器：%@";
 "Sets %@=%@, which changes what code runs." = "设置了 %1$@=%2$@，这会改变实际运行的代码。";
-"Settings > Built-in Tools has six tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file and contacts nothing new." = "“设置”>“内置工具”中有六个 Parley 自带的工具，在你开启之前全部处于关闭状态。开启的工具会在每个对话中提供，无需 MCP 服务器。若某个对话不想使用它们，请在扳手弹出菜单（⇧⌘T）中取消勾选“内置工具”。所有工具都关闭时，Parley 不读取任何文件，也不会联系任何新的地址。";
+"Settings > Built-in Tools has seven tools of Parley's own, all off until you turn them on. A tool that is on is offered in every conversation, with no MCP server needed. To leave them out of one conversation, untick Built-in tools in the wrench popover (⇧⌘T). With every tool off, Parley reads no file, writes none and contacts nothing new." = "“设置”>“内置工具”中有七个 Parley 自带的工具，在你开启之前全部处于关闭状态。开启的工具会在每个对话中提供，无需 MCP 服务器。若某个对话不想使用它们，请在扳手弹出菜单（⇧⌘T）中取消勾选“内置工具”。所有工具都关闭时，Parley 不读取也不写入任何文件，也不会联系任何新的地址。";
 "Settings that are off use the server's default." = "关闭的设置项使用服务器的默认值。";
 "Settings…" = "设置…";
 "Short passwords are easy to guess. Use at least 8 characters." = "短密码容易被猜到。请至少使用 8 个字符。";
@@ -651,7 +663,7 @@
 "System Prompt" = "系统提示词";
 "Temperature" = "温度";
 "Test Connection" = "测试连接";
-"Text files in the folder above. Asks every time." = "上方文件夹中的文本文件。每次都会询问。";
+"Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings)." = "上方文件夹中的文本文件（UTF-8、UTF-16，或 GBK 等中文编码）。";
 "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request." = "这约占此模型上下文的 %lld%%。请关闭不需要的服务器或工具，否则模型可能会拒绝请求。";
 "The %lld messages after this one will be deleted from the conversation." = "这条消息之后的 %lld 条消息将从对话中删除。";
 "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it." = "地址检查和实际连接是两次独立的查询，因此如果网站在两次查询之间更改了 DNS 应答，或者存在代理，请求就可能在 Parley 察觉并丢弃该应答之前到达你网络中的设备。模型永远不会收到该应答。如果代理会用它自己的地址应答每个域名（Clash 和 Surge 就可能这样做），地址检查就无法区分你网络中的设备与公共网站。卡片才是真正的防线：允许之前请先看清地址。";
@@ -678,7 +690,7 @@
 "The conversation plus Max tokens (%@) is more than the context (%@ tokens)." = "对话加上最大 token 数（%1$@）超出了上下文（%2$@ 个 token）。";
 "The conversation will be saved as a plain, unencrypted JSON file that anyone with access to the file can read." = "对话将被保存为未加密的普通 JSON 文件，任何能访问该文件的人都可以读取。";
 "The Copy buttons keep text off Universal Clipboard. Text you select and copy with ⌘C uses the normal clipboard." = "“拷贝”按钮不会让文本进入通用剪贴板。你选中并用 ⌘C 拷贝的文本使用普通剪贴板。";
-"The date, time and time zone of this Mac. Runs without asking." = "这台 Mac 的日期、时间和时区。运行时不询问。";
+"The date, time and time zone of this Mac." = "这台 Mac 的日期、时间和时区。";
 "The description is longer than 1,024 characters. The model sees only the first 1,024." = "描述超过 1,024 个字符。模型只会看到前 1,024 个字符。";
 "The file could not be written and is still encrypted. %@" = "无法写入文件，文件仍处于加密状态。%@";
 "The file is not a zip archive Parley can read." = "这个文件不是 Parley 能读取的 zip 压缩包。";
@@ -796,7 +808,8 @@
 "Tokens" = "Token 数";
 "Too many requests" = "请求过多";
 "Tool calling" = "工具调用";
-"Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. Every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model." = "扳手弹出菜单中的“工具调用：ReAct（文本）”适用于不支持工具的模型和服务器。工具会以文本形式放在系统提示词中发给模型，模型用 Action 和 Action Input 行作答。此方式默认关闭，Parley 也从不自行切换到它；当服务器拒绝或忽略工具时，弹出菜单会提供“使用 ReAct”。每个 ReAct 调用都会先询问，并且只能允许一次，即使是你始终允许的工具也是如此，因为文本可能复述工具写下的内容。此时工具服务器的描述会放在系统提示词中，并标记为数据。ReAct 依赖模型遵循固定格式，因此有些模型用这种方式无法很好地使用工具。如果模型的模板会开启思考，模型仅在思考中拟写的调用也可能弹出卡片，而这段思考随后会被发回给模型。";
+"Tool calling: ReAct (text), in the wrench popover, is for models and servers without tool support. Tools go to the model as text in the system prompt, and the model answers with Action and Action Input lines. It is off by default, and Parley never switches to it on its own; the popover offers Use ReAct when a server refuses or ignores tools. In Manual Approval every ReAct call asks first and can only be allowed once, even for a tool you always allow, because text can repeat what a tool wrote; with Run Automatically it runs without asking. Tool servers' descriptions then sit in the system prompt, marked as data. ReAct relies on the model following a format, so some models will not use tools well this way. If a model's template opens its thinking, a call it only drafted while thinking can bring up a card, and that thinking then goes back to the model." = "扳手弹出菜单中的“工具调用：ReAct（文本）”适用于不支持工具的模型和服务器。工具会以文本形式放在系统提示词中发给模型，模型用 Action 和 Action Input 行作答。此方式默认关闭，Parley 也从不自行切换到它；当服务器拒绝或忽略工具时，弹出菜单会提供“使用 ReAct”。在“手动批准”下，每个 ReAct 调用都会先询问，并且只能允许一次，即使是你始终允许的工具也是如此，因为文本可能复述工具写下的内容；选了“自动放行”则不询问直接运行。此时工具服务器的描述会放在系统提示词中，并标记为数据。ReAct 依赖模型遵循固定格式，因此有些模型用这种方式无法很好地使用工具。如果模型的模板会开启思考，模型仅在思考中拟写的调用也可能弹出卡片，而这段思考随后会被发回给模型。";
+"Tool Calls" = "工具调用";
 "Tool definitions take about %@ tokens of it. Turn off servers or tools you do not need with the wrench button (⇧⌘T)." = "其中工具定义约占 %@ 个 token。可用扳手按钮（⇧⌘T）关闭不需要的服务器或工具。";
 "Tool definitions: about %@ tokens per request." = "工具定义：每次请求约 %@ 个 token。";
 "Tool error" = "工具错误";
@@ -847,13 +860,14 @@
 "Waiting for your approval" = "等待你批准";
 "Waiting for your approval of a tool call" = "正在等待你批准一个工具调用";
 "Web" = "网页";
-"What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address. That is why these tools have no Always Allow: check the arguments on each card, the address above all." = "与任何工具结果一样，工具返回的内容会发送给模型的提供商。网页或文件可能会指使模型读取某些内容并把它放进一个地址中。这就是这些工具没有“始终允许”的原因：请检查每张卡片上的参数，尤其是地址。";
+"What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away." = "与任何工具结果一样，工具返回的内容会发送给模型的提供商。网页或文件可能会指使模型读取某些内容并把它放进一个地址中，或者覆盖某个文件。这就是这些工具没有“始终允许”的原因：请检查每张卡片上的参数，尤其是地址。“自动放行”会去掉这道检查。";
 "Where files live" = "文件存放位置";
 "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image." = "加上图像，此对话每次请求约 %1$@，超过了 %3$@ 接受的 %2$@：每条消息都会再次发送这些图像。请移除部分图像，或从第一张图像之前的消息分叉。";
 "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back." = "加上工具结果，此对话每次请求约 %1$@，超过了 %3$@ 接受的 %2$@：每条消息都会再次发送这些结果。请从较早的消息分叉，或回退。";
 "Working folder" = "工作文件夹";
 "Working folder: %@" = "工作文件夹：%@";
-"Works out arithmetic on this Mac. Runs without asking." = "在这台 Mac 上进行算术计算。运行时不询问。";
+"Works out arithmetic on this Mac." = "在这台 Mac 上进行算术计算。";
+"Write File" = "写入文件";
 "Wrong password, or the file has been tampered with." = "密码错误，或文件已被篡改。";
 "Yesterday" = "昨天";
 "Your context length in tokens" = "你的上下文长度（token 数）";

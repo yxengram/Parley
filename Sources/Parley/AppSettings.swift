@@ -26,6 +26,7 @@ final class AppSettings {
         static let builtInTools = "builtInTools"
         static let builtInFolderPath = "builtInFolderPath"
         static let builtInBrowseOtherSites = "builtInBrowseOtherSites"
+        static let toolApproval = "toolApproval"
         static let disabledSkills = "disabledSkills"
     }
 
@@ -83,6 +84,10 @@ final class AppSettings {
     /// Off by default.
     var builtInBrowseOtherSites: Bool {
         didSet { defaults.set(builtInBrowseOtherSites, forKey: Key.builtInBrowseOtherSites) }
+    }
+    /// Whether a tool call waits for the user's Allow. Manual unless the user chose otherwise.
+    var toolApproval: ToolApprovalMode {
+        didSet { defaults.set(toolApproval.rawValue, forKey: Key.toolApproval) }
     }
 
     /// The names of the skills the user switched off in Settings > Skills. A skill is on unless it is
@@ -340,6 +345,7 @@ final class AppSettings {
         let storedFolder = defaults.string(forKey: Key.builtInFolderPath) ?? ""
         self.builtInFolderPath = storedFolder.isEmpty ? nil : storedFolder
         self.builtInBrowseOtherSites = defaults.bool(forKey: Key.builtInBrowseOtherSites)
+        self.toolApproval = defaults.string(forKey: Key.toolApproval).flatMap(ToolApprovalMode.init(rawValue:)) ?? .manual
         self.disabledSkills = defaults.stringArray(forKey: Key.disabledSkills) ?? []
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }

@@ -54,7 +54,7 @@ public enum AttachmentLoader {
             return Attachment(kind: .text, filename: filename, mimeType: textMIME(type), text: text)
         }
 
-        // Unknown type: accept it if it reads as UTF-8 without NUL bytes.
+        // Unknown type: accept it if it reads as text (decodeText) without NUL bytes.
         guard let handle = try? FileHandle(forReadingFrom: url) else {
             throw ParleyError.unsupportedAttachment(filename)
         }
@@ -146,21 +146,26 @@ public enum AttachmentLoader {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
 
-    /// Full decode: valid UTF-8 with no NUL bytes. A leading BOM is dropped.
+    /// Full decode, with no NUL: UTF-8, UTF-16 with a byte order mark, or GB18030 (which GBK and
+    /// GB2312 files are part of) when the bytes are not UTF-8 and read cleanly as that. A byte
+    /// order mark is dropped.
     static func decodeText(_ data: Data) -> String? {
-        if data.contains(0) { return nil }
-        guard var text = String(data: data, encoding: .utf8) else { return nil }
-        if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
-        return text
+        decode(data, wasCut: false)
     }
 
     /// Like decodeText, but tolerates a multi-byte character cut off at the end of the sample.
     private static func decodeTextPrefix(_ data: Data) -> Bool {
-        if data.contains(0) { return false }
-        for cut in 0...min(3, data.count) {
-            if String(data: data.dropLast(cut), encoding: .utf8) != nil { return true }
+        decode(data, wasCut: true) != nil
+    }
+
+    private static func decode(_ data: Data, wasCut: Bool) -> String? {
+        if let (encoding, length) = TextDecoding.byteOrderMark(data) {
+            guard let text = TextDecoding.strict(data.dropFirst(length), encoding, wasCut: wasCut), !text.contains("\0") else { return nil }
+            return text
         }
-        return false
+        if data.contains(0) { return nil }
+        if let text = TextDecoding.strict(data, .utf8, wasCut: wasCut) { return text }
+        return TextDecoding.guessedGB18030(data, wasCut: wasCut)
     }
 
     private static func hasAlpha(_ image: CGImage) -> Bool {

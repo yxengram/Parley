@@ -46,9 +46,11 @@ recovered, so keep them somewhere safe.
   memory (context) is.
 
 **Let the model use tools, safely.** Parley can give a model tools: a clock, a calculator,
-reading files in one folder you pick, and reading web pages. You can also connect "MCP" tool
-servers, the same kind used by other AI apps. Every tool is off until you turn it on, and
-anything that touches your files or the web asks you first, showing exactly what it wants to do.
+reading and writing files in one folder you pick, and reading web pages (Chinese pages in GBK
+included). You can also connect "MCP" tool servers, the same kind used by other AI apps. Every
+tool is off until you turn it on, and anything that touches your files or the web asks you first,
+showing exactly what it wants to do. If you would rather not be asked, set **Tool Calls** to
+**Run Automatically** in **Settings → General**. A file the model replaces goes to the Trash.
 
 ![Parley asking before a tool runs](docs/images/en/tool-approval.jpg)
 

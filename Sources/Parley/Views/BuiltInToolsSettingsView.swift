@@ -16,20 +16,41 @@ struct BuiltInToolsSettingsView: View {
         case .calculate: return String(localized: "Calculator")
         case .listFiles: return String(localized: "List Files")
         case .readFile: return String(localized: "Read File")
+        case .writeFile: return String(localized: "Write File")
         case .fetchURL: return String(localized: "Fetch Web Page")
         case .browseURL: return String(localized: "Browse Web Page")
         }
     }
 
-    static func explanation(_ tool: BuiltInTools.Tool) -> String {
+    /// What the tool does, then whether it asks, which depends on Settings > General > Tool calls.
+    static func explanation(_ tool: BuiltInTools.Tool, approval: ToolApprovalMode = .manual) -> String {
+        let what: String
         switch tool {
-        case .currentTime: return String(localized: "The date, time and time zone of this Mac. Runs without asking.")
-        case .calculate: return String(localized: "Works out arithmetic on this Mac. Runs without asking.")
-        case .listFiles: return String(localized: "Names and sizes in the folder above, one level at a time. Asks every time.")
-        case .readFile: return String(localized: "Text files in the folder above. Asks every time.")
-        case .fetchURL: return String(localized: "Gets one public web page, directly from this Mac, so the site sees your IP address. Asks every time and shows the host.")
-        case .browseURL: return String(localized: "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards. Asks every time and shows the host.")
+        case .currentTime: what = String(localized: "The date, time and time zone of this Mac.")
+        case .calculate: what = String(localized: "Works out arithmetic on this Mac.")
+        case .listFiles: what = String(localized: "Names and sizes in the folder above, one level at a time.")
+        case .readFile: what = String(localized: "Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings).")
+        case .writeFile: what = String(localized: "Creates or replaces text files in the folder above, as UTF-8. A file it replaces goes to the Trash first.")
+        case .fetchURL: what = String(localized: "Gets one public web page, directly from this Mac, so the site sees your IP address.")
+        case .browseURL: what = String(localized: "Opens one public web page in a private browser that runs its scripts, for pages Fetch Web Page reads as empty. It loads only from the site you approve, unless the switch below is on. It ignores the Mac's proxy settings. No images, no downloads, nothing kept afterwards.")
         }
+        let asks: String
+        if approval == .automatic {
+            asks = String(localized: "Runs without asking: tool calls are set to run automatically in Settings > General.")
+        } else if tool.contactsWebsites {
+            asks = String(localized: "Asks every time and shows the host.")
+        } else if tool.asksEveryTime {
+            asks = String(localized: "Asks every time.")
+        } else {
+            asks = String(localized: "Runs without asking.")
+        }
+        return joined(what, asks)
+    }
+
+    /// Two sentences, with a space only after an ASCII stop: Chinese ends a sentence with a
+    /// full-width stop and puts no space after it.
+    static func joined(_ first: String, _ second: String) -> String {
+        first + (first.last.map { $0.isASCII } == false ? "" : " ") + second
     }
 
     private func isOn(_ tool: BuiltInTools.Tool) -> Binding<Bool> {
@@ -60,7 +81,7 @@ struct BuiltInToolsSettingsView: View {
         SettingsSwitchRow(isOn: isOn(tool)) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: Self.title(tool))
-                Text(verbatim: Self.explanation(tool))
+                Text(verbatim: Self.explanation(tool, approval: appState.settings.toolApproval))
                     .font(.caption)
                     .foregroundStyle(Hideout.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
@@ -116,7 +137,7 @@ struct BuiltInToolsSettingsView: View {
             }
 
             // A note taped up at the end, not a card of controls.
-            Text("A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks. Hidden files are never listed or read, and the model is never told where the folder is. With every tool off, Parley reads no file and contacts nothing new.")
+            Text("A tool that is on is offered in every conversation, and its name and description go to the model's provider with each request. What an approved tool returns goes there too. In ReAct mode every call asks, unless tool calls run automatically (Settings > General). Hidden files are never listed, read or written, and the model is never told where the folder is. With every tool off, Parley reads no file, writes none and contacts nothing new.")
                 .font(.caption)
                 .foregroundStyle(Hideout.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)

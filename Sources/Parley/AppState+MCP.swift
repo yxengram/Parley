@@ -21,7 +21,8 @@ extension AppState {
             maxRounds: { [weak self] in self?.settings.maxToolRounds ?? AppSettings.defaultMaxToolRounds },
             contextLimit: { [weak self] provider, model in self?.contextLimit(provider: provider, model: model) },
             builtInFolderPath: { [weak self] in self?.settings.builtInFolderPath },
-            builtInBrowseOtherSites: { [weak self] in self?.settings.builtInBrowseOtherSites ?? false }
+            builtInBrowseOtherSites: { [weak self] in self?.settings.builtInBrowseOtherSites ?? false },
+            approval: { [weak self] in self?.settings.toolApproval ?? .manual }
         )
     }
 
