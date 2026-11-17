@@ -23,6 +23,9 @@ trap 'rm -rf "$TMP"' EXIT
 SDK_VERSION="$(xcrun --show-sdk-version)"
 vtool -set-build-version macos 14.0 "$SDK_VERSION" -replace -output "$TMP/other" "$OTHER_BIN"
 lipo -create "$NATIVE" "$TMP/other" -output "$TMP/universal"
+# The linker leaves debug-map entries in the symbol table: the absolute path of every object file
+# and source file, which names this Mac's user and folders. They are only for dsymutil; strip them.
+strip -S "$TMP/universal"
 cp "$TMP/universal" "$NATIVE"
 codesign --force --sign - "$APP" >/dev/null
 codesign --verify --deep --strict "$APP"
@@ -32,6 +35,13 @@ if strings "$NATIVE" | grep -q PARLEY_SNAPSHOT; then
     echo "error: the release binary contains the snapshot harness" >&2
     exit 1
 fi
+# Every byte of the bundle, not only what `strings` shows: the symbol table is not in its view.
+for private in "/Users/" "$HOME" "$USER"; do
+    if LC_ALL=C grep -rqaF -- "$private" "$APP"; then
+        echo "error: the app contains a local path or the user name ($private)" >&2
+        exit 1
+    fi
+done
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
