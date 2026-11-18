@@ -133,7 +133,12 @@ enum ReaderFixturePasswords {
             reactReply,
             failed,
         ],
-        forkedFrom: ForkOrigin(conversationID: UUID(), messageID: UUID())
+        forkedFrom: ForkOrigin(conversationID: UUID(), messageID: UUID()),
+        // Context compaction: requests send the first two messages as this summary (the Reader
+        // shows a divider after reply1 with the summary in a disclosure).
+        compaction: ConversationCompaction(summary: "The user asked why loading config files crashes; it was a nil path.",
+                                           throughMessageID: reply1.id, countsStaleThroughID: reply1.id,
+                                           createdAt: at(3), model: "qwen3-14b-instruct", messageCount: 2)
     )
 
     try save("plain.json", ConversationFile.encode(conversation, encryption: nil))

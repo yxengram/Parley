@@ -43,7 +43,8 @@ recovered, so keep them somewhere safe.
   a new conversation from that point.
 - Code blocks, tables, lists and links are formatted nicely. Links always ask before opening.
 - A small strip under the message box shows how fast the model is replying and how full its
-  memory (context) is.
+  memory (context) is. When a long conversation fills it, Parley summarizes the earlier messages
+  so the chat can go on (automatically at 80%, or with Compact Now); nothing is deleted.
 
 **Let the model use tools, safely.** Parley can give a model tools: a clock, a calculator,
 reading and writing files in one folder you pick, and reading web pages (Chinese pages in GBK

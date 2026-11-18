@@ -35,6 +35,12 @@ struct HelpView: View {
                     String(localized: "Shortcuts: ⌘R regenerates the last reply, ⇧⌘C copies it, ⇧⌘E edits your last message, ⌘. or Esc stops a reply, ⌘I opens the conversation settings."),
                 ])
 
+                section(String(localized: "Context and compaction"), "rectangle.compress.vertical", [
+                    String(localized: "The strip under the message box shows how fast the model is replying and how much of its context (memory) the conversation uses. Click it for details, to enter the context length if the server does not report it, and for compaction."),
+                    String(localized: "Compaction lets a long conversation go on: the earlier messages are summarized by the conversation's own model, and requests send the summary and the newest messages instead of the whole history. The messages stay in the conversation; a divider shows where the summary ends, and opens it."),
+                    String(localized: "It runs automatically before a reply once the context is 80 percent full (change the threshold or turn it off in the context popover; one setting for every conversation), and only where the context length is known. Compact Now does it at once. Restore Full History sends every message again. Each compaction is one more request to the model, which costs on a paid API. If it fails, the reply goes on without a new summary and a note says so."),
+                ])
+
                 section(String(localized: "Thinking"), "brain", [
                     String(localized: "Reasoning from models that send it (reasoning_content, reasoning, or <think> tags) is shown in a collapsible section with how long the model thought. It is never sent back to the server."),
                     String(localized: "Reasoning Effort “None (no thinking)” (Conversation Settings, ⌘I) asks the server not to think. Not every server or model supports it; a note under the reply says so when Parley can tell it was refused or ignored."),

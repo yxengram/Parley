@@ -144,7 +144,7 @@ struct SidebarView: View {
     private func contextMenu(for entry: LibraryEntry) -> some View {
         let session = appState.session(for: entry.id)
         let locked = entry.isEncrypted && session == nil
-        let streaming = session?.isStreaming ?? false
+        let streaming = session?.isBusy ?? false
 
         Button("Rename…") { appState.sidebarRequest = .rename(entry.id) }
             .disabled(locked)
@@ -360,7 +360,7 @@ struct SidebarRow: View {
                     .foregroundStyle(isSelected ? Hideout.attention : Hideout.wallInk)
                     .help("Waiting for your approval of a tool call")
                     .accessibilityLabel("Waiting for approval")
-            } else if session?.isStreaming == true {
+            } else if session?.isBusy == true {
                 HideoutSpinner(color: isSelected ? Hideout.emberText : Hideout.wallInk)
             }
             if entry.isEncrypted || session?.isEncrypted == true {

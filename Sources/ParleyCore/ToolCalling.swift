@@ -99,7 +99,9 @@ public struct ToolNote: Codable, Hashable, Sendable {
 
     public static let toolsNotAccepted = "toolsNotAccepted", toolsNotOffered = "toolsNotOffered",
         serverUnavailable = "serverUnavailable", roundLimit = "roundLimit",
-        callsNotRun = "callsNotRun", emptyAfterTools = "emptyAfterTools", nativeCallsIgnored = "nativeCallsIgnored"
+        callsNotRun = "callsNotRun", emptyAfterTools = "emptyAfterTools", nativeCallsIgnored = "nativeCallsIgnored",
+        /// Automatic compaction failed before this reply; `detail` is the stored English error.
+        compactionFailed = "compactionFailed"
     /// Its `detail`. It sits on replies that ended well, and on replies whose text call ran.
     public static let nativeCallsIgnoredText = "The model sent native tool calls. ReAct runs only calls written as text, so those were not run."
 

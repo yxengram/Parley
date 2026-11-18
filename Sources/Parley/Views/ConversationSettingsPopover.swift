@@ -214,7 +214,7 @@ struct ConversationSettingsPopover: View {
         .padding(14)
         .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
-        .disabled(session.isStreaming)
+        .disabled(session.isBusy)
     }
 }
 

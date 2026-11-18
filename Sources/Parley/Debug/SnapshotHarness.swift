@@ -794,6 +794,21 @@ enum SnapshotHarness {
         await wait(0.6)
         await scrollChat(toTop: false)
         capture(appearance, "thinking-off-notes")
+
+        // Context compaction: the divider after the summarized messages, and the popover's card
+        // with Restore Full History. Taken off again for the states after this.
+        if session.conversation.messages.count >= 4 {
+            session.conversation.compaction = ConversationCompaction(
+                summary: "The user is checking a few products by hand. Settled so far: 17 × 23 = 391. They want short answers.",
+                throughMessageID: session.conversation.messages[1].id, countsStaleThroughID: session.conversation.messages.last?.id,
+                model: "qwen3-14b-instruct", messageCount: 2)
+            await wait(0.6)
+            await scrollChat(toTop: true)
+            capture(appearance, "compacted-divider")
+            await captureContextPopover(appearance, "context-popover-compacted")
+            session.conversation.compaction = nil
+            await wait(0.3)
+        }
     }
 
     /// Tool rounds: seeded rows and notes, then a live reply through the stdio mock.

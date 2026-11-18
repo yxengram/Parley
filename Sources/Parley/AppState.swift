@@ -325,6 +325,12 @@ final class AppState {
             self?.markThinkingOffRejected(provider: provider, model: model, fields: fields)
         }
         session.tools = toolServices()
+        session.compactionPolicy = { [weak self] in
+            self?.settings.compactionPolicy ?? CompactionPolicy(automatic: false, thresholdPercent: Compaction.defaultThresholdPercent)
+        }
+        session.contextLimitFor = { [weak self] provider, model in
+            self?.contextLimit(provider: provider, model: model)
+        }
         sessions[session.id] = session
     }
 
@@ -457,7 +463,7 @@ final class AppState {
 
     /// Fork through message `index`: same directory, same encryption key.
     func fork(_ session: ConversationSession, through index: Int) {
-        guard !session.isStreaming else { return }
+        guard !session.isBusy else { return }
         let forked = session.conversation.forked(through: index)
         let dir = session.fileURL.deletingLastPathComponent()
         let url = dir.appendingPathComponent(ConversationFile.fileName(for: forked.id))

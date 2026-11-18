@@ -53,6 +53,7 @@
 "1 source on" = "已开启 1 个来源";
 "1 tool" = "1 个工具";
 "1 tool round" = "1 轮工具调用";
+"30–95" = "30–95";
 "A chat uses this server once you turn it on there, with the wrench button (⇧⌘T)." = "在对话中用扳手按钮（⇧⌘T）打开此服务器后，该对话才会使用它。";
 "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory." = "对话可以在创建时加密，也可以之后通过“对话”>“加密…”加密。整个文件使用由你的密码派生的密钥以 AES-256-GCM 加密，并且只在内存中解密。";
 "A conversation could not be saved." = "有 1 个对话未能保存。";
@@ -107,9 +108,12 @@
 "Attach Files" = "附加文件";
 "Attach images or text files" = "附加图像或文本文件";
 "Automatic (from first message)" = "自动（取自第一条消息）";
+"Automatic compaction needs the context length: enter it above." = "自动压缩需要知道上下文长度：请在上方填写。";
 "Back" = "返回";
 "Base URL" = "基础 URL";
 "Basic" = "基本";
+"Before a reply, earlier messages are summarized by this conversation's model. One setting for every conversation." = "在回复之前，由这个对话自己的模型总结较早的消息。这个设置对所有对话生效。";
+"Before a reply, earlier messages are summarized by this conversation's model. The limit here is the model's maximum; the loaded size may be smaller." = "在回复之前，由这个对话自己的模型总结较早的消息。这里的上限是模型支持的最大值，实际加载的大小可能更小。";
 "Browse Web Page" = "浏览网页";
 "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address." = "“浏览网页”用于只有在脚本运行后才显示文字的网页。每次调用都会在一个新的隐私浏览器中打开网页，结束后不保留任何东西：不会带入、也不会留下任何 Cookie、缓存或存储数据。网页加载的所有内容都要经过一道只放行公共地址的关卡，图片、视频、字体、弹出窗口和下载都会被阻止。默认情况下，网页只能从你批准的地址加载内容，因此有些网页显示的内容很少；结果会告诉模型有多少个对其他网站的请求被阻止。开启“允许‘浏览网页’从其他网站加载内容”后，网页的脚本可能会联系其他网站（例如 CDN），这些网站同样会看到你的 IP 地址。卡片会注明是哪种情况。如果网页跳转到另一个地址，Parley 会停止，需要新的卡片。“停止”“锁定”和“退出”会立即关闭网页。它不使用 Mac 的代理设置，因此在系统代理之后，网站看到的是这台 Mac 自己的 IP 地址。";
 "Built-in tool" = "内置工具";
@@ -143,6 +147,7 @@
 "Check the model ID and the base URL. The server said: %@" = "请检查模型 ID 和基础 URL。服务器返回：%@";
 "Checking…" = "正在检查…";
 "Choose" = "选择";
+"Choose a model first: the summary is written by the conversation's model." = "请先选择模型：总结由这个对话的模型来写。";
 "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@" = "请从列表中选择一个模型（模型菜单中的“刷新模型列表”），或在 Strata App 中加载一个模型。Strata 返回：%@";
 "Choose a model to see its context length." = "选择一个模型以查看其上下文长度。";
 "Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file." = "选择一个技能文件夹（包含 SKILL.md）、一个包含多个技能的文件夹，或者 .zip 或 .skill 文件。";
@@ -170,6 +175,12 @@
 "code" = "代码";
 "Come in and say something." = "进来坐坐，说点什么吧。";
 "Command" = "命令";
+"Compact automatically" = "自动压缩";
+"Compact Now" = "立即压缩";
+"Compacting…" = "正在压缩…";
+"Compaction" = "上下文压缩";
+"Compaction lets a long conversation go on: the earlier messages are summarized by the conversation's own model, and requests send the summary and the newest messages instead of the whole history. The messages stay in the conversation; a divider shows where the summary ends, and opens it." = "压缩让长对话可以继续下去：较早的消息由这个对话自己的模型总结，之后的请求发送这份总结和最新的消息，而不是完整的历史。消息本身仍保留在对话里；一条分隔线标出总结到哪里为止，点开可以看到总结。";
+"Compaction threshold in percent" = "压缩阈值（百分比）";
 "Confirm password" = "确认密码";
 "Connect" = "连接";
 "Connected, %lld models" = "已连接，%lld 个模型";
@@ -184,6 +195,7 @@
 "Context %lld tokens, limit unknown" = "上下文已用 %lld 个 token，上限未知";
 "Context about %lld of %lld tokens, %lld percent; limit %@" = "上下文已用约 %lld / %lld 个 token，即 %lld%%；上限来源：%@";
 "Context about %lld tokens, limit unknown" = "上下文已用约 %lld 个 token，上限未知";
+"Context and compaction" = "上下文与压缩";
 "Context limit %@ tokens (%@)" = "上下文上限 %@ 个 token（%@）";
 "Context used" = "已用上下文";
 "Context: checking…" = "上下文：正在检查…";
@@ -252,6 +264,8 @@
 "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat." = "每个对话是一个以随机 ID 命名的 JSON 文件，默认位于 ~/Library/Application Support/Parley/Conversations（不会被 iCloud 同步）。你可以在“设置”>“通用”中更改默认文件夹，也可以为每个新对话选择文件夹。";
 "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not." = "每个对话都存储为一个以随机 ID 命名的 JSON 文件。新对话可以选择自己的文件夹。“桌面”和“文稿”可能会被 iCloud 同步，~/Library/CloudStorage 中的文件夹可能会被 Dropbox、OneDrive 或 Google Drive 同步；位于 Application Support 中的默认位置则不会。";
 "Each skin has an afternoon and a lights-out look, which follow the system appearance." = "每款皮肤都有“午后”和“熄灯”两种外观，跟随系统外观切换。";
+"Earlier messages could not be summarized, so this reply was sent without a new summary. %@" = "较早的消息没能总结成功，所以这次回复没有使用新的总结。%@";
+"Earlier messages were summarized to fit the context. Restore the full history in the context popover at the bottom right." = "较早的消息已被总结，以便放进上下文。可以在右下角的上下文弹窗里恢复完整历史。";
 "Edit & Resend" = "编辑并重新发送";
 "Edit & resend" = "编辑并重新发送";
 "Edit & Resend puts the message back in the composer. Nothing changes until you send it; Esc cancels. ↑ in an empty composer edits your last message." = "“编辑并重新发送”会把消息放回输入框。在你发送之前不会有任何改动；按 Esc 取消。在空输入框中按 ↑ 可编辑你的上一条消息。";
@@ -283,6 +297,7 @@
 "Estimated from the text; the server's count replaces it after the next reply." = "根据文本估算；下次回复后将以服务器的计数为准。";
 "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General." = "每次调用都会先询问你，并显示确切的参数。你可以选择“拒绝”“允许一次”或“始终允许此工具”；“始终允许”会一直有效，直到该工具的定义，或服务器的命令、参数、URL、工作文件夹或 PATH 发生变化。即使服务器已停止，也可以在“设置”>“MCP”中撤销。“停止”（Esc 或 ⌘.）会取消正在运行的调用。如果不想让任何调用询问，请在“设置”>“通用”中把“工具调用”设为“自动放行”。";
 "Every MCP server is switched off. Turn one on in Settings > MCP." = "所有 MCP 服务器都已关闭。请在“设置”>“MCP”中打开一个。";
+"Every message is sent in full." = "所有消息都完整发送。";
 "Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash." = "所有工具调用都不再询问：共享文件夹里的文件会被直接读取和写入，网页会被直接获取，MCP 工具会直接运行，ReAct 模式下也一样。模型读到的网页或文件可能会指使它去做别的事，例如把某个文件的内容发到某个网站，或者覆盖某个文件，而这时不会有任何步骤停下来问你。调用仍会显示在对话里，“停止”可以中止它们。被替换的文件会移到废纸篓。";
 "Failed" = "失败";
 "Fetch Web Page" = "获取网页";
@@ -299,6 +314,7 @@
 "Fork from here" = "从此处分叉";
 "Fork from Last Message" = "从最后一条消息分叉";
 "From the server: " = "来自服务器：";
+"full" = "时";
 "General" = "通用";
 "Get Reply" = "获取回复";
 "Gets one public web page, directly from this Mac, so the site sees your IP address." = "直接从这台 Mac 获取一个公开网页，因此该网站会看到你的 IP 地址。";
@@ -307,6 +323,7 @@
 "Hide Details" = "隐藏详细信息";
 "Hide Sidebar" = "隐藏边栏";
 "Hide Sidebar (⌃⌘S)" = "隐藏边栏（⌃⌘S）";
+"Hide summary" = "隐藏总结";
 "Hide thinking" = "隐藏思考内容";
 "Hides the arguments and result" = "隐藏参数和结果";
 "High" = "高";
@@ -336,6 +353,7 @@
 "It lists allowed tools. Parley ignores that: tools still ask as they always do." = "它列出了预先允许的工具。Parley 会忽略这一项：工具仍会像平常一样先询问。";
 "It receives a request from this Mac for that information, and nothing else." = "它会收到这台 Mac 索取该信息的请求，除此之外不会收到任何内容。";
 "it refused the connection" = "它拒绝了连接";
+"It runs automatically before a reply once the context is 80 percent full (change the threshold or turn it off in the context popover; one setting for every conversation), and only where the context length is known. Compact Now does it at once. Restore Full History sends every message again. Each compaction is one more request to the model, which costs on a paid API. If it fails, the reply goes on without a new summary and a note says so." = "上下文用到 80% 时，会在回复之前自动压缩（可以在上下文弹窗里修改阈值或关闭；这个设置对所有对话生效），前提是知道上下文长度。“立即压缩”会马上压缩，“恢复完整历史”会重新发送所有消息。每次压缩都会向模型多发一次请求，付费 API 会因此多花一点钱。压缩失败时，这次回复不使用新的总结，并附一条说明。";
 "It runs only as a task, which Parley does not support." = "它只能作为任务运行，而 Parley 不支持这种方式。";
 "It stops, and its arguments, URL, environment values and headers are removed from the Keychain." = "它会停止运行，其参数、URL、环境变量值和标头会从钥匙串中移除。";
 "it took too long" = "它耗时过长";
@@ -437,6 +455,7 @@
 "Not shown to the model: %@." = "未提供给模型：%@。";
 "Nothing leaves here except what you send to the servers you chose, the sign-in providers and the tools you allow." = "除了你发送给所选服务器、登录提供商和你允许的工具的内容之外，任何内容都不会离开这里。";
 "Nothing starts when you import. Turn a server on for a chat with the wrench button (⇧⌘T)." = "导入时不会启动任何东西。请用扳手按钮（⇧⌘T）为对话打开服务器。";
+"Nothing to compact yet: the newest exchange is always sent in full." = "暂时没有可压缩的内容：最新的一轮对话总是完整发送。";
 "Nothing yet" = "暂无";
 "Nothing yet." = "暂无内容。";
 "npx, uvx, or a full path" = "npx、uvx 或完整路径";
@@ -474,6 +493,7 @@
 "Paste a server config from another MCP client" = "粘贴来自其他 MCP 客户端的服务器配置";
 "Paste a server config from another MCP client: an object with mcpServers or servers, or the entries alone. Parley does not read other apps' files." = "粘贴来自其他 MCP 客户端的服务器配置：包含 mcpServers 或 servers 的对象，或仅粘贴其中的条目。Parley 不读取其他 App 的文件。";
 "Paste from Clipboard" = "从剪贴板粘贴";
+"Percent" = "百分比";
 "Permissions" = "权限";
 "Permissions requested:" = "请求的权限：";
 "Pick a note from the wall, or start a new one." = "从墙上挑一张便条，或者开始一张新的。";
@@ -548,6 +568,7 @@
 "Reset All Approvals" = "重置所有批准";
 "Restart" = "重新启动";
 "Restarts on next use. %@" = "下次使用时重新启动。%@";
+"Restore Full History" = "恢复完整历史";
 "Result" = "结果";
 "Result limit (characters)" = "结果上限（字符）";
 "Resume them on Strata's Serving page, then retry." = "请在 Strata 的 Serving 页面上恢复接受请求，然后重试。";
@@ -586,6 +607,7 @@
 "See its log in Settings > MCP." = "请在“设置”>“MCP”中查看它的日志。";
 "Select a provider" = "选择一个提供商";
 "Send (Enter)" = "发送（Enter）";
+"Send every message in full again. The summary is dropped." = "重新完整发送所有消息，丢弃总结。";
 "Send Message" = "发送消息";
 "Sending replaces it and the %lld messages after it. Esc cancels." = "发送后将替换此消息及其后的 %lld 条消息。按 Esc 取消。";
 "Sending replaces it and the message after it. Esc cancels." = "发送后将替换此消息及其后的 1 条消息。按 Esc 取消。";
@@ -604,6 +626,7 @@
 "Show Sidebar" = "显示边栏";
 "Show Sidebar (⌃⌘S)" = "显示边栏（⌃⌘S）";
 "Show Skills Folder" = "显示技能文件夹";
+"Show summary" = "显示总结";
 "Show thinking" = "显示思考内容";
 "Show token usage under replies" = "在回复下方显示 token 用量";
 "Shows context details" = "显示上下文详细信息";
@@ -659,12 +682,15 @@
 "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.%@ A value below overrides it." = "Strata 的共享端口不报告上下文长度；Parley 从 Strata 上次的溢出错误中得知并记住了它。%@在下方输入的值会覆盖它。";
 "Strata's Tailscale or LAN address" = "Strata 的 Tailscale 或局域网地址";
 "Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone." = "Strata：“无”会关闭思考，“高”是其最高级别，预算限制每条回复的思考量。最大 token 数较小时，可能仅思考就会把它用完。";
+"Summarize everything but the newest exchange now. The messages stay in the conversation." = "现在就把除最新一轮以外的内容总结起来。消息本身仍保留在对话里。";
+"Summarizing earlier messages to fit the context…" = "正在总结较早的消息，以便放进上下文…";
 "Switched off in the pasted config, so it stays off here." = "粘贴的配置中已将其关闭，因此在这里也保持关闭。";
 "System Prompt" = "系统提示词";
 "Temperature" = "温度";
 "Test Connection" = "测试连接";
 "Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings)." = "上方文件夹中的文本文件（UTF-8、UTF-16，或 GBK 等中文编码）。";
 "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request." = "这约占此模型上下文的 %lld%%。请关闭不需要的服务器或工具，否则模型可能会拒绝请求。";
+"The %lld messages above are sent as a summary" = "以上 %lld 条消息以总结的形式发送";
 "The %lld messages after this one will be deleted from the conversation." = "这条消息之后的 %lld 条消息将从对话中删除。";
 "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it." = "地址检查和实际连接是两次独立的查询，因此如果网站在两次查询之间更改了 DNS 应答，或者存在代理，请求就可能在 Parley 察觉并丢弃该应答之前到达你网络中的设备。模型永远不会收到该应答。如果代理会用它自己的地址应答每个域名（Clash 和 Surge 就可能这样做），地址检查就无法区分你网络中的设备与公共网站。卡片才是真正的防线：允许之前请先看清地址。";
 "The address contains hidden or right-to-left characters, shown here as \\u{…}." = "该地址包含隐藏字符或从右到左书写的字符，此处显示为 \\u{…}。";
@@ -696,10 +722,12 @@
 "The file is not a zip archive Parley can read." = "这个文件不是 Parley 能读取的 zip 压缩包。";
 "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory." = "文件将使用由此密码派生的密钥以 AES-256-GCM 加密，并且只会在内存中解密。";
 "The file will be re-encrypted with a key derived from the new password." = "文件将使用由新密码派生的密钥重新加密。";
+"The first %lld messages are sent as a summary; the rest in full." = "前 %lld 条消息以总结的形式发送，其余完整发送。";
 "The header %@ has an empty name or a line break, so it cannot be sent." = "标头 %@ 的名称为空或包含换行符，因此无法发送。";
 "The Internet connection appears to be offline." = "似乎已断开与互联网的连接。";
 "The lantern's on" = "灯笼亮着呢";
 "The message after this one will be deleted from the conversation." = "这条消息之后的 1 条消息将从对话中删除。";
+"The messages above are sent as a summary" = "以上消息以总结的形式发送";
 "The model is still loading in Strata" = "模型仍在 Strata 中加载";
 "The model may still be loading (a cold start can take several minutes), or the engine stopped. Retry in a moment." = "模型可能仍在加载（冷启动可能需要几分钟），或者引擎已停止。请稍后重试。";
 "The model wrote nothing after the tool results." = "模型在工具结果之后没有写任何内容。";
@@ -749,9 +777,11 @@
 "The skill's files could not be copied into Parley's skills folder." = "无法将技能的文件复制到 Parley 的技能文件夹中。";
 "The skill's folders are nested more than 16 levels deep." = "这个技能的文件夹嵌套超过 16 层。";
 "The skills already there go to the Trash." = "已有的同名技能会移到废纸篓。";
+"The strip under the message box shows how fast the model is replying and how much of its context (memory) the conversation uses. Click it for details, to enter the context length if the server does not report it, and for compaction." = "输入框下方的状态条显示模型回复的速度，以及对话用掉了多少上下文（记忆）。点它可以看详情；服务器不报告上下文长度时，可以在这里填写；压缩也在这里。";
 "The text received so far is kept." = "已收到的文本会保留。";
 "The thinking budget is sent only to Strata." = "思考预算只会发送给 Strata。";
 "The thinking budget is sent only to Strata; this server does not get it." = "思考预算只会发送给 Strata；此服务器不会收到。";
+"The threshold is a percent from 30 to 95." = "阈值是 30 到 95 之间的百分比。";
 "The tool asked for input Parley does not support." = "该工具请求了 Parley 不支持的输入。";
 "The URL and header values go to your login Keychain." = "URL 和标头值会存入你的登录钥匙串。";
 "The URL uses a variable, which Parley does not expand." = "此 URL 使用了变量，而 Parley 不会展开变量。";
@@ -861,6 +891,7 @@
 "Waiting for your approval of a tool call" = "正在等待你批准一个工具调用";
 "Web" = "网页";
 "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away." = "与任何工具结果一样，工具返回的内容会发送给模型的提供商。网页或文件可能会指使模型读取某些内容并把它放进一个地址中，或者覆盖某个文件。这就是这些工具没有“始终允许”的原因：请检查每张卡片上的参数，尤其是地址。“自动放行”会去掉这道检查。";
+"When the context is" = "上下文用到";
 "Where files live" = "文件存放位置";
 "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image." = "加上图像，此对话每次请求约 %1$@，超过了 %3$@ 接受的 %2$@：每条消息都会再次发送这些图像。请移除部分图像，或从第一张图像之前的消息分叉。";
 "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back." = "加上工具结果，此对话每次请求约 %1$@，超过了 %3$@ 接受的 %2$@：每条消息都会再次发送这些结果。请从较早的消息分叉，或回退。";

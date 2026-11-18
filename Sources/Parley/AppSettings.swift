@@ -27,6 +27,8 @@ final class AppSettings {
         static let builtInFolderPath = "builtInFolderPath"
         static let builtInBrowseOtherSites = "builtInBrowseOtherSites"
         static let toolApproval = "toolApproval"
+        static let autoCompaction = "autoCompaction"
+        static let compactionThreshold = "compactionThresholdPercent"
         static let disabledSkills = "disabledSkills"
     }
 
@@ -88,6 +90,25 @@ final class AppSettings {
     /// Whether a tool call waits for the user's Allow. Manual unless the user chose otherwise.
     var toolApproval: ToolApprovalMode {
         didSet { defaults.set(toolApproval.rawValue, forKey: Key.toolApproval) }
+    }
+    /// Automatic context compaction (the context popover). On unless the user turned it off; it
+    /// acts only where the context length is known.
+    var autoCompaction: Bool {
+        didSet { defaults.set(autoCompaction, forKey: Key.autoCompaction) }
+    }
+    /// Percent of the context length at which a reply first compacts the history. One value for
+    /// every conversation, kept within `Compaction.thresholdRange`.
+    var compactionThresholdPercent: Int {
+        didSet {
+            let clamped = min(max(compactionThresholdPercent, Compaction.thresholdRange.lowerBound), Compaction.thresholdRange.upperBound)
+            // Setting a property in its own didSet does not call didSet again.
+            if clamped != compactionThresholdPercent { compactionThresholdPercent = clamped }
+            defaults.set(compactionThresholdPercent, forKey: Key.compactionThreshold)
+        }
+    }
+
+    var compactionPolicy: CompactionPolicy {
+        CompactionPolicy(automatic: autoCompaction, thresholdPercent: compactionThresholdPercent)
     }
 
     /// The names of the skills the user switched off in Settings > Skills. A skill is on unless it is
@@ -346,6 +367,9 @@ final class AppSettings {
         self.builtInFolderPath = storedFolder.isEmpty ? nil : storedFolder
         self.builtInBrowseOtherSites = defaults.bool(forKey: Key.builtInBrowseOtherSites)
         self.toolApproval = defaults.string(forKey: Key.toolApproval).flatMap(ToolApprovalMode.init(rawValue:)) ?? .manual
+        self.autoCompaction = defaults.object(forKey: Key.autoCompaction) as? Bool ?? true
+        let storedThreshold = defaults.object(forKey: Key.compactionThreshold) as? Int ?? Compaction.defaultThresholdPercent
+        self.compactionThresholdPercent = min(max(storedThreshold, Compaction.thresholdRange.lowerBound), Compaction.thresholdRange.upperBound)
         self.disabledSkills = defaults.stringArray(forKey: Key.disabledSkills) ?? []
         self.contextLengthOverrides = (defaults.dictionary(forKey: Key.contextLengthOverrides) ?? [:])
             .compactMapValues { ($0 as? NSNumber)?.intValue }

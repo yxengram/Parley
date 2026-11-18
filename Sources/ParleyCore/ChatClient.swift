@@ -36,6 +36,9 @@ public struct ChatRequestOptions: Sendable {
     /// ReAct text mode: the tools go out as text in the system message, and `tools` stays nil.
     /// `omitsTools` drops this too.
     public var react: ReActRequest? = nil
+    /// The compacted history's summary block (`EffectiveHistory.summaryBlock`), added to the system
+    /// text after the prompt and any ReAct block. Nil sends what was sent before compaction existed.
+    public var historySummary: String? = nil
 
     public init(model: String, systemPrompt: String = "", temperature: Double? = nil, maxTokens: Int? = nil, reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
@@ -513,6 +516,12 @@ public final class ChatClient: @unchecked Sendable {
         if sendsReact(options), let react = options.react {
             let block = ReActPrompt.block(tools: react.tools, nonce: react.nonce)
             systemText = Message.isBlank(systemText) ? block : systemText + "\n\n" + block
+        }
+        // After the prompt and tools, which stay the same from request to request (a server's
+        // prompt cache keeps them), and in the system text: some chat templates refuse a system
+        // message anywhere but first.
+        if let summary = options.historySummary, !Message.isBlank(summary) {
+            systemText = Message.isBlank(systemText) ? summary : systemText + "\n\n" + summary
         }
         if !systemText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             apiMessages.append(["role": "system", "content": systemText])

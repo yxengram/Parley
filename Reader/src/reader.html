@@ -231,6 +231,7 @@ button { cursor: pointer; }
 }
 .paper-btn:hover { background: var(--paperDeep); color: var(--ink); }
 .forked { font-size: 10px; color: var(--inkFaint); padding: 0 20px 4px; }
+.compacted { padding: 6px 20px 10px; border-top: 1px dashed var(--inkFaint); margin: 4px 20px 8px; }
 .small-note { display: flex; gap: 5px; align-items: flex-start; font-size: 10px; line-height: 13px; color: var(--inkSoft); }
 .small-note .icon { margin-top: 1px; }
 .footer-stats { font-size: 10px; color: var(--inkFaint); font-variant-numeric: tabular-nums; }
@@ -547,6 +548,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       detailsTip: 'Conversation details: system prompt and settings (read-only)',
       lockTip: 'Lock: remove the decrypted conversation from memory',
       forkedFrom: 'Forked from another conversation',
+      compactedSummary: 'The {count} messages above are sent as a summary',
+      compactedSummaryNoCount: 'The messages above are sent as a summary',
       messageFailed: 'This message could not be shown.',
       scrollToBottom: 'Scroll to Bottom',
       scrollToLatest: 'Scroll to the latest message',
@@ -754,6 +757,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       detailsTip: '对话详情：系统提示词和设置（只读）',
       lockTip: '锁定：从内存中移除已解密的对话',
       forkedFrom: '从另一个对话分叉而来',
+      compactedSummary: '以上 {count} 条消息以总结的形式发送',
+      compactedSummaryNoCount: '以上消息以总结的形式发送',
       messageFailed: '无法显示此消息。',
       scrollToBottom: '滚动到底部',
       scrollToLatest: '滚动到最新消息',
@@ -1838,10 +1843,14 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     if (obj(c.forkedFrom)) column.append(h('div', { class: 'forked', text: t('forkedFrom') }));
     if (!messages.length) column.append(invitation(model));
     const notes = thinkingOffRepeats(messages);
+    // Context compaction: requests sent the messages up to here as a summary. Parley keeps them all.
+    const compaction = obj(c.compaction);
+    const compactedThrough = compaction ? str(compaction.throughMessageID) : '';
     messages.forEach((m, i) => {
       let row;
       try { row = messageRow(entry, c, m, notes[i]); } catch (_) { row = h('div', { class: 'msg' }, h('div', { class: 'row-failed', text: t('messageFailed') })); }
       column.append(row);
+      if (compactedThrough && obj(m) && str(m.id) === compactedThrough) column.append(compactionDivider(compaction));
     });
     const sentinel = h('div', { 'aria-hidden': 'true', style: 'height:1px' });
     column.append(sentinel);
@@ -2237,6 +2246,23 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       h('pre', { class: 'code-body', dir: 'ltr', tabindex: '0' }, h('code', { text: code })));
     addShape(card, [{ seed: 5, radius: 12, amplitude: 0.8 }], 'shadow-code');
     return card;
+  }
+
+  // ---- context compaction: where the summary ends, with the summary in a disclosure
+  function compactionDivider(compaction) {
+    const count = num(compaction.messageCount);
+    const label = count > 0 ? t('compactedSummary', { count: grouped(count) }) : t('compactedSummaryNoCount');
+    const btn = h('button', { type: 'button', class: 'disclosure-btn', 'aria-expanded': 'false' },
+      icon('chevron', 'chev'), h('span', { text: label }));
+    const wrap = h('div', { class: 'thinking' }, btn);
+    let body = null;
+    on(btn, 'click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(open));
+      if (open && !body) { body = h('div', { class: 'thinking-body', dir: 'auto', text: str(compaction.summary) }); wrap.append(body); }
+      if (body) body.hidden = !open;
+    });
+    return h('div', { class: 'compacted' }, wrap);
   }
 
   // ---- disclosure (thinking, ReAct thought)

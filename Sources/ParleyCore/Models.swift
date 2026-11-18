@@ -215,6 +215,9 @@ public struct Conversation: Codable, Identifiable, Hashable, Sendable {
     /// Linear history, oldest first. The system prompt lives in `settings`, not here.
     public var messages: [Message]
     public var forkedFrom: ForkOrigin?
+    /// The summary that stands for the start of `messages` in requests (see Compaction). Nil, and
+    /// absent from the file, until the history is compacted.
+    public var compaction: ConversationCompaction?
 
     public init(
         id: UUID = UUID(),
@@ -223,7 +226,8 @@ public struct Conversation: Codable, Identifiable, Hashable, Sendable {
         updatedAt: Date = Date(),
         settings: ConversationSettings = ConversationSettings(),
         messages: [Message] = [],
-        forkedFrom: ForkOrigin? = nil
+        forkedFrom: ForkOrigin? = nil,
+        compaction: ConversationCompaction? = nil
     ) {
         self.id = id
         self.title = title
@@ -232,13 +236,28 @@ public struct Conversation: Codable, Identifiable, Hashable, Sendable {
         self.settings = settings
         self.messages = messages
         self.forkedFrom = forkedFrom
+        self.compaction = compaction
     }
 
-    /// Keeps messages[0...index] and drops the rest (rollback).
+    /// Keeps messages[0...index] and drops the rest (rollback). A compaction whose summary covers
+    /// a message that goes is dropped with it: it would stand for messages no longer there.
     public mutating func truncate(keepingThrough index: Int) {
         guard index >= -1, index < messages.count else { return }
         messages = Array(messages.prefix(index + 1))
+        if compaction != nil, compactionBoundary == nil { compaction = nil }
+        compaction = Self.restaled(compaction, in: messages)
         updatedAt = Date()
+    }
+
+    /// When the message that marks where stale server counts end is gone (a rollback, an edit or a
+    /// regenerate dropped it), every message left predates the summary, so the mark moves to the
+    /// last one: a reply written after this anchors again.
+    static func restaled(_ compaction: ConversationCompaction?, in messages: [Message]) -> ConversationCompaction? {
+        guard var compaction, let stale = compaction.countsStaleThroughID, !messages.contains(where: { $0.id == stale }) else {
+            return compaction
+        }
+        compaction.countsStaleThroughID = messages.last?.id
+        return compaction
     }
 
     /// A new conversation containing messages[0...index] (fork). Gets a fresh id.
@@ -253,7 +272,10 @@ public struct Conversation: Codable, Identifiable, Hashable, Sendable {
             updatedAt: now,
             settings: settings,
             messages: prefix,
-            forkedFrom: prefix.last.map { ForkOrigin(conversationID: id, messageID: $0.id) }
+            forkedFrom: prefix.last.map { ForkOrigin(conversationID: id, messageID: $0.id) },
+            // Kept when the fork holds every message it covers.
+            compaction: Self.restaled(compaction.flatMap { compaction in prefix.contains { $0.id == compaction.throughMessageID } ? compaction : nil },
+                                      in: prefix)
         )
     }
 }

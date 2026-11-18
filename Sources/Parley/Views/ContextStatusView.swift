@@ -138,7 +138,7 @@ struct ContextSnapshot: Equatable {
             promptTokensRead: lastStats?.promptTokensRead,
             cachedPromptTokens: lastStats?.cachedPromptTokens,
             promptProgress: live?.promptProgress,
-            toolActivity: toolActivity(session.replyPhase),
+            toolActivity: session.isCompacting ? String(localized: "Compacting…") : toolActivity(session.replyPhase),
             isStreaming: session.isStreaming,
             reload: provider.flatMap { model.isEmpty ? nil : appState.reloadState(provider: $0, model: model) }
         )
@@ -150,6 +150,7 @@ struct ContextSnapshot: Equatable {
         case .connecting(let servers): return MessageRow.startingText(servers)
         case .awaitingApproval: return String(localized: "Waiting for your approval")
         case .runningTool(let tool): return String(localized: "Running \(ToolDisplay.visible(tool))…")
+        case .compacting: return String(localized: "Compacting…")
         case .generating, nil: return nil
         }
     }
@@ -429,6 +430,7 @@ struct ContextPopover: View {
     @ViewState private var manualText = ""
     @ViewState private var reloadText = ""
     @ViewState private var confirmingReload = false
+    @ViewState private var thresholdText = ""
 
     static func sourceText(_ source: ContextLimitSource, serverKind: InferenceServerKind? = nil) -> String {
         switch source {
@@ -468,6 +470,10 @@ struct ContextPopover: View {
                     .padding(15)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .stitchedCard(Hideout.card, seed: 22, radius: 14)
+                compactionSection(snap)
+                    .padding(15)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .stitchedCard(Hideout.card, seed: 24, radius: 14)
             }
             if snap.info?.canSetContextLength == true {
                 reloadSection(snap)
@@ -480,6 +486,7 @@ struct ContextPopover: View {
         .frame(width: 360)
         .onAppear {
             manualText = snap.manual.map(String.init) ?? ""
+            thresholdText = String(appState.settings.compactionThresholdPercent)
         }
         // The reload runs on in AppState when the popover closes; its outcome stays until then.
         .onDisappear {
@@ -674,6 +681,103 @@ struct ContextPopover: View {
             .font(.caption)
             .foregroundStyle(Hideout.inkSoft)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// One value for every conversation (AppSettings); parsed on every keystroke, and only a value
+    /// in range is taken, so typing "85" does not pass through 8.
+    static func parseThreshold(_ text: String) -> Int? {
+        guard let value = Int(text.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "%％"))),
+              Compaction.thresholdRange.contains(value) else { return nil }
+        return value
+    }
+
+    static func compactionStatus(_ conversation: Conversation) -> String {
+        guard conversation.compactionBoundary != nil, let count = conversation.compaction?.messageCount else {
+            return String(localized: "Every message is sent in full.")
+        }
+        return String(localized: "The first \(count) messages are sent as a summary; the rest in full.")
+    }
+
+    private func compactionSection(_ snap: ContextSnapshot) -> some View {
+        @Bindable var settings = appState.settings
+        let busy = session.isBusy
+        let compacted = session.conversation.compactionBoundary != nil
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Compaction").lettered(15)
+            Toggle(isOn: $settings.autoCompaction) {
+                Text("Compact automatically")
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            HStack(spacing: 6) {
+                Text("When the context is")
+                TextField("Percent", text: $thresholdText, prompt: Text(verbatim: String(Compaction.defaultThresholdPercent)).foregroundStyle(Hideout.inkFaint))
+                    .accessibilityLabel("Compaction threshold in percent")
+                    .composerPopoverField()
+                    .frame(width: 48)
+                    .onChange(of: thresholdText) { _, text in
+                        if let value = Self.parseThreshold(text) { appState.settings.compactionThresholdPercent = value }
+                    }
+                    // A value out of range is not taken: Return shows the one in use again.
+                    .onSubmit { thresholdText = String(appState.settings.compactionThresholdPercent) }
+                    .onDisappear { thresholdText = String(appState.settings.compactionThresholdPercent) }
+                Text(verbatim: "%")
+                Text("full")
+                if Self.parseThreshold(thresholdText) == nil {
+                    Text("30–95")
+                        .foregroundStyle(Hideout.danger)
+                        .help("The threshold is a percent from 30 to 95.")
+                }
+            }
+            .disabled(!settings.autoCompaction)
+            .foregroundStyle(settings.autoCompaction ? Hideout.ink : Hideout.inkFaint)
+            Text(snap.limit == nil
+                 ? "Automatic compaction needs the context length: enter it above."
+                 : snap.limit?.source == .serverMaximum
+                 ? "Before a reply, earlier messages are summarized by this conversation's model. The limit here is the model's maximum; the loaded size may be smaller."
+                 : "Before a reply, earlier messages are summarized by this conversation's model. One setting for every conversation.")
+                .font(.caption)
+                .foregroundStyle(Hideout.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: Self.compactionStatus(session.conversation))
+                .font(.caption)
+                .foregroundStyle(Hideout.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button {
+                    session.compactNow(settings: appState.settings)
+                } label: {
+                    if session.isCompacting {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.mini)
+                            Text("Compacting…")
+                        }
+                    } else {
+                        Text("Compact Now")
+                    }
+                }
+                .buttonStyle(TagButtonStyle(kind: .primary))
+                .disabled(busy || session.conversation.messages.count < 3)
+                .help("Summarize everything but the newest exchange now. The messages stay in the conversation.")
+                if compacted {
+                    Button("Restore Full History", action: session.restoreFullHistory)
+                        .buttonStyle(TagButtonStyle())
+                        .disabled(busy)
+                        .help("Send every message in full again. The summary is dropped.")
+                }
+            }
+            if let error = session.compactionError {
+                Text(verbatim: ErrorPresentation.shownSystemText(ErrorPresentation.displayText(error)))
+                    .font(.caption)
+                    .foregroundStyle(Hideout.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let notice = session.compactionNotice {
+                Text(verbatim: notice)
+                    .font(.caption)
+                    .foregroundStyle(Hideout.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private func manualSection(_ snap: ContextSnapshot) -> some View {

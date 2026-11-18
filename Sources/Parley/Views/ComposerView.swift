@@ -11,7 +11,7 @@ struct ComposerView: View {
     @ViewState private var showToolsPopover = false
 
     private var canSend: Bool {
-        !session.isStreaming
+        !session.isBusy
             && (!session.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !session.draftAttachments.isEmpty)
     }
 
@@ -120,7 +120,7 @@ struct ComposerView: View {
                 .padding(.vertical, 5)
                 .help("Enter sends, Shift-Enter adds a new line. ↑ edits your last message.")
 
-                if session.isStreaming {
+                if session.isBusy {
                     // Inked in, with a square: nothing like the ember paper plane it replaces.
                     Button(action: session.stop) {
                         Image(systemName: "stop.fill")
@@ -181,7 +181,7 @@ struct ComposerView: View {
                 .foregroundStyle(count > 0 ? Hideout.emberText : Hideout.inkSoft)
         }
         .buttonStyle(RoundIconButtonStyle(size: 32, hoverFill: Hideout.composerWash))
-        .disabled(session.isStreaming)
+        .disabled(session.isBusy)
         .help("Tools: what this conversation can use (⇧⌘T)")
         .accessibilityLabel("Tools")
         .accessibilityValue(count == 1 ? Text("1 source on") : Text("\(count) sources on"))
@@ -212,8 +212,11 @@ struct ComposerView: View {
         let provider = appState.settings.resolvedProvider(for: session.conversation.settings)
         let model = ConversationSession.effectiveModel(settings: session.conversation.settings, provider: provider)
         guard let provider, !model.isEmpty, let info = appState.contextInfo(provider: provider, model: model) else { return nil }
-        // What the next request sends again (a staged edit replaces its message and the later ones).
-        let history = session.pendingEditIndex.map { Array(session.conversation.messages.prefix($0)) } ?? session.conversation.messages
+        // What the next request sends again (a staged edit replaces its message and the later ones),
+        // after any compaction: the request's own rule (Conversation.effectiveHistory).
+        var next = session.conversation
+        if let edit = session.pendingEditIndex { next.truncate(keepingThrough: edit - 1) }
+        let history = next.effectiveHistory.messages
         return Self.serverWarning(info: info, providerName: provider.name, model: model, history: history,
                                   draft: session.draftAttachments, draftText: session.draftText,
                                   // A conversation with only built-in tools stays a plain chat here too.
@@ -286,7 +289,7 @@ struct ComposerView: View {
 
     /// Esc: stop a streaming reply, or cancel an edit. Returns false when there is nothing to do.
     private func escape() -> Bool {
-        if session.isStreaming {
+        if session.isBusy {
             session.stop()
             return true
         }
@@ -299,7 +302,7 @@ struct ComposerView: View {
 
     /// ↑ in an empty composer: edit the last user message.
     private func editLast() -> Bool {
-        guard !session.isStreaming, session.draftText.isEmpty, session.draftAttachments.isEmpty,
+        guard !session.isBusy, session.draftText.isEmpty, session.draftAttachments.isEmpty,
               session.pendingEditMessageID == nil,
               let index = session.lastUserMessageIndex else { return false }
         session.beginEdit(messageAt: index)

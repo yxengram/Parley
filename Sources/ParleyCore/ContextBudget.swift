@@ -128,13 +128,18 @@ public enum ContextBudget {
     /// keeps the figure honest during a tool loop. `toolDefinitionTokens` are what the next request
     /// sends as `tools`: added in full without an anchor, otherwise only what the anchor's request
     /// did not already carry.
+    ///
+    /// `anchorsFrom`: after compaction, the counts of replies from before the summary existed took a
+    /// prompt with the whole history, so only messages from this index on may anchor
+    /// (`EffectiveHistory.anchorsFrom`); the rest are estimated, the summary in `systemPrompt`.
     public static func usage(
         messages: [Message],
         systemPrompt: String,
         inFlightID: UUID? = nil,
         liveCompletionTokens: Int = 0,
         liveIsEstimated: Bool = false,
-        toolDefinitionTokens: Int = 0
+        toolDefinitionTokens: Int = 0,
+        anchorsFrom: Int = 0
     ) -> ContextUsage {
         var tokens = 0
         var estimated = false
@@ -142,7 +147,8 @@ public enum ContextBudget {
         var anchored = false
         var anchorDefinitions = 0
 
-        if let i = messages.lastIndex(where: { hasAnchor($0, inFlightID: inFlightID) }) {
+        let firstAnchor = min(max(messages.startIndex, messages.startIndex + anchorsFrom), messages.endIndex)
+        if let i = messages[firstAnchor...].lastIndex(where: { hasAnchor($0, inFlightID: inFlightID) }) {
             let message = messages[i]
             anchored = true
             anchorDefinitions = message.toolDefinitionTokens ?? 0

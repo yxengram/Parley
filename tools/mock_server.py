@@ -57,6 +57,8 @@ by that much, so tests can send while a context probe is still running (/v1/mode
 GET /mock/last-request (every flavor) returns the last chat request body without its messages
 (message_count instead), so tests can check which fields were sent. GET /mock/last-messages returns
 its messages and tools as received.
+GET /mock/last-summary returns the last context-compaction summary request (the one whose last user
+message is Parley's compaction instruction), whole.
 
 Tool calling (every non-Strata flavor), selected by model name like the mock-* modes below, but not
 listed by /v1/models. Last message from the user: call the tool named by tool=<name> in its text
@@ -136,6 +138,9 @@ Endpoints:
   GET  /v1/models             lists the mock models below
   POST /v1/chat/completions   streams (SSE) a reply; the mode is picked by the model name:
     mock-plain               plain content (also used for unknown model names)
+    mock-summary-fail        a context-compaction summary request gets HTTP 500; anything else is plain
+    mock-summary-length      a summary request ends with finish_reason "length"; anything else is plain
+                             (every model answers a summary request with SUMMARY(n): the first words of each message)
     mock-reasoning-content   reasoning in delta.reasoning_content, then content
     mock-reasoning           reasoning in delta.reasoning, then content
     mock-think-tags          inline <think>...</think>, tags split across chunks
@@ -239,9 +244,12 @@ STATE_LOCK = threading.Lock()
 # LM Studio-like model state, in memory: key -> {"max": int, "instances": [{"id", "context_length"}]}
 LMS_MODELS = {}
 COUNTERS = {"chat": 0, "stream_options_rejected": 0, "thinking_off_rejected": 0, "load": 0, "unload": 0, "get_other": 0,
-            "requests_with_tools": 0, "react_disconnects": 0, "react_streamed_to_end": 0}
+            "requests_with_tools": 0, "react_disconnects": 0, "react_streamed_to_end": 0, "summaries": 0}
 LAST_REQUEST = {}
 LAST_MESSAGES = {}
+# The last context-compaction summary request (Parley's Compaction.instruction ends it).
+LAST_SUMMARY = {}
+SUMMARY_INSTRUCTION_PREFIX = "Summarize the conversation above so that it can continue without it."
 
 STRATA_MODELS = ["strata-qwen", "strata-nofit", "strata-slow", "strata-loading", "strata-novision", "strata-length"]
 STRATA_CTX = 8192
@@ -667,6 +675,8 @@ class Handler(BaseHTTPRequestHandler):
             LAST_MESSAGES.update({"messages": req.get("messages"), "tools": req.get("tools")})
             if req.get("tools"):
                 COUNTERS["requests_with_tools"] += 1
+        if self.summary_reply(req, model):
+            return
         if model.startswith(REACT_MODEL_PREFIX):
             self.react_reply(req, model)
             return
@@ -727,6 +737,43 @@ class Handler(BaseHTTPRequestHandler):
             # The client stopped reading (e.g. the user pressed Stop).
             self.close_connection = True
 
+    def summary_reply(self, req, model):
+        """A context-compaction request: answered, for any model, with a summary that names the
+        first words of each message it was given. Model mock-summary-fail answers it with 500."""
+        messages = req.get("messages") or []
+        text, _ = last_user_message(messages)
+        if not text.startswith(SUMMARY_INSTRUCTION_PREFIX):
+            return False
+        with STATE_LOCK:
+            COUNTERS["summaries"] += 1
+            LAST_SUMMARY.clear()
+            LAST_SUMMARY.update({k: v for k, v in req.items()})
+        if model == "mock-summary-fail":
+            self.send_json(500, {"error": {"message": "mock summary failure"}})
+            return True
+        if model == "mock-summary-length":
+            # A summary cut off at max_tokens.
+            self.start_stream()
+            self.sse(self.chunk(model, {"role": "assistant", "content": "SUMMARY cut"}))
+            self.sse(self.chunk(model, {}, finish="length"))
+            self.end_stream()
+            return True
+        parts = []
+        for msg in messages[:-1]:
+            content = msg.get("content") if isinstance(msg, dict) else None
+            if isinstance(content, str) and content.strip():
+                parts.append(" ".join(content.split()[:3]))
+        summary = "SUMMARY(%d): %s" % (len(messages) - 1, " | ".join(parts))
+        try:
+            options = req.get("stream_options")
+            include_usage = isinstance(options, dict) and options.get("include_usage") is True
+            self.start_stream()
+            self.stream(model, summary, include_usage, thinking=False)
+            self.end_stream()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        return True
+
     # ---- mock control (every flavor) -------------------------------------
 
     def mock_control(self, path):
@@ -741,6 +788,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/mock/last-messages":
             with STATE_LOCK:
                 self.send_json(200, dict(LAST_MESSAGES))
+            return True
+        if path == "/mock/last-summary":
+            with STATE_LOCK:
+                self.send_json(200, dict(LAST_SUMMARY))
             return True
         return False
 

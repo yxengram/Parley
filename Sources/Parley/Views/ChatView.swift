@@ -236,6 +236,7 @@ private struct MessageListView: View {
         let serverKind = provider.flatMap { model.isEmpty ? nil : appState.contextInfo(provider: $0, model: model) }?.serverKind
         let editIndex = session.pendingEditIndex
         let repeatsNote = MessageRow.repeatsThinkingOffNotes(messages)
+        let compactedThrough = session.conversation.compactionBoundary
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -248,7 +249,7 @@ private struct MessageListView: View {
                             isStreamingThis: streamingThis,
                             isReasoningNow: streamingThis && session.streamIsReasoning,
                             thinkingStartedAt: streamingThis ? session.streamReasoningStartedAt : nil,
-                            conversationBusy: session.isStreaming,
+                            conversationBusy: session.isBusy,
                             showUsage: appState.settings.showTokenUsage,
                             editState: editIndex.map { index == $0 ? .editing : (index > $0 ? .replaced : .none) } ?? .none,
                             providerName: provider?.name,
@@ -265,6 +266,9 @@ private struct MessageListView: View {
                         )
                         .equatable()
                         .id(message.id)
+                        if index == compactedThrough, let compaction = session.conversation.compaction {
+                            CompactionDivider(compaction: compaction)
+                        }
                     }
                     Color.clear
                         .frame(height: 1)
@@ -514,7 +518,7 @@ private struct ModelMenu: View {
         let failure: String? = { if case .failed(let m) = state { return m } else { return nil } }()
 
         Group {
-            if session.isStreaming {
+            if session.isBusy {
                 // No model change during a reply, but a disabled Menu turns AppKit grey just when
                 // the name matters most. The hidden chevron keeps the tag's width.
                 HStack(spacing: 4) {

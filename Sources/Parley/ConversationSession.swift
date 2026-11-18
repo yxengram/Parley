@@ -99,6 +99,16 @@ final class ConversationSession: Identifiable {
     /// only the views that show it re-render. Nil when nothing is streaming.
     private(set) var liveGeneration: LiveGeneration?
     var isStreaming: Bool { streamingMessageID != nil }
+    /// A Compact Now from the context popover is running (no reply is). Automatic compaction runs
+    /// inside a reply instead, as its `.compacting` phase.
+    private(set) var isCompacting = false
+    /// Streaming, or compacting by hand: the history must not change, and nothing new may start.
+    var isBusy: Bool { isStreaming || isCompacting }
+    /// Why the last Compact Now failed: stored English (shown through ErrorPresentation), or a
+    /// sentence in the interface language. Cleared by the next attempt.
+    private(set) var compactionError: String?
+    /// A Compact Now that found nothing to do says so here, not as an error.
+    private(set) var compactionNotice: String?
     /// What the in-flight reply is doing. Nil when nothing is streaming.
     private(set) var replyPhase: ReplyPhase?
     /// The tool call waiting for the user, shown as a card in the reply.
@@ -115,6 +125,8 @@ final class ConversationSession: Identifiable {
         case awaitingApproval
         /// Tool name.
         case runningTool(String)
+        /// Summarizing earlier messages before the request (automatic compaction).
+        case compacting
     }
 
     struct LiveGeneration: Equatable {
@@ -162,6 +174,13 @@ final class ConversationSession: Identifiable {
     @ObservationIgnored var markThinkingOffRejected: ((Provider, String, [String]) -> Void)?
     /// Tool calling (AppState.toolServices).
     @ObservationIgnored var tools: ConversationToolServices?
+    /// Context compaction: the automatic setting and threshold (AppSettings), read for each reply.
+    @ObservationIgnored var compactionPolicy: (() -> CompactionPolicy)?
+    /// The context length AppState knows for a provider's model (AppState.contextLimit).
+    @ObservationIgnored var contextLimitFor: ((Provider, String) -> ContextLimit?)?
+    @ObservationIgnored private var compactTask: Task<Void, Never>?
+    /// Which Compact Now is current: a cancelled one still unwinding must not touch the next one's state.
+    @ObservationIgnored private var compactRun = 0
     /// Resumed exactly once: by the card's buttons, or by `finalizeStreamingMessage`.
     @ObservationIgnored private var approvalContinuation: CheckedContinuation<ToolApprovalDecision, Never>?
     /// What is known to be on disk: set only after a write succeeded (or on load). Lets
@@ -260,6 +279,7 @@ final class ConversationSession: Identifiable {
             task.cancel()
             finalizeStreamingMessage(stoppedEarly: true)
         }
+        cancelCompaction()
         if saving, let error = flushSync(onlyIfChanged: true) {
             return error
         }
@@ -290,7 +310,7 @@ final class ConversationSession: Identifiable {
 
     /// Appends a user message and requests a reply.
     func send(text: String, attachments: [Attachment], settings: AppSettings) {
-        guard !isStreaming, !isClosed else { return }
+        guard !isBusy, !isClosed else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || !attachments.isEmpty else { return }
 
@@ -323,10 +343,12 @@ final class ConversationSession: Identifiable {
 
     /// Streams an assistant reply to the current history.
     func startReply(settings: AppSettings) {
-        guard !isStreaming, !isClosed else { return }
+        guard !isBusy, !isClosed else { return }
 
-        // History excludes the placeholder we are about to append.
-        let history = conversation.messages
+        // History excludes the placeholder we are about to append. After compaction it is the
+        // messages after the summary, and the summary goes in the system text.
+        let effective = conversation.effectiveHistory
+        let history = effective.messages
         let provider = settings.resolvedProvider(for: conversation.settings)
         let model = Self.effectiveModel(settings: conversation.settings, provider: provider)
 
@@ -361,6 +383,7 @@ final class ConversationSession: Identifiable {
 
         var options = ChatRequestOptions(settings: conversation.settings)
         options.model = model
+        options.historySummary = effective.summaryBlock
         let info = serverInfo?(provider, model)
         options.serverKind = info?.serverKind
         options.maxRequestBytes = info?.maxRequestBytes
@@ -469,6 +492,37 @@ final class ConversationSession: Identifiable {
             }
             options.serverKind = info?.serverKind
             options.maxRequestBytes = info?.maxRequestBytes
+        }
+
+        // Automatic compaction, before a reply to a user turn (never inside a tool loop): the
+        // earlier messages are summarized, and the request carries the summary and the rest.
+        var history = history
+        if history.last?.role == .user, let policy = compactionPolicy?(), policy.automatic,
+           let end = index(of: messageID),
+           Compaction.isDue(usage: contextUsage(), limit: contextLimitFor?(target.provider, target.model),
+                            thresholdPercent: policy.thresholdPercent) {
+            replyPhase = .compacting
+            let outcome = await compactHistory(client: client, base: options, provider: target.provider, model: target.model,
+                                               end: end) { [weak self] in self?.isCurrent(messageID) ?? false }
+            guard isCurrent(messageID) else { return }
+            if Task.isCancelled {
+                finalizeStreamingMessage(stoppedEarly: true)
+                return
+            }
+            replyPhase = .generating
+            switch outcome {
+            case .done:
+                let effective = conversation.effectiveHistory
+                history = effective.messages.filter { $0.id != messageID }
+                options.historySummary = effective.summaryBlock
+                historyUsageCache = nil
+            case .failed(let error):
+                // The reply goes on with what it had: the whole history, or the earlier summary
+                // and the messages after it.
+                addNote(ToolNote.compactionFailed, SystemErrorText.english(error), to: messageID)
+            case .nothingToDo, .cancelled:
+                break
+            }
         }
 
         // The wait above can be long, and the user may have switched a server off in it.
@@ -962,18 +1016,24 @@ final class ConversationSession: Identifiable {
                                       systemPrompt: conversation.settings.systemPrompt,
                                       toolRoundCount: rounds.count,
                                       resolvedCallCount: rounds.reduce(0) { $0 + $1.calls.filter { $0.result != nil }.count },
-                                      toolDefinitionTokens: inFlight?.toolDefinitionTokens ?? 0)
+                                      toolDefinitionTokens: inFlight?.toolDefinitionTokens ?? 0,
+                                      compaction: conversation.compaction)
             if let cached = historyUsageCache, cached.key == key {
                 history = cached.usage
             } else {
-                history = ContextBudget.usage(messages: conversation.messages, systemPrompt: key.systemPrompt, inFlightID: id,
-                                              toolDefinitionTokens: key.toolDefinitionTokens)
+                // What the request carries (Conversation.effectiveHistory), as everywhere else.
+                let effective = conversation.effectiveHistory
+                history = ContextBudget.usage(messages: effective.messages, systemPrompt: effective.systemText(prompt: key.systemPrompt),
+                                              inFlightID: id, toolDefinitionTokens: key.toolDefinitionTokens,
+                                              anchorsFrom: effective.anchorsFrom)
                 historyUsageCache = (key, history)
             }
         } else {
             historyUsageCache = nil
-            history = ContextBudget.usage(messages: conversation.messages, systemPrompt: conversation.settings.systemPrompt,
-                                          toolDefinitionTokens: idleToolDefinitionTokens)
+            let effective = conversation.effectiveHistory
+            history = ContextBudget.usage(messages: effective.messages,
+                                          systemPrompt: effective.systemText(prompt: conversation.settings.systemPrompt),
+                                          toolDefinitionTokens: idleToolDefinitionTokens, anchorsFrom: effective.anchorsFrom)
         }
         guard let live = liveGeneration, live.tokens > 0 else { return history }
         return ContextUsage(tokens: history.tokens + live.tokens, isEstimated: history.isEstimated || live.isEstimated)
@@ -986,6 +1046,7 @@ final class ConversationSession: Identifiable {
         let toolRoundCount: Int
         let resolvedCallCount: Int
         let toolDefinitionTokens: Int
+        let compaction: ConversationCompaction?
     }
 
     @ObservationIgnored private var historyUsageCache: (key: HistoryUsageKey, usage: ContextUsage)?
@@ -1081,6 +1142,7 @@ final class ConversationSession: Identifiable {
 
     /// Stop button: cancel the request and keep the partial message.
     func stop() {
+        if isCompacting { cancelCompaction() }
         guard let task = streamTask else { return }
         task.cancel()
         finalizeStreamingMessage(stoppedEarly: true)
@@ -1089,7 +1151,7 @@ final class ConversationSession: Identifiable {
     // MARK: - History editing (disabled while streaming)
 
     func rollback(toMessageAt index: Int) {
-        guard !isStreaming, index >= 0, index < conversation.messages.count else { return }
+        guard !isBusy, index >= 0, index < conversation.messages.count else { return }
         pendingEditMessageID = nil
         conversation.truncate(keepingThrough: index)
         saveNow()
@@ -1097,7 +1159,7 @@ final class ConversationSession: Identifiable {
 
     /// Puts a user message back in the composer and drops it and everything after it.
     func editAndResend(messageAt index: Int) {
-        guard !isStreaming, conversation.messages.indices.contains(index) else { return }
+        guard !isBusy, conversation.messages.indices.contains(index) else { return }
         let message = conversation.messages[index]
         guard message.role == .user else { return }
         draftText = message.content
@@ -1109,7 +1171,7 @@ final class ConversationSession: Identifiable {
     /// Staged edit (what the UI uses): puts a user message in the composer without changing
     /// the history. Sending replaces that message and everything after it; `cancelEdit` keeps all.
     func beginEdit(messageAt index: Int) {
-        guard !isStreaming, conversation.messages.indices.contains(index) else { return }
+        guard !isBusy, conversation.messages.indices.contains(index) else { return }
         let message = conversation.messages[index]
         guard message.role == .user else { return }
         if pendingEditMessageID == nil {
@@ -1142,15 +1204,173 @@ final class ConversationSession: Identifiable {
 
     /// True when the conversation ends with a user message that has no reply yet.
     var awaitsReply: Bool {
-        !isStreaming && conversation.messages.last?.role == .user
+        !isBusy && conversation.messages.last?.role == .user
     }
 
     /// Drops an assistant message (and later ones) and asks again.
     func regenerate(messageAt index: Int, settings: AppSettings) {
-        guard !isStreaming, conversation.messages.indices.contains(index) else { return }
+        guard !isBusy, conversation.messages.indices.contains(index) else { return }
         guard conversation.messages[index].role == .assistant else { return }
         pendingEditMessageID = nil
         conversation.truncate(keepingThrough: index - 1)
         startReply(settings: settings)
+    }
+}
+
+/// Settings > (context popover) Compaction, as a session reads it for each reply.
+struct CompactionPolicy: Equatable {
+    var automatic: Bool
+    var thresholdPercent: Int
+}
+
+// MARK: - Context compaction (see Compaction in ParleyCore)
+
+extension ConversationSession {
+    enum CompactionOutcome {
+        case done
+        /// Nothing worth summarizing: too few messages, or everything but the newest turn already is.
+        case nothingToDo
+        case failed(Error)
+        case cancelled
+    }
+
+    /// Folds the messages before the newest user turn (and before `end`) into the summary, with the
+    /// conversation's own model: the earlier summary and the newly covered messages go in, a new
+    /// summary comes out. A history too long for one request goes a piece at a time. Changes nothing
+    /// unless it succeeds; `stillWanted` is asked after every await (Stop, Lock).
+    func compactHistory(client: ChatClient, base: ChatRequestOptions, provider: Provider, model: String, end: Int,
+                        stillWanted: () -> Bool) async -> CompactionOutcome {
+        let limit = contextLimitFor?(provider, model)
+        let current = conversation.compactionBoundary
+        let snapshot = conversation.messages
+        guard end > 0, end <= snapshot.count,
+              let through = Compaction.boundary(in: snapshot, current: current, limitTokens: limit?.tokens, before: end) else {
+            return .nothingToDo
+        }
+        let covered = Array(snapshot[((current ?? -1) + 1)...through])
+        var summary = current == nil ? nil : conversation.compaction?.summary
+
+        // A summary request of its own: no tools (earlier rounds go as text), no thinking, no
+        // system prompt, a fixed length. The server kind shapes "no thinking" as for any request.
+        var options = ChatRequestOptions(model: model)
+        options.maxTokens = Compaction.summaryMaxTokens
+        options.disablesThinking = true
+        options.serverKind = base.serverKind
+        options.maxRequestBytes = base.maxRequestBytes
+        let thinkingOffFields = ChatClient.sentThinkingOffFields(options)
+        if !thinkingOffFields.isEmpty, thinkingOffRejected?(provider, model, thinkingOffFields) == true {
+            options.omitsThinkingOff = true
+        }
+        // Room for the input of one request: the context, less the summary it writes, the
+        // earlier summary, the instruction and a margin.
+        let budget = limit.map {
+            max(1024, $0.tokens - Compaction.summaryMaxTokens - 1024
+                - ContextBudget.estimateTokens(summary ?? "") - ContextBudget.estimateTokens(Compaction.instruction))
+        }
+        let pieces = budget.map { Compaction.chunks(covered, budgetTokens: $0) } ?? [covered]
+        do {
+            for piece in pieces {
+                var accumulator = StreamAccumulator()
+                let messages = Compaction.requestMessages(previousSummary: summary, messages: piece)
+                for try await delta in client.streamChat(messages: messages, options: options) {
+                    if Task.isCancelled || !stillWanted() { return .cancelled }
+                    if delta.thinkingOffRejected, !thinkingOffFields.isEmpty {
+                        markThinkingOffRejected?(provider, model, thinkingOffFields)
+                    }
+                    accumulator.apply(delta)
+                }
+                accumulator.finish()
+                guard !Task.isCancelled, stillWanted() else { return .cancelled }
+                // Cut off at the length limit: what it left out would be lost to every later request.
+                if accumulator.finishReason == "length" {
+                    return .failed(ParleyError.api("The summary was cut off by its length limit."))
+                }
+                let text = accumulator.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return .failed(ParleyError.api("The model returned an empty summary.")) }
+                summary = text
+            }
+        } catch {
+            if Task.isCancelled || !stillWanted() { return .cancelled }
+            return .failed(error)
+        }
+        // The history cannot change while this runs (every edit waits for isBusy), but check.
+        guard let summary, conversation.messages.count >= end,
+              conversation.messages[through].id == snapshot[through].id,
+              conversation.messages[end - 1].id == snapshot[end - 1].id else { return .cancelled }
+        conversation.compaction = ConversationCompaction(
+            summary: summary, throughMessageID: snapshot[through].id, countsStaleThroughID: snapshot[end - 1].id,
+            model: model, messageCount: through + 1)
+        conversation.updatedAt = Date()
+        saveNow()
+        return .done
+    }
+
+    /// Compact Now, from the context popover: summarizes everything but the newest exchange.
+    func compactNow(settings: AppSettings) {
+        guard !isBusy, !isClosed else { return }
+        compactionError = nil
+        compactionNotice = nil
+        let provider = settings.resolvedProvider(for: conversation.settings)
+        let model = Self.effectiveModel(settings: conversation.settings, provider: provider)
+        guard let provider, !model.isEmpty else {
+            compactionError = String(localized: "Choose a model first: the summary is written by the conversation's model.")
+            return
+        }
+        let client: ChatClient
+        do {
+            client = try ChatClient(baseURL: provider.baseURL, apiKey: try KeychainStore.apiKey(for: provider.id))
+        } catch {
+            compactionError = SystemErrorText.english(error)
+            return
+        }
+        var base = ChatRequestOptions(settings: conversation.settings)
+        base.model = model
+        let info = serverInfo?(provider, model)
+        base.serverKind = info?.serverKind
+        base.maxRequestBytes = info?.maxRequestBytes
+        let end = conversation.messages.count
+        isCompacting = true
+        compactRun += 1
+        let run = compactRun
+        compactTask = Task { [weak self] in
+            guard let self else { return }
+            let outcome = await self.compactHistory(client: client, base: base, provider: provider, model: model, end: end) { [weak self] in
+                guard let self else { return false }
+                return self.compactRun == run && self.isCompacting && !self.isClosed
+            }
+            // Cancelled (Stop, Lock) has already reset the state, and a newer run may own it now.
+            guard self.compactRun == run, self.isCompacting, !self.isClosed else { return }
+            self.isCompacting = false
+            self.compactTask = nil
+            self.historyUsageCache = nil
+            switch outcome {
+            case .failed(let error):
+                self.compactionError = SystemErrorText.english(error)
+            case .nothingToDo:
+                self.compactionNotice = String(localized: "Nothing to compact yet: the newest exchange is always sent in full.")
+            case .done, .cancelled:
+                break
+            }
+        }
+    }
+
+    /// Stop, Lock, close: a Compact Now in progress ends and changes nothing.
+    func cancelCompaction() {
+        compactRun += 1
+        compactTask?.cancel()
+        compactTask = nil
+        isCompacting = false
+    }
+
+    /// Restore Full History: requests carry every message again. The summary is dropped; the
+    /// messages were never touched.
+    func restoreFullHistory() {
+        guard !isBusy, !isClosed, conversation.compaction != nil else { return }
+        conversation.compaction = nil
+        compactionError = nil
+        compactionNotice = nil
+        conversation.updatedAt = Date()
+        historyUsageCache = nil
+        saveNow()
     }
 }

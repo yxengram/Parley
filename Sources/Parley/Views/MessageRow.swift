@@ -219,6 +219,12 @@ struct MessageRow: View, Equatable {
                         Text(verbatim: Self.startingText(servers))
                             .foregroundStyle(Hideout.inkSoft)
                     }
+                } else if replyPhase == .compacting {
+                    HStack(spacing: 6) {
+                        FirefliesIndicator()
+                        Text("Summarizing earlier messages to fit the context…")
+                            .foregroundStyle(Hideout.inkSoft)
+                    }
                 }
             }
 
@@ -403,6 +409,11 @@ struct MessageRow: View, Equatable {
             return String(localized: "The reply ended inside a tool call, so it was not run.")
         case ToolNote.emptyAfterTools:
             return String(localized: "The model wrote nothing after the tool results.")
+        case ToolNote.compactionFailed:
+            // The detail is the stored English error, shown in the interface language.
+            let detail = note.detail.map { ErrorPresentation.shownSystemText(ErrorPresentation.displayText($0)) } ?? ""
+            return String(localized: "Earlier messages could not be summarized, so this reply was sent without a new summary. \(detail)")
+                .trimmingCharacters(in: .whitespaces)
         default:
             return note.detail ?? ""
         }

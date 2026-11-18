@@ -51,7 +51,7 @@ private struct ConversationMenuContent: View {
     var body: some View {
         let entry = appState.entry(id: appState.selection)
         let open = entry.flatMap { appState.session(for: $0.id) }
-        let streaming = open?.isStreaming ?? false
+        let streaming = open?.isBusy ?? false
         let locked = (entry?.isEncrypted ?? false) && open == nil
         let encrypted = (entry?.isEncrypted ?? false) || (open?.isEncrypted ?? false)
 
@@ -139,7 +139,7 @@ private struct MessageMenuContent: View {
 
     var body: some View {
         let messages = session?.conversation.messages ?? []
-        let busy = session?.isStreaming ?? true
+        let busy = session?.isBusy ?? true
         let lastReply = messages.last(where: { $0.role == .assistant && !$0.visibleText.isEmpty })
 
         Button("Copy Last Reply") {
@@ -178,7 +178,7 @@ private struct MessageMenuContent: View {
             session?.stop()
         }
         .keyboardShortcut(".", modifiers: .command)
-        .disabled(!(session?.isStreaming ?? false))
+        .disabled(!(session?.isBusy ?? false))
     }
 }
 

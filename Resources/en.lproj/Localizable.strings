@@ -53,6 +53,7 @@
 "1 source on" = "1 source on";
 "1 tool" = "1 tool";
 "1 tool round" = "1 tool round";
+"30–95" = "30–95";
 "A chat uses this server once you turn it on there, with the wrench button (⇧⌘T)." = "A chat uses this server once you turn it on there, with the wrench button (⇧⌘T).";
 "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory." = "A conversation can be encrypted when you create it, or later with Conversation > Encrypt…. The whole file is encrypted with AES-256-GCM using a key derived from your password, and decrypted only in memory.";
 "A conversation could not be saved." = "A conversation could not be saved.";
@@ -107,9 +108,12 @@
 "Attach Files" = "Attach Files";
 "Attach images or text files" = "Attach images or text files";
 "Automatic (from first message)" = "Automatic (from first message)";
+"Automatic compaction needs the context length: enter it above." = "Automatic compaction needs the context length: enter it above.";
 "Back" = "Back";
 "Base URL" = "Base URL";
 "Basic" = "Basic";
+"Before a reply, earlier messages are summarized by this conversation's model. One setting for every conversation." = "Before a reply, earlier messages are summarized by this conversation's model. One setting for every conversation.";
+"Before a reply, earlier messages are summarized by this conversation's model. The limit here is the model's maximum; the loaded size may be smaller." = "Before a reply, earlier messages are summarized by this conversation's model. The limit here is the model's maximum; the loaded size may be smaller.";
 "Browse Web Page" = "Browse Web Page";
 "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address." = "Browse Web Page is for pages that only show their text once their scripts run. Each call opens the page in a new private browser that keeps nothing afterwards: no cookies, cache or storage come in or stay. Everything the page loads goes through a gate that lets only public addresses through, and images, video, fonts, popups and downloads are blocked. By default the page may load only from the address you approved, so some pages show little; the result tells the model how many requests to other sites were blocked. With “Let Browse Web Page load from other sites” on, the page's scripts may contact other websites, such as CDNs, and those sites see your IP address too. The card says which way it is. If the page moves to another address, Parley stops and a new card is needed. Stop, Lock and Quit close the page at once. It does not use the Mac's proxy settings, so behind a system proxy the site sees this Mac's own IP address.";
 "Built-in tool" = "Built-in tool";
@@ -143,6 +147,7 @@
 "Check the model ID and the base URL. The server said: %@" = "Check the model ID and the base URL. The server said: %@";
 "Checking…" = "Checking…";
 "Choose" = "Choose";
+"Choose a model first: the summary is written by the conversation's model." = "Choose a model first: the summary is written by the conversation's model.";
 "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@" = "Choose a model from the list (Refresh Model List in the model menu), or load one in the Strata app. Strata said: %@";
 "Choose a model to see its context length." = "Choose a model to see its context length.";
 "Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file." = "Choose a skill folder (with a SKILL.md), a folder of skills, or a .zip or .skill file.";
@@ -170,6 +175,12 @@
 "code" = "code";
 "Come in and say something." = "Come in and say something.";
 "Command" = "Command";
+"Compact automatically" = "Compact automatically";
+"Compact Now" = "Compact Now";
+"Compacting…" = "Compacting…";
+"Compaction" = "Compaction";
+"Compaction lets a long conversation go on: the earlier messages are summarized by the conversation's own model, and requests send the summary and the newest messages instead of the whole history. The messages stay in the conversation; a divider shows where the summary ends, and opens it." = "Compaction lets a long conversation go on: the earlier messages are summarized by the conversation's own model, and requests send the summary and the newest messages instead of the whole history. The messages stay in the conversation; a divider shows where the summary ends, and opens it.";
+"Compaction threshold in percent" = "Compaction threshold in percent";
 "Confirm password" = "Confirm password";
 "Connect" = "Connect";
 "Connected, %lld models" = "Connected, %lld models";
@@ -184,6 +195,7 @@
 "Context %lld tokens, limit unknown" = "Context %lld tokens, limit unknown";
 "Context about %lld of %lld tokens, %lld percent; limit %@" = "Context about %lld of %lld tokens, %lld percent; limit %@";
 "Context about %lld tokens, limit unknown" = "Context about %lld tokens, limit unknown";
+"Context and compaction" = "Context and compaction";
 "Context limit %@ tokens (%@)" = "Context limit %@ tokens (%@)";
 "Context used" = "Context used";
 "Context: checking…" = "Context: checking…";
@@ -252,6 +264,8 @@
 "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat." = "Each conversation is one JSON file named by a random ID, by default in ~/Library/Application Support/Parley/Conversations (not synced by iCloud). You can change the default folder in Settings > General, and choose a folder for each new chat.";
 "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not." = "Each conversation is saved as one JSON file named by a random ID. New chats can choose their own folder. Desktop and Documents may be synced by iCloud, and folders in ~/Library/CloudStorage by Dropbox, OneDrive or Google Drive; the default location in Application Support is not.";
 "Each skin has an afternoon and a lights-out look, which follow the system appearance." = "Each skin has an afternoon and a lights-out look, which follow the system appearance.";
+"Earlier messages could not be summarized, so this reply was sent without a new summary. %@" = "Earlier messages could not be summarized, so this reply was sent without a new summary. %@";
+"Earlier messages were summarized to fit the context. Restore the full history in the context popover at the bottom right." = "Earlier messages were summarized to fit the context. Restore the full history in the context popover at the bottom right.";
 "Edit & Resend" = "Edit & Resend";
 "Edit & resend" = "Edit & resend";
 "Edit & Resend puts the message back in the composer. Nothing changes until you send it; Esc cancels. ↑ in an empty composer edits your last message." = "Edit & Resend puts the message back in the composer. Nothing changes until you send it; Esc cancels. ↑ in an empty composer edits your last message.";
@@ -283,6 +297,7 @@
 "Estimated from the text; the server's count replaces it after the next reply." = "Estimated from the text; the server's count replaces it after the next reply.";
 "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General." = "Every call asks first, with the exact arguments. Deny, Allow Once, or Always Allow This Tool, which lasts until the tool's definition, or the server's command, arguments, URL, working folder or PATH, changes. Revoke it in Settings > MCP, even while the server is stopped. Stop (Esc or ⌘.) cancels a running call. To have no call ask at all, set Tool Calls to Run Automatically in Settings > General.";
 "Every MCP server is switched off. Turn one on in Settings > MCP." = "Every MCP server is switched off. Turn one on in Settings > MCP.";
+"Every message is sent in full." = "Every message is sent in full.";
 "Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash." = "Every tool call runs without asking: files in the shared folder are read and written, web pages are fetched and MCP tools run, in ReAct mode too. A web page or file the model reads can tell it to do something else, such as send a file's text to a website or write over a file, and nothing stops to ask you. Calls still show in the conversation, and Stop ends them. A file that is replaced goes to the Trash.";
 "Failed" = "Failed";
 "Fetch Web Page" = "Fetch Web Page";
@@ -299,6 +314,7 @@
 "Fork from here" = "Fork from here";
 "Fork from Last Message" = "Fork from Last Message";
 "From the server: " = "From the server: ";
+"full" = "full";
 "General" = "General";
 "Get Reply" = "Get Reply";
 "Gets one public web page, directly from this Mac, so the site sees your IP address." = "Gets one public web page, directly from this Mac, so the site sees your IP address.";
@@ -307,6 +323,7 @@
 "Hide Details" = "Hide Details";
 "Hide Sidebar" = "Hide Sidebar";
 "Hide Sidebar (⌃⌘S)" = "Hide Sidebar (⌃⌘S)";
+"Hide summary" = "Hide summary";
 "Hide thinking" = "Hide thinking";
 "Hides the arguments and result" = "Hides the arguments and result";
 "High" = "High";
@@ -336,6 +353,7 @@
 "It lists allowed tools. Parley ignores that: tools still ask as they always do." = "It lists allowed tools. Parley ignores that: tools still ask as they always do.";
 "It receives a request from this Mac for that information, and nothing else." = "It receives a request from this Mac for that information, and nothing else.";
 "it refused the connection" = "it refused the connection";
+"It runs automatically before a reply once the context is 80 percent full (change the threshold or turn it off in the context popover; one setting for every conversation), and only where the context length is known. Compact Now does it at once. Restore Full History sends every message again. Each compaction is one more request to the model, which costs on a paid API. If it fails, the reply goes on without a new summary and a note says so." = "It runs automatically before a reply once the context is 80 percent full (change the threshold or turn it off in the context popover; one setting for every conversation), and only where the context length is known. Compact Now does it at once. Restore Full History sends every message again. Each compaction is one more request to the model, which costs on a paid API. If it fails, the reply goes on without a new summary and a note says so.";
 "It runs only as a task, which Parley does not support." = "It runs only as a task, which Parley does not support.";
 "It stops, and its arguments, URL, environment values and headers are removed from the Keychain." = "It stops, and its arguments, URL, environment values and headers are removed from the Keychain.";
 "it took too long" = "it took too long";
@@ -437,6 +455,7 @@
 "Not shown to the model: %@." = "Not shown to the model: %@.";
 "Nothing leaves here except what you send to the servers you chose, the sign-in providers and the tools you allow." = "Nothing leaves here except what you send to the servers you chose, the sign-in providers and the tools you allow.";
 "Nothing starts when you import. Turn a server on for a chat with the wrench button (⇧⌘T)." = "Nothing starts when you import. Turn a server on for a chat with the wrench button (⇧⌘T).";
+"Nothing to compact yet: the newest exchange is always sent in full." = "Nothing to compact yet: the newest exchange is always sent in full.";
 "Nothing yet" = "Nothing yet";
 "Nothing yet." = "Nothing yet.";
 "npx, uvx, or a full path" = "npx, uvx, or a full path";
@@ -474,6 +493,7 @@
 "Paste a server config from another MCP client" = "Paste a server config from another MCP client";
 "Paste a server config from another MCP client: an object with mcpServers or servers, or the entries alone. Parley does not read other apps' files." = "Paste a server config from another MCP client: an object with mcpServers or servers, or the entries alone. Parley does not read other apps' files.";
 "Paste from Clipboard" = "Paste from Clipboard";
+"Percent" = "Percent";
 "Permissions" = "Permissions";
 "Permissions requested:" = "Permissions requested:";
 "Pick a note from the wall, or start a new one." = "Pick a note from the wall, or start a new one.";
@@ -548,6 +568,7 @@
 "Reset All Approvals" = "Reset All Approvals";
 "Restart" = "Restart";
 "Restarts on next use. %@" = "Restarts on next use. %@";
+"Restore Full History" = "Restore Full History";
 "Result" = "Result";
 "Result limit (characters)" = "Result limit (characters)";
 "Resume them on Strata's Serving page, then retry." = "Resume them on Strata's Serving page, then retry.";
@@ -586,6 +607,7 @@
 "See its log in Settings > MCP." = "See its log in Settings > MCP.";
 "Select a provider" = "Select a provider";
 "Send (Enter)" = "Send (Enter)";
+"Send every message in full again. The summary is dropped." = "Send every message in full again. The summary is dropped.";
 "Send Message" = "Send Message";
 "Sending replaces it and the %lld messages after it. Esc cancels." = "Sending replaces it and the %lld messages after it. Esc cancels.";
 "Sending replaces it and the message after it. Esc cancels." = "Sending replaces it and the message after it. Esc cancels.";
@@ -604,6 +626,7 @@
 "Show Sidebar" = "Show Sidebar";
 "Show Sidebar (⌃⌘S)" = "Show Sidebar (⌃⌘S)";
 "Show Skills Folder" = "Show Skills Folder";
+"Show summary" = "Show summary";
 "Show thinking" = "Show thinking";
 "Show token usage under replies" = "Show token usage under replies";
 "Shows context details" = "Shows context details";
@@ -659,12 +682,15 @@
 "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.%@ A value below overrides it." = "Strata's shared port does not report the context length; Parley learned it from Strata's last overflow error and remembers it.%@ A value below overrides it.";
 "Strata's Tailscale or LAN address" = "Strata's Tailscale or LAN address";
 "Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone." = "Strata: None turns thinking off, High is its highest level, and the budget caps thinking per reply. A small Max Tokens can be used up by thinking alone.";
+"Summarize everything but the newest exchange now. The messages stay in the conversation." = "Summarize everything but the newest exchange now. The messages stay in the conversation.";
+"Summarizing earlier messages to fit the context…" = "Summarizing earlier messages to fit the context…";
 "Switched off in the pasted config, so it stays off here." = "Switched off in the pasted config, so it stays off here.";
 "System Prompt" = "System Prompt";
 "Temperature" = "Temperature";
 "Test Connection" = "Test Connection";
 "Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings)." = "Text files in the folder above (UTF-8, UTF-16, or GBK and other Chinese encodings).";
 "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request." = "That is about %lld%% of this model's context. Turn off servers or tools you do not need, or the model may refuse the request.";
+"The %lld messages above are sent as a summary" = "The %lld messages above are sent as a summary";
 "The %lld messages after this one will be deleted from the conversation." = "The %lld messages after this one will be deleted from the conversation.";
 "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it." = "The address check and the connection are separate lookups, so a site that changes its DNS answer in between, or a proxy, can make the request reach a device on your network before Parley sees that and throws the answer away. The model never receives that answer. A proxy that answers every name with its own address, as Clash and Surge can, means the check cannot tell a device on your network from a public site. The card is the real defence: read the address before you allow it.";
 "The address contains hidden or right-to-left characters, shown here as \\u{…}." = "The address contains hidden or right-to-left characters, shown here as \\u{…}.";
@@ -696,10 +722,12 @@
 "The file is not a zip archive Parley can read." = "The file is not a zip archive Parley can read.";
 "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory." = "The file will be encrypted with AES-256-GCM using a key derived from this password. It is decrypted only in memory.";
 "The file will be re-encrypted with a key derived from the new password." = "The file will be re-encrypted with a key derived from the new password.";
+"The first %lld messages are sent as a summary; the rest in full." = "The first %lld messages are sent as a summary; the rest in full.";
 "The header %@ has an empty name or a line break, so it cannot be sent." = "The header %@ has an empty name or a line break, so it cannot be sent.";
 "The Internet connection appears to be offline." = "The Internet connection appears to be offline.";
 "The lantern's on" = "The lantern's on";
 "The message after this one will be deleted from the conversation." = "The message after this one will be deleted from the conversation.";
+"The messages above are sent as a summary" = "The messages above are sent as a summary";
 "The model is still loading in Strata" = "The model is still loading in Strata";
 "The model may still be loading (a cold start can take several minutes), or the engine stopped. Retry in a moment." = "The model may still be loading (a cold start can take several minutes), or the engine stopped. Retry in a moment.";
 "The model wrote nothing after the tool results." = "The model wrote nothing after the tool results.";
@@ -749,9 +777,11 @@
 "The skill's files could not be copied into Parley's skills folder." = "The skill's files could not be copied into Parley's skills folder.";
 "The skill's folders are nested more than 16 levels deep." = "The skill's folders are nested more than 16 levels deep.";
 "The skills already there go to the Trash." = "The skills already there go to the Trash.";
+"The strip under the message box shows how fast the model is replying and how much of its context (memory) the conversation uses. Click it for details, to enter the context length if the server does not report it, and for compaction." = "The strip under the message box shows how fast the model is replying and how much of its context (memory) the conversation uses. Click it for details, to enter the context length if the server does not report it, and for compaction.";
 "The text received so far is kept." = "The text received so far is kept.";
 "The thinking budget is sent only to Strata." = "The thinking budget is sent only to Strata.";
 "The thinking budget is sent only to Strata; this server does not get it." = "The thinking budget is sent only to Strata; this server does not get it.";
+"The threshold is a percent from 30 to 95." = "The threshold is a percent from 30 to 95.";
 "The tool asked for input Parley does not support." = "The tool asked for input Parley does not support.";
 "The URL and header values go to your login Keychain." = "The URL and header values go to your login Keychain.";
 "The URL uses a variable, which Parley does not expand." = "The URL uses a variable, which Parley does not expand.";
@@ -861,6 +891,7 @@
 "Waiting for your approval of a tool call" = "Waiting for your approval of a tool call";
 "Web" = "Web";
 "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away." = "What a tool returns goes to the model's provider, like any tool result. A page or a file can tell the model to read something and put it in an address, or to write over a file. That is why these tools have no Always Allow: check the arguments on each card, the address above all. Run Automatically takes that check away.";
+"When the context is" = "When the context is";
 "Where files live" = "Where files live";
 "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image." = "With its images this conversation is about %@ per request, more than the %@ %@ accepts: every message sends the images again. Remove some, or fork from a message before the first image.";
 "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back." = "With its tool results this conversation is about %@ per request, more than the %@ %@ accepts: every message sends them again. Fork from an earlier message, or roll back.";
