@@ -1,0 +1,3918 @@
+[
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "model" : "m"
+    },
+    "variant" : "bare"
+  },
+  {
+    "body" : {
+      "max_tokens" : 512,
+      "messages" : [
+        {
+          "content" : "You are kind.",
+          "role" : "system"
+        },
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "high",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      },
+      "temperature" : 0.69999999999999996
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "includeUsage" : true,
+      "maxTokens" : 512,
+      "model" : "m",
+      "reasoningEffort" : "high",
+      "systemPrompt" : "You are kind.",
+      "temperature" : 0.69999999999999996
+    },
+    "variant" : "full"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+      "includeUsage" : true,
+      "model" : "m",
+      "systemPrompt" : "Sys"
+    },
+    "variant" : "summary"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+      "model" : "m"
+    },
+    "variant" : "summaryNoPrompt"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : null
+    },
+    "variant" : "none-unknown"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-lmStudio"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "llamaCpp"
+    },
+    "variant" : "none-llamaCpp"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "vLLM"
+    },
+    "variant" : "none-vLLM"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "ollama"
+    },
+    "variant" : "none-ollama"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "return_progress" : true,
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "strata"
+    },
+    "variant" : "none-strata"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "hosted"
+    },
+    "variant" : "none-hosted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Hi",
+          "role" : "user"
+        },
+        {
+          "content" : "Hello!",
+          "role" : "assistant"
+        },
+        {
+          "content" : "Next question",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "plain",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "model" : "m",
+      "omitsThinkingOff" : true,
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-omitted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "model" : "m"
+    },
+    "variant" : "bare"
+  },
+  {
+    "body" : {
+      "max_tokens" : 512,
+      "messages" : [
+        {
+          "content" : "You are kind.",
+          "role" : "system"
+        },
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "high",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      },
+      "temperature" : 0.69999999999999996
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "includeUsage" : true,
+      "maxTokens" : 512,
+      "model" : "m",
+      "reasoningEffort" : "high",
+      "systemPrompt" : "You are kind.",
+      "temperature" : 0.69999999999999996
+    },
+    "variant" : "full"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+      "includeUsage" : true,
+      "model" : "m",
+      "systemPrompt" : "Sys"
+    },
+    "variant" : "summary"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+      "model" : "m"
+    },
+    "variant" : "summaryNoPrompt"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : null
+    },
+    "variant" : "none-unknown"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-lmStudio"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "llamaCpp"
+    },
+    "variant" : "none-llamaCpp"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "vLLM"
+    },
+    "variant" : "none-vLLM"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "ollama"
+    },
+    "variant" : "none-ollama"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "return_progress" : true,
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "strata"
+    },
+    "variant" : "none-strata"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "hosted"
+    },
+    "variant" : "none-hosted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Look\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+              "type" : "text"
+            },
+            {
+              "image_url" : {
+                "url" : "data:image/png;base64,iVBORw=="
+              },
+              "type" : "image_url"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : "Counted reply",
+          "role" : "assistant"
+        },
+        {
+          "content" : "\n\n<file name=\"notes &quot;a&quot;.txt\">\nline one\nline two\n</file>",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "attachments",
+    "messages" : [
+      {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "model" : "m",
+      "omitsThinkingOff" : true,
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-omitted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "model" : "m"
+    },
+    "variant" : "bare"
+  },
+  {
+    "body" : {
+      "max_tokens" : 512,
+      "messages" : [
+        {
+          "content" : "You are kind.",
+          "role" : "system"
+        },
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "high",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      },
+      "temperature" : 0.69999999999999996
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "includeUsage" : true,
+      "maxTokens" : 512,
+      "model" : "m",
+      "reasoningEffort" : "high",
+      "systemPrompt" : "You are kind.",
+      "temperature" : 0.69999999999999996
+    },
+    "variant" : "full"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+      "includeUsage" : true,
+      "model" : "m",
+      "systemPrompt" : "Sys"
+    },
+    "variant" : "summary"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+      "model" : "m"
+    },
+    "variant" : "summaryNoPrompt"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : null
+    },
+    "variant" : "none-unknown"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-lmStudio"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "llamaCpp"
+    },
+    "variant" : "none-llamaCpp"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "vLLM"
+    },
+    "variant" : "none-vLLM"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "ollama"
+    },
+    "variant" : "none-ollama"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "return_progress" : true,
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "strata"
+    },
+    "variant" : "none-strata"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "hosted"
+    },
+    "variant" : "none-hosted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Q",
+          "role" : "user"
+        },
+        {
+          "content" : "Be terse.",
+          "role" : "system"
+        },
+        {
+          "content" : "Again",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "failedAndSystem",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "model" : "m",
+      "omitsThinkingOff" : true,
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-omitted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "model" : "m"
+    },
+    "variant" : "bare"
+  },
+  {
+    "body" : {
+      "max_tokens" : 512,
+      "messages" : [
+        {
+          "content" : "You are kind.",
+          "role" : "system"
+        },
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "high",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      },
+      "temperature" : 0.69999999999999996
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "includeUsage" : true,
+      "maxTokens" : 512,
+      "model" : "m",
+      "reasoningEffort" : "high",
+      "systemPrompt" : "You are kind.",
+      "temperature" : 0.69999999999999996
+    },
+    "variant" : "full"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey said hi.\n</conversation_summary>",
+      "includeUsage" : true,
+      "model" : "m",
+      "systemPrompt" : "Sys"
+    },
+    "variant" : "summary"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+          "role" : "system"
+        },
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "historySummary" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nOnly summary.\n</conversation_summary>",
+      "model" : "m"
+    },
+    "variant" : "summaryNoPrompt"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : null
+    },
+    "variant" : "none-unknown"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-lmStudio"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "llamaCpp"
+    },
+    "variant" : "none-llamaCpp"
+  },
+  {
+    "body" : {
+      "chat_template_kwargs" : {
+        "enable_thinking" : false
+      },
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "vLLM"
+    },
+    "variant" : "none-vLLM"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "ollama"
+    },
+    "variant" : "none-ollama"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "return_progress" : true,
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "strata"
+    },
+    "variant" : "none-strata"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "reasoning_effort" : "none",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      }
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "includeUsage" : true,
+      "model" : "m",
+      "reasoningEffort" : "low",
+      "serverKind" : "hosted"
+    },
+    "variant" : "none-hosted"
+  },
+  {
+    "body" : {
+      "messages" : [
+        {
+          "content" : "你好，请用三句话介绍杭州。",
+          "role" : "user"
+        },
+        {
+          "content" : "Answer",
+          "role" : "assistant"
+        },
+        {
+          "content" : "再说说西湖的历史吧",
+          "role" : "user"
+        }
+      ],
+      "model" : "m",
+      "stream" : true
+    },
+    "history" : "chinese",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "options" : {
+      "disablesThinking" : true,
+      "model" : "m",
+      "omitsThinkingOff" : true,
+      "serverKind" : "lmStudio"
+    },
+    "variant" : "none-omitted"
+  }
+]

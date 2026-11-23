@@ -536,6 +536,19 @@ The earlier part of a conversation can stand in requests as a summary its own mo
 
 **Tests.** `CompactionTests` (storage, effective history, request, usage, boundary, summary request) and `CompactionAppTests` (Compact Now, Restore, rollback, Stop and Lock, automatic at the threshold, off or unknown length, a failed summary), against `tools/mock_server.py`, which answers any summary request with `SUMMARY(n): …` and records it at `/mock/last-summary`; model `mock-summary-fail` answers it with 500. ReaderFixtureTests' plain fixture has a compaction.
 
+## Parley Web
+A chat client in one self-contained page (`Web/`), built and deployed like the Reader: `tools/build_web.sh` inlines `Reader/src/core.js` and `markdown.js` (shared with the Reader) and `Web/src/chat.js`, `context.js`, `store.js` into `Web/src/web.html` (a fork of the Reader's page, same look and rendering); the built `Web/ParleyWeb.html` is committed, published at `/web/` by `pages.yml`, and attached to each release. `Web/SPEC.md` is the contract (phase 1 scope, module APIs, data shapes, decisions). The Reader is unchanged: it stays a viewer with no network.
+
+**Same files as the app.** Conversations are stored in the browser (IndexedDB `parley-web`) as Parley conversations (ids uppercase, dates ISO 8601 without fractions), plain or as Parley's encrypted file text (`ParleyCore.encryptFile`, same header, AAD and payload as `ConversationFile.encode`; an encrypted record's index holds no title). Export writes a Parley file; import reads one. `WebFixtureTests` (with `PARLEY_WEB_FIXTURES`) opens files the JS writes with the app's own code.
+
+**Ports checked against the app.** `chat.js` ports ChatClient's no-tools request, streaming, error texts and retries; `context.js` ports ContextBudget and Compaction. `WebOracleTests` (with `PARLEY_WEB_VECTORS`) writes JSON vectors from the Swift code into `Web/tests/vectors/`; the node tests must reproduce them. When the app's behaviour changes there, regenerate the vectors and fix the JS.
+
+**Network and privacy.** CSP `connect-src http: https:`, everything else `'none'` (scripts and styles inline). Only `chat.js` touches the network, only toward a configured server's base URL; `tools/test_web_page.mjs` enforces that statically, with the Reader's other rules (no markup from strings, no external URLs, links through the link sheet). API keys are kept for the session unless "Remember in this browser" is ticked, which warns that the page's origin (`yxengram.github.io`) is shared with the account's other Pages sites. Browser limits, said in the README and the error hint: the server must allow CORS, and an https page cannot reach an http server on the network (the downloaded file can, in Chrome).
+
+**Not yet** (later phases): tools, built-in tools, MCP, skills, folder storage, server probing beyond `/v1/models`, change or remove a password.
+
+**Tests:** `tools/test_web.sh` (node module tests, the Swift cross-check, two identical builds, the page audit).
+
 ## Strata
 
 [Strata](https://github.com/Niko1221/Strata) (C++ inference engine, Windows/Linux) has two HTTP surfaces; the facts below were read from its source (commit ffa80d73133e, release 0.2.10).

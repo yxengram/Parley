@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Builds a universal (Apple silicon + Intel) Parley.app and zips it for a GitHub release.
-#   tools/package_release.sh            -> build/release/Parley-<version>.zip (+ ParleyReader.html)
+#   tools/package_release.sh            -> build/release/Parley-<version>.zip (+ ParleyReader.html, ParleyWeb.html)
 # The app is ad-hoc signed, not notarized: the README explains how to open it the first time.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -48,10 +48,20 @@ mkdir -p "$OUT"
 ZIP="$OUT/Parley-$VERSION.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
 cp Reader/ParleyReader.html "$OUT/ParleyReader.html"
+cp Web/ParleyWeb.html "$OUT/ParleyWeb.html"
+# The pages are built from sources in the repository, but check them like the app anyway.
+for page in "$OUT/ParleyReader.html" "$OUT/ParleyWeb.html"; do
+    for private in "/Users/" "$HOME" "$USER"; do
+        if LC_ALL=C grep -qaF -- "$private" "$page"; then
+            echo "error: ${page:t} contains a local path or the user name ($private)" >&2
+            exit 1
+        fi
+    done
+done
 
 # Check the archive opens to a valid, signed app.
 mkdir "$TMP/unzip"
 ditto -x -k "$ZIP" "$TMP/unzip"
 codesign --verify --deep --strict "$TMP/unzip/Parley.app"
 
-( cd "$OUT" && shasum -a 256 "Parley-$VERSION.zip" ParleyReader.html )
+( cd "$OUT" && shasum -a 256 "Parley-$VERSION.zip" ParleyReader.html ParleyWeb.html )

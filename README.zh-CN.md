@@ -13,7 +13,8 @@
 
 <p align="center">
 <a href="https://github.com/yxengram/Parley/releases/latest"><b>下载 Mac 版</b></a> ·
-<a href="https://yxengram.github.io/Parley/">Parley Reader（在任何浏览器里查看对话）</a>
+<a href="https://yxengram.github.io/Parley/">Parley Reader（在任何浏览器里查看对话）</a> ·
+<a href="https://yxengram.github.io/Parley/web/">Parley Web（在浏览器里聊天，预览版）</a>
 </p>
 
 ![Parley 聊天窗口](docs/images/zh/chat.jpg)
@@ -62,6 +63,14 @@ AI 应用使用的同一类工具。所有工具在你打开之前都是关闭�
   里打开链接，点 **打开…** 选择文件。小技巧：点“分享”→“**添加到主屏幕**”，以后一点就能打开 Reader。
 
 想找到某个对话的文件，在 Parley 边栏里右键点它，选择“**在访达中显示**”。
+
+## Parley Web：在浏览器里聊天（预览版）
+
+[Parley Web](https://yxengram.github.io/Parley/web/) 把 Parley 的聊天功能放进了一个网页，iPhone、iPad 和任何电脑都能用：添加服务器、流式回复和思考过程、编辑 / 重新生成 / 回退 / 分叉、图片和文本附件、对话设置、用密码加密对话、上下文统计和上下文压缩，皮肤也一样。对话保存在这个浏览器里，用的是 Parley 自己的格式：导出后 Mac 版 Parley 可以直接打开，反过来也行。网页版暂时还没有工具、MCP 和技能。
+
+- 网页直接从你的浏览器连接你添加的服务器，所以服务器需要允许这样做：LM Studio 在服务器设置里打开“**Enable CORS**”；Ollama 设置 `OLLAMA_ORIGINS`；llama.cpp 默认允许。OpenRouter 可以直接用；OpenAI 官方 API 不允许浏览器直接访问。
+- `https://` 网页无法访问局域网里 `http://` 地址的服务器。可以给服务器配一个 `https://` 地址（例如 `tailscale serve` 或 Cloudflare Tunnel），或者从[发布页面](https://github.com/yxengram/Parley/releases/latest)下载 `ParleyWeb.html`，用 Chrome 打开这个文件。
+- API key 默认只保存到关闭页面为止，除非勾选“**在此浏览器中记住**”。这个网页的地址和同一网站的其他页面共用，所以希望内容不可读的对话请加密。在 iPhone 上请把网页添加到主屏幕，Safari 才会长期保留它的数据。
 
 ## 安装
 

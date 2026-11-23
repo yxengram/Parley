@@ -568,7 +568,7 @@ const ParleyCore = (() => {
    * PBKDF2-HMAC-SHA256 to a non-extractable AES-GCM key. The password is NFC-normalised first,
    * as Parley does, so the same visible password gives the same key however it was typed.
    */
-  async function deriveKey(password, header) {
+  async function deriveKey(password, header, usages = ['decrypt']) {
     const bytes = new TextEncoder().encode(String(password).normalize('NFC'));
     const s = subtle();
     const material = await s.importKey('raw', bytes, 'PBKDF2', false, ['deriveKey']);
@@ -578,7 +578,7 @@ const ParleyCore = (() => {
       material,
       { name: 'AES-GCM', length: 256 },
       false,
-      ['decrypt'],
+      usages,
     );
   }
 
@@ -622,7 +622,99 @@ const ParleyCore = (() => {
     return open(header, await deriveKey(password, header));
   }
 
-  return { FORMAT, VERSION, MAX_ITERATIONS, ReaderError, parseFile, decrypt, base64ToBytes, bytesToBase64 };
+  // ---- Writing (used by Parley Web; the Reader itself only reads) ----
+
+  const DEFAULT_ITERATIONS = 600000;
+  /** Same salt length as ConversationCrypto.saltByteCount. */
+  const SALT_BYTES = 16;
+
+  function checkIterations(iterations) {
+    if (!Number.isInteger(iterations) || iterations <= 0 || iterations > MAX_ITERATIONS) {
+      throw new ReaderError('corrupt', 'invalid iteration count');
+    }
+  }
+
+  /** A fresh random salt and the key derived from it: {key, salt, iterations}. Memory only. */
+  async function newKey(password, iterations = DEFAULT_ITERATIONS) {
+    checkIterations(iterations);
+    const salt = globalThis.crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+    const key = await deriveKey(password, { salt, iterations }, ['encrypt', 'decrypt']);
+    return { key, salt, iterations };
+  }
+
+  /** The key for an existing file's salt and iterations, so an unlocked conversation can be saved again. */
+  async function keyFromHeader(header, password) {
+    checkIterations(header.iterations);
+    const key = await deriveKey(password, header, ['encrypt', 'decrypt']);
+    return { key, salt: header.salt, iterations: header.iterations };
+  }
+
+  /** Opens a parsed encrypted file with an already derived key (fast; the AAD comes from the file). */
+  function decryptWithKey(header, keyInfo) {
+    return open(header, keyInfo.key);
+  }
+
+  function encodePlainFile(conversation) {
+    // Replacer arrays filter nested keys too, so sort the whole tree instead.
+    return JSON.stringify(sortKeys({ format: FORMAT, version: VERSION, encrypted: false, conversation }), null, 2);
+  }
+
+  // Swift's .iso8601 decoder rejects fractional seconds, which Date.toISOString() always writes.
+  // Only keys named like dates (createdAt, updatedAt, startedAt...) are rewritten, never message text.
+  function sortKeys(value, key) {
+    if (typeof value === 'string' && typeof key === 'string' && /At$/.test(key)) {
+      return value.replace(/^(\d{4}-\d\d-\d\dT[\d:]+)\.\d+Z$/, '$1Z');
+    }
+    if (Array.isArray(value)) return value.map(v => sortKeys(v));
+    if (!isObject(value)) return value;
+    const proto = Object.getPrototypeOf(value);
+    // A Date or Uint8Array would silently become {}; fail instead of writing a damaged file.
+    if (proto !== Object.prototype && proto !== null) throw new ReaderError('corrupt', 'cannot encode a non-plain object');
+    const out = {};
+    // defineProperty, because out['__proto__'] = x would set the prototype and drop the key.
+    for (const k of Object.keys(value).sort()) {
+      if (value[k] !== undefined) {
+        Object.defineProperty(out, k, { value: sortKeys(value[k], k), enumerable: true, writable: true, configurable: true });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The encrypted file text, as ConversationFile.encode writes it: payload is
+   * base64(nonce 12 | ciphertext | tag 16) of the conversation's JSON, bound to the header by the AAD.
+   */
+  async function encryptFile(conversation, keyInfo) {
+    if (!isObject(conversation) || typeof conversation.id !== 'string' || !UUID_RE.test(conversation.id)) {
+      throw new ReaderError('corrupt', 'invalid conversation data');
+    }
+    const header = { id: conversation.id.toUpperCase(), iterations: keyInfo.iterations, salt: keyInfo.salt };
+    const plain = new TextEncoder().encode(JSON.stringify(sortKeys(conversation)));
+    const nonce = globalThis.crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
+    const sealed = new Uint8Array(await subtle().encrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: additionalData(header), tagLength: 128 },
+      keyInfo.key,
+      plain,
+    ));
+    plain.fill(0);
+    const box = new Uint8Array(NONCE_BYTES + sealed.length);
+    box.set(nonce, 0);
+    box.set(sealed, NONCE_BYTES);
+    return JSON.stringify(sortKeys({
+      format: FORMAT,
+      version: VERSION,
+      encrypted: true,
+      id: header.id,
+      kdf: { name: KDF_NAME, iterations: header.iterations, salt: bytesToBase64(header.salt) },
+      cipher: CIPHER_NAME,
+      payload: bytesToBase64(box),
+    }), null, 2);
+  }
+
+  return {
+    FORMAT, VERSION, MAX_ITERATIONS, DEFAULT_ITERATIONS, ReaderError, parseFile, decrypt, base64ToBytes, bytesToBase64,
+    newKey, keyFromHeader, decryptWithKey, encryptFile, encodePlainFile,
+  };
 })();
 if (typeof globalThis !== 'undefined') globalThis.ParleyCore = ParleyCore;
 </script>

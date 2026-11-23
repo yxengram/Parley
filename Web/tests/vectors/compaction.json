@@ -1,0 +1,1777 @@
+{
+  "block" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nSummary text.\n</conversation_summary>",
+  "boundaries" : [
+    {
+      "cases" : [
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 1,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        }
+      ],
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:40Z",
+          "id" : "00000000-0000-4000-8000-000000000100",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 0 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:41Z",
+          "id" : "00000000-0000-4000-8000-000000000101",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ]
+    },
+    {
+      "cases" : [
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : 5,
+          "boundary" : 3,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : 5,
+          "boundary" : 3,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 5,
+          "boundary" : 3,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 5,
+          "boundary" : 3,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 1,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 5,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        }
+      ],
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:40Z",
+          "id" : "00000000-0000-4000-8000-000000000100",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 0 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:41Z",
+          "id" : "00000000-0000-4000-8000-000000000101",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:42Z",
+          "id" : "00000000-0000-4000-8000-000000000102",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 1 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:43Z",
+          "id" : "00000000-0000-4000-8000-000000000103",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:44Z",
+          "id" : "00000000-0000-4000-8000-000000000104",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 2 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:45Z",
+          "id" : "00000000-0000-4000-8000-000000000105",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ]
+    },
+    {
+      "cases" : [
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 7,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 5,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : 7,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 5,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : 7,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 5,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : null,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        }
+      ],
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:40Z",
+          "id" : "00000000-0000-4000-8000-000000000100",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 0 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:41Z",
+          "id" : "00000000-0000-4000-8000-000000000101",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:42Z",
+          "id" : "00000000-0000-4000-8000-000000000102",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 1 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:43Z",
+          "id" : "00000000-0000-4000-8000-000000000103",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:44Z",
+          "id" : "00000000-0000-4000-8000-000000000104",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 2 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:45Z",
+          "id" : "00000000-0000-4000-8000-000000000105",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:46Z",
+          "id" : "00000000-0000-4000-8000-000000000106",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 3 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:47Z",
+          "id" : "00000000-0000-4000-8000-000000000107",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:48Z",
+          "id" : "00000000-0000-4000-8000-000000000108",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 4 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:49Z",
+          "id" : "00000000-0000-4000-8000-000000000109",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:50Z",
+          "id" : "00000000-0000-4000-8000-000000000110",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 5 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:51Z",
+          "id" : "00000000-0000-4000-8000-000000000111",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ]
+    },
+    {
+      "cases" : [
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : null
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 10
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : null,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 1,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : 11,
+          "boundary" : 9,
+          "current" : 3,
+          "limitTokens" : 400
+        },
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : 1,
+          "current" : null,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : 3,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : null,
+          "current" : 1,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : null,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        },
+        {
+          "before" : 11,
+          "boundary" : null,
+          "current" : 3,
+          "limitTokens" : 4000
+        }
+      ],
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:40Z",
+          "id" : "00000000-0000-4000-8000-000000000100",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 0 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:41Z",
+          "id" : "00000000-0000-4000-8000-000000000101",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:42Z",
+          "id" : "00000000-0000-4000-8000-000000000102",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 1 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:43Z",
+          "id" : "00000000-0000-4000-8000-000000000103",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:44Z",
+          "id" : "00000000-0000-4000-8000-000000000104",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 2 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:45Z",
+          "id" : "00000000-0000-4000-8000-000000000105",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:46Z",
+          "id" : "00000000-0000-4000-8000-000000000106",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 3 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:47Z",
+          "id" : "00000000-0000-4000-8000-000000000107",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:48Z",
+          "id" : "00000000-0000-4000-8000-000000000108",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 4 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:49Z",
+          "id" : "00000000-0000-4000-8000-000000000109",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "question 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "createdAt" : "2027-01-15T08:01:50Z",
+          "id" : "00000000-0000-4000-8000-000000000110",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "answer 5 yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "createdAt" : "2027-01-15T08:01:51Z",
+          "id" : "00000000-0000-4000-8000-000000000111",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ]
+    }
+  ],
+  "chunks" : {
+    "budgetTokens" : 250,
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 0 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:40Z",
+        "id" : "00000000-0000-4000-8000-000000000400",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 1 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:41Z",
+        "id" : "00000000-0000-4000-8000-000000000401",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 2 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:42Z",
+        "id" : "00000000-0000-4000-8000-000000000402",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 3 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:43Z",
+        "id" : "00000000-0000-4000-8000-000000000403",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 4 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:44Z",
+        "id" : "00000000-0000-4000-8000-000000000404",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 5 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:45Z",
+        "id" : "00000000-0000-4000-8000-000000000405",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 6 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:46Z",
+        "id" : "00000000-0000-4000-8000-000000000406",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 7 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:47Z",
+        "id" : "00000000-0000-4000-8000-000000000407",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 8 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:48Z",
+        "id" : "00000000-0000-4000-8000-000000000408",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "message 9 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "createdAt" : "2027-01-15T08:06:49Z",
+        "id" : "00000000-0000-4000-8000-000000000409",
+        "isComplete" : true,
+        "role" : "user"
+      }
+    ],
+    "result" : [
+      [
+        "00000000-0000-4000-8000-000000000400",
+        "00000000-0000-4000-8000-000000000401"
+      ],
+      [
+        "00000000-0000-4000-8000-000000000402",
+        "00000000-0000-4000-8000-000000000403"
+      ],
+      [
+        "00000000-0000-4000-8000-000000000404",
+        "00000000-0000-4000-8000-000000000405"
+      ],
+      [
+        "00000000-0000-4000-8000-000000000406",
+        "00000000-0000-4000-8000-000000000407"
+      ],
+      [
+        "00000000-0000-4000-8000-000000000408",
+        "00000000-0000-4000-8000-000000000409"
+      ]
+    ]
+  },
+  "constants" : {
+    "defaultThresholdPercent" : 80,
+    "keptShare" : 0.25,
+    "summaryMaxTokens" : 2048,
+    "thresholdMax" : 95,
+    "thresholdMin" : 30
+  },
+  "conversation" : {
+    "compaction" : {
+      "countsStaleThroughID" : "00000000-0000-4000-8000-000000000505",
+      "createdAt" : "2027-01-15T08:08:30Z",
+      "messageCount" : 4,
+      "model" : "m",
+      "summary" : "They talked.",
+      "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+    },
+    "createdAt" : "2027-01-15T08:00:00Z",
+    "id" : "00000000-0000-4000-8000-000000000550",
+    "messages" : [
+      {
+        "attachments" : [
+
+        ],
+        "content" : "u0",
+        "createdAt" : "2027-01-15T08:08:20Z",
+        "id" : "00000000-0000-4000-8000-000000000500",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "a1",
+        "createdAt" : "2027-01-15T08:08:21Z",
+        "id" : "00000000-0000-4000-8000-000000000501",
+        "isComplete" : true,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "u2",
+        "createdAt" : "2027-01-15T08:08:22Z",
+        "id" : "00000000-0000-4000-8000-000000000502",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "a3",
+        "createdAt" : "2027-01-15T08:08:23Z",
+        "id" : "00000000-0000-4000-8000-000000000503",
+        "isComplete" : true,
+        "role" : "assistant"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "u4",
+        "createdAt" : "2027-01-15T08:08:24Z",
+        "id" : "00000000-0000-4000-8000-000000000504",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      {
+        "attachments" : [
+
+        ],
+        "content" : "a5",
+        "createdAt" : "2027-01-15T08:08:25Z",
+        "id" : "00000000-0000-4000-8000-000000000505",
+        "isComplete" : true,
+        "role" : "assistant"
+      }
+    ],
+    "settings" : {
+      "model" : "",
+      "systemPrompt" : ""
+    },
+    "title" : "T",
+    "updatedAt" : "2027-01-15T08:00:01Z"
+  },
+  "due" : [
+    {
+      "due" : true,
+      "limit" : 1000,
+      "percent" : 80,
+      "tokens" : 800
+    },
+    {
+      "due" : false,
+      "limit" : 1000,
+      "percent" : 80,
+      "tokens" : 799
+    },
+    {
+      "due" : false,
+      "limit" : 1001,
+      "percent" : 80,
+      "tokens" : 800
+    },
+    {
+      "due" : false,
+      "limit" : null,
+      "percent" : 80,
+      "tokens" : 500
+    },
+    {
+      "due" : true,
+      "limit" : 1000,
+      "percent" : 95,
+      "tokens" : 950
+    }
+  ],
+  "effective" : [
+    {
+      "anchorsFrom" : 2,
+      "conversation" : {
+        "compaction" : {
+          "countsStaleThroughID" : "00000000-0000-4000-8000-000000000505",
+          "createdAt" : "2027-01-15T08:08:30Z",
+          "messageCount" : 4,
+          "model" : "m",
+          "summary" : "They talked.",
+          "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+        },
+        "createdAt" : "2027-01-15T08:00:00Z",
+        "id" : "00000000-0000-4000-8000-000000000550",
+        "messages" : [
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u0",
+            "createdAt" : "2027-01-15T08:08:20Z",
+            "id" : "00000000-0000-4000-8000-000000000500",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a1",
+            "createdAt" : "2027-01-15T08:08:21Z",
+            "id" : "00000000-0000-4000-8000-000000000501",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u2",
+            "createdAt" : "2027-01-15T08:08:22Z",
+            "id" : "00000000-0000-4000-8000-000000000502",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a3",
+            "createdAt" : "2027-01-15T08:08:23Z",
+            "id" : "00000000-0000-4000-8000-000000000503",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u4",
+            "createdAt" : "2027-01-15T08:08:24Z",
+            "id" : "00000000-0000-4000-8000-000000000504",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a5",
+            "createdAt" : "2027-01-15T08:08:25Z",
+            "id" : "00000000-0000-4000-8000-000000000505",
+            "isComplete" : true,
+            "role" : "assistant"
+          }
+        ],
+        "settings" : {
+          "model" : "",
+          "systemPrompt" : ""
+        },
+        "title" : "T",
+        "updatedAt" : "2026-11-23T02:56:38Z"
+      },
+      "coveredCount" : 4,
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000504",
+        "00000000-0000-4000-8000-000000000505"
+      ],
+      "summaryBlock" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "systemText" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "truncatedThrough" : 5
+    },
+    {
+      "anchorsFrom" : 1,
+      "conversation" : {
+        "compaction" : {
+          "countsStaleThroughID" : "00000000-0000-4000-8000-000000000504",
+          "createdAt" : "2027-01-15T08:08:30Z",
+          "messageCount" : 4,
+          "model" : "m",
+          "summary" : "They talked.",
+          "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+        },
+        "createdAt" : "2027-01-15T08:00:00Z",
+        "id" : "00000000-0000-4000-8000-000000000550",
+        "messages" : [
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u0",
+            "createdAt" : "2027-01-15T08:08:20Z",
+            "id" : "00000000-0000-4000-8000-000000000500",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a1",
+            "createdAt" : "2027-01-15T08:08:21Z",
+            "id" : "00000000-0000-4000-8000-000000000501",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u2",
+            "createdAt" : "2027-01-15T08:08:22Z",
+            "id" : "00000000-0000-4000-8000-000000000502",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a3",
+            "createdAt" : "2027-01-15T08:08:23Z",
+            "id" : "00000000-0000-4000-8000-000000000503",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u4",
+            "createdAt" : "2027-01-15T08:08:24Z",
+            "id" : "00000000-0000-4000-8000-000000000504",
+            "isComplete" : true,
+            "role" : "user"
+          }
+        ],
+        "settings" : {
+          "model" : "",
+          "systemPrompt" : ""
+        },
+        "title" : "T",
+        "updatedAt" : "2026-11-23T02:56:38Z"
+      },
+      "coveredCount" : 4,
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000504"
+      ],
+      "summaryBlock" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "systemText" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "truncatedThrough" : 4
+    },
+    {
+      "anchorsFrom" : 0,
+      "conversation" : {
+        "compaction" : {
+          "countsStaleThroughID" : "00000000-0000-4000-8000-000000000503",
+          "createdAt" : "2027-01-15T08:08:30Z",
+          "messageCount" : 4,
+          "model" : "m",
+          "summary" : "They talked.",
+          "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+        },
+        "createdAt" : "2027-01-15T08:00:00Z",
+        "id" : "00000000-0000-4000-8000-000000000550",
+        "messages" : [
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u0",
+            "createdAt" : "2027-01-15T08:08:20Z",
+            "id" : "00000000-0000-4000-8000-000000000500",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a1",
+            "createdAt" : "2027-01-15T08:08:21Z",
+            "id" : "00000000-0000-4000-8000-000000000501",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u2",
+            "createdAt" : "2027-01-15T08:08:22Z",
+            "id" : "00000000-0000-4000-8000-000000000502",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a3",
+            "createdAt" : "2027-01-15T08:08:23Z",
+            "id" : "00000000-0000-4000-8000-000000000503",
+            "isComplete" : true,
+            "role" : "assistant"
+          }
+        ],
+        "settings" : {
+          "model" : "",
+          "systemPrompt" : ""
+        },
+        "title" : "T",
+        "updatedAt" : "2026-11-23T02:56:38Z"
+      },
+      "coveredCount" : 4,
+      "messageIDs" : [
+
+      ],
+      "summaryBlock" : "<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "systemText" : "Sys\n\n<conversation_summary>\nThe earlier part of this conversation was summarized to save space. This summary stands for those messages; the messages after it continue from where it ends.\n\nThey talked.\n</conversation_summary>",
+      "truncatedThrough" : 3
+    },
+    {
+      "anchorsFrom" : 0,
+      "conversation" : {
+        "createdAt" : "2027-01-15T08:00:00Z",
+        "id" : "00000000-0000-4000-8000-000000000550",
+        "messages" : [
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u0",
+            "createdAt" : "2027-01-15T08:08:20Z",
+            "id" : "00000000-0000-4000-8000-000000000500",
+            "isComplete" : true,
+            "role" : "user"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "a1",
+            "createdAt" : "2027-01-15T08:08:21Z",
+            "id" : "00000000-0000-4000-8000-000000000501",
+            "isComplete" : true,
+            "role" : "assistant"
+          },
+          {
+            "attachments" : [
+
+            ],
+            "content" : "u2",
+            "createdAt" : "2027-01-15T08:08:22Z",
+            "id" : "00000000-0000-4000-8000-000000000502",
+            "isComplete" : true,
+            "role" : "user"
+          }
+        ],
+        "settings" : {
+          "model" : "",
+          "systemPrompt" : ""
+        },
+        "title" : "T",
+        "updatedAt" : "2026-11-23T02:56:38Z"
+      },
+      "coveredCount" : 0,
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000500",
+        "00000000-0000-4000-8000-000000000501",
+        "00000000-0000-4000-8000-000000000502"
+      ],
+      "summaryBlock" : null,
+      "systemText" : "Sys",
+      "truncatedThrough" : 2
+    }
+  ],
+  "forks" : [
+    {
+      "compaction" : {
+        "countsStaleThroughID" : "00000000-0000-4000-8000-000000000505",
+        "createdAt" : "2027-01-15T08:08:30Z",
+        "messageCount" : 4,
+        "model" : "m",
+        "summary" : "They talked.",
+        "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+      },
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000500",
+        "00000000-0000-4000-8000-000000000501",
+        "00000000-0000-4000-8000-000000000502",
+        "00000000-0000-4000-8000-000000000503",
+        "00000000-0000-4000-8000-000000000504",
+        "00000000-0000-4000-8000-000000000505"
+      ],
+      "through" : 5
+    },
+    {
+      "compaction" : {
+        "countsStaleThroughID" : "00000000-0000-4000-8000-000000000504",
+        "createdAt" : "2027-01-15T08:08:30Z",
+        "messageCount" : 4,
+        "model" : "m",
+        "summary" : "They talked.",
+        "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+      },
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000500",
+        "00000000-0000-4000-8000-000000000501",
+        "00000000-0000-4000-8000-000000000502",
+        "00000000-0000-4000-8000-000000000503",
+        "00000000-0000-4000-8000-000000000504"
+      ],
+      "through" : 4
+    },
+    {
+      "compaction" : {
+        "countsStaleThroughID" : "00000000-0000-4000-8000-000000000503",
+        "createdAt" : "2027-01-15T08:08:30Z",
+        "messageCount" : 4,
+        "model" : "m",
+        "summary" : "They talked.",
+        "throughMessageID" : "00000000-0000-4000-8000-000000000503"
+      },
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000500",
+        "00000000-0000-4000-8000-000000000501",
+        "00000000-0000-4000-8000-000000000502",
+        "00000000-0000-4000-8000-000000000503"
+      ],
+      "through" : 3
+    },
+    {
+      "compaction" : null,
+      "messageIDs" : [
+        "00000000-0000-4000-8000-000000000500",
+        "00000000-0000-4000-8000-000000000501",
+        "00000000-0000-4000-8000-000000000502"
+      ],
+      "through" : 2
+    }
+  ],
+  "instruction" : "Summarize the conversation above so that it can continue without it. Write in the language the conversation is in. Keep: what the user wants and has decided, facts, names, numbers, file names and addresses that came up, what tools returned that still matters, code that is still being worked on (quote it if it is short), questions still open, and where things were left. Leave out pleasantries and anything already settled and no longer needed. Write the summary only, with no introduction, as compact notes.",
+  "requestMessages" : [
+    {
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "a",
+          "createdAt" : "2027-01-15T08:05:10Z",
+          "id" : "00000000-0000-4000-8000-000000000310",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "b",
+          "createdAt" : "2027-01-15T08:05:11Z",
+          "id" : "00000000-0000-4000-8000-000000000311",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ],
+      "previousSummary" : null,
+      "result" : [
+        {
+          "attachments" : 0,
+          "content" : "a",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "b",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "Summarize the conversation above so that it can continue without it. Write in the language the conversation is in. Keep: what the user wants and has decided, facts, names, numbers, file names and addresses that came up, what tools returned that still matters, code that is still being worked on (quote it if it is short), questions still open, and where things were left. Leave out pleasantries and anything already settled and no longer needed. Write the summary only, with no introduction, as compact notes.",
+          "role" : "user"
+        }
+      ]
+    },
+    {
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            }
+          ],
+          "content" : "look",
+          "createdAt" : "2027-01-15T08:05:00Z",
+          "id" : "00000000-0000-4000-8000-000000000300",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "seen",
+          "createdAt" : "2027-01-15T08:05:01Z",
+          "id" : "00000000-0000-4000-8000-000000000301",
+          "isComplete" : true,
+          "reasoning" : "secret",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 1,
+            "promptTokens" : 9
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:05:02Z",
+          "error" : "x",
+          "id" : "00000000-0000-4000-8000-000000000302",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "and then",
+          "createdAt" : "2027-01-15T08:05:03Z",
+          "id" : "00000000-0000-4000-8000-000000000303",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "previousSummary" : "Before: hello.",
+      "result" : [
+        {
+          "attachments" : 0,
+          "content" : "Summary of the conversation so far:\n\nBefore: hello.\n\nlook\n\n[An image was attached here.]",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "seen",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "and then",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "(No reply yet.)",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "Summarize the conversation above so that it can continue without it. Write in the language the conversation is in. Keep: what the user wants and has decided, facts, names, numbers, file names and addresses that came up, what tools returned that still matters, code that is still being worked on (quote it if it is short), questions still open, and where things were left. Leave out pleasantries and anything already settled and no longer needed. Write the summary only, with no introduction, as compact notes.",
+          "role" : "user"
+        }
+      ]
+    },
+    {
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "a2",
+          "createdAt" : "2027-01-15T08:05:20Z",
+          "id" : "00000000-0000-4000-8000-000000000320",
+          "isComplete" : true,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "u3",
+          "createdAt" : "2027-01-15T08:05:21Z",
+          "id" : "00000000-0000-4000-8000-000000000321",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "a3",
+          "createdAt" : "2027-01-15T08:05:22Z",
+          "id" : "00000000-0000-4000-8000-000000000322",
+          "isComplete" : true,
+          "role" : "assistant"
+        }
+      ],
+      "previousSummary" : "So far.",
+      "result" : [
+        {
+          "attachments" : 0,
+          "content" : "Summary of the conversation so far:\n\nSo far.",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "a2",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "u3",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "a3",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "Summarize the conversation above so that it can continue without it. Write in the language the conversation is in. Keep: what the user wants and has decided, facts, names, numbers, file names and addresses that came up, what tools returned that still matters, code that is still being worked on (quote it if it is short), questions still open, and where things were left. Leave out pleasantries and anything already settled and no longer needed. Write the summary only, with no introduction, as compact notes.",
+          "role" : "user"
+        }
+      ]
+    },
+    {
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "u1",
+          "createdAt" : "2027-01-15T08:05:30Z",
+          "id" : "00000000-0000-4000-8000-000000000330",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:05:02Z",
+          "error" : "x",
+          "id" : "00000000-0000-4000-8000-000000000302",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "u2",
+          "createdAt" : "2027-01-15T08:05:31Z",
+          "id" : "00000000-0000-4000-8000-000000000331",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "previousSummary" : null,
+      "result" : [
+        {
+          "attachments" : 0,
+          "content" : "u1\n\nu2",
+          "role" : "user"
+        },
+        {
+          "attachments" : 0,
+          "content" : "(No reply yet.)",
+          "role" : "assistant"
+        },
+        {
+          "attachments" : 0,
+          "content" : "Summarize the conversation above so that it can continue without it. Write in the language the conversation is in. Keep: what the user wants and has decided, facts, names, numbers, file names and addresses that came up, what tools returned that still matters, code that is still being worked on (quote it if it is short), questions still open, and where things were left. Leave out pleasantries and anything already settled and no longer needed. Write the summary only, with no introduction, as compact notes.",
+          "role" : "user"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 # Publishes Parley Reader (Reader/ParleyReader.html, built by tools/build_reader.sh and committed)
-# to GitHub Pages as index.html. Nothing is built here: the page is copied as it is.
+# to GitHub Pages as index.html, and Parley Web (Web/ParleyWeb.html, built by tools/build_web.sh and
+# committed) as web/index.html. Nothing is built here: the pages are copied as they are.
 name: Publish Parley Reader
 
 on:
@@ -7,6 +8,7 @@ on:
     branches: [master]
     paths:
       - Reader/ParleyReader.html
+      - Web/ParleyWeb.html
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -31,6 +33,8 @@ jobs:
         run: |
           mkdir _site
           cp Reader/ParleyReader.html _site/index.html
+          mkdir _site/web
+          cp Web/ParleyWeb.html _site/web/index.html
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

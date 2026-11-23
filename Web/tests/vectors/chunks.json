@@ -1,0 +1,92 @@
+[
+  {
+    "delta" : {
+      "content" : "Hel"
+    },
+    "payload" : "{\"choices\":[{\"delta\":{\"content\":\"Hel\"},\"finish_reason\":null}]}"
+  },
+  {
+    "delta" : {
+      "reasoning" : "think"
+    },
+    "payload" : "{\"choices\":[{\"delta\":{\"reasoning_content\":\"think\"}}]}"
+  },
+  {
+    "delta" : {
+      "reasoning" : "also think"
+    },
+    "payload" : "{\"choices\":[{\"delta\":{\"reasoning\":\"also think\"}}]}"
+  },
+  {
+    "delta" : {
+      "finishReason" : "stop"
+    },
+    "payload" : "{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"
+  },
+  {
+    "delta" : {
+      "usage" : {
+        "cachedPromptTokens" : 4,
+        "completionTokens" : 5,
+        "promptTokens" : 10,
+        "reasoningTokens" : 2,
+        "totalTokens" : 15
+      }
+    },
+    "payload" : "{\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15,\"completion_tokens_details\":{\"reasoning_tokens\":2},\"prompt_tokens_details\":{\"cached_tokens\":4}}}"
+  },
+  {
+    "delta" : {
+      "content" : "x",
+      "finishReason" : "length",
+      "timings" : {
+        "predictedMilliseconds" : 800,
+        "predictedPerSecond" : 50,
+        "predictedTokens" : 40,
+        "promptMilliseconds" : 30.5,
+        "promptPerSecond" : 393.39999999999998,
+        "promptTokens" : 12
+      }
+    },
+    "payload" : "{\"choices\":[{\"delta\":{\"content\":\"x\"},\"finish_reason\":\"length\"}],\"timings\":{\"prompt_n\":12,\"prompt_ms\":30.5,\"predicted_n\":40,\"predicted_ms\":800,\"predicted_per_second\":50,\"prompt_per_second\":393.4}}"
+  },
+  {
+    "delta" : {
+      "promptProgress" : {
+        "cached" : 200,
+        "milliseconds" : 120,
+        "processed" : 500,
+        "total" : 1000
+      }
+    },
+    "payload" : "{\"choices\":[{\"delta\":{}}],\"prompt_progress\":{\"total\":1000,\"cache\":200,\"processed\":500,\"time_ms\":120}}"
+  },
+  {
+    "error" : "API error: model not found",
+    "payload" : "{\"error\":{\"message\":\"model not found\"}}"
+  },
+  {
+    "error" : "API error: plain string error",
+    "payload" : "{\"error\":\"plain string error\"}"
+  },
+  {
+    "delta" : null,
+    "payload" : "[DONE]"
+  },
+  {
+    "delta" : null,
+    "payload" : "not json"
+  },
+  {
+    "delta" : {
+      "content" : ""
+    },
+    "payload" : "{\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}"
+  },
+  {
+    "delta" : {
+      "content" : "non-stream style"
+    },
+    "payload" : "{\"choices\":[{\"message\":{\"content\":\"non-stream style\"}}]}"
+  }
+]

@@ -1,0 +1,101 @@
+[
+  {
+    "lines" : [
+      "data: {\"a\":1}",
+      "",
+      "data: {\"b\":2}",
+      ""
+    ],
+    "payloads" : [
+      "{\"a\":1}",
+      "{\"b\":2}"
+    ]
+  },
+  {
+    "lines" : [
+      "data:{\"no\":\"space\"}",
+      ""
+    ],
+    "payloads" : [
+      "{\"no\":\"space\"}"
+    ]
+  },
+  {
+    "lines" : [
+      ": comment",
+      "id: 7",
+      "retry: 1000",
+      "data: {\"x\":1}",
+      ""
+    ],
+    "payloads" : [
+      "{\"x\":1}"
+    ]
+  },
+  {
+    "lines" : [
+      "data: {\"split\":",
+      "data: true}",
+      ""
+    ],
+    "payloads" : [
+      "{\"split\":\ntrue}"
+    ]
+  },
+  {
+    "lines" : [
+      "data: [DONE]",
+      ""
+    ],
+    "payloads" : [
+      "[DONE]"
+    ]
+  },
+  {
+    "lines" : [
+      "event: error",
+      "data: {\"message\":\"overloaded\"}",
+      ""
+    ],
+    "payloads" : [
+      "{\"error\":{\"message\":\"overloaded\"}}"
+    ]
+  },
+  {
+    "lines" : [
+      "error: {\"message\":\"llama failed\"}",
+      ""
+    ],
+    "payloads" : [
+      "{\"error\":{\"message\":\"llama failed\"}}"
+    ]
+  },
+  {
+    "lines" : [
+      "{\"error\":{\"message\":\"bare\"}}",
+      ""
+    ],
+    "payloads" : [
+      "{\"error\":{\"message\":\"bare\"}}"
+    ]
+  },
+  {
+    "lines" : [
+      "data: partial without end"
+    ],
+    "payloads" : [
+      "partial without end"
+    ]
+  },
+  {
+    "lines" : [
+      "data: {\"c\":1}",
+      "data: {\"d\":2}",
+      ""
+    ],
+    "payloads" : [
+      "{\"c\":1}",
+      "{\"d\":2}"
+    ]
+  }
+]

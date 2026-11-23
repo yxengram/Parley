@@ -13,7 +13,8 @@ on your own computer or online.
 
 <p align="center">
 <a href="https://github.com/yxengram/Parley/releases/latest"><b>Download for Mac</b></a> ·
-<a href="https://yxengram.github.io/Parley/">Parley Reader (open chats in any browser)</a>
+<a href="https://yxengram.github.io/Parley/">Parley Reader (open chats in any browser)</a> ·
+<a href="https://yxengram.github.io/Parley/web/">Parley Web (chat in a browser, preview)</a>
 </p>
 
 ![Parley chat window](docs/images/en/chat.jpg)
@@ -86,6 +87,27 @@ Parley does. It runs entirely in your browser: nothing is uploaded anywhere.
 
 To find a conversation's file, right-click it in Parley's sidebar and choose
 **Reveal in Finder**.
+
+## Parley Web: chat from a browser (preview)
+
+[Parley Web](https://yxengram.github.io/Parley/web/) is Parley's chat in a single web page, for
+an iPhone, an iPad or any computer: servers, streaming replies with thinking, editing, regenerating,
+rolling back and forking, pictures and text files, conversation settings, password-locked
+conversations, the context meter and context compaction, and the same skins. Conversations are kept
+in that browser, in Parley's own format: export one and Parley for Mac opens it, and the other way
+round. Tools, MCP and skills are not in the web version yet.
+
+- The page talks only to the servers you add, straight from your browser, so the server must allow
+  it: in LM Studio turn on **Enable CORS** in the server settings; for Ollama set
+  `OLLAMA_ORIGINS`; llama.cpp allows it by default. OpenRouter works directly; OpenAI's own API
+  does not allow browser requests.
+- A page on `https://` cannot reach a server on plain `http://` in your network. Give the server an
+  `https://` address (for example `tailscale serve` or a Cloudflare tunnel), or download
+  `ParleyWeb.html` from the [release page](https://github.com/yxengram/Parley/releases/latest) and
+  open the file in Chrome.
+- API keys are kept only until you close the page unless you tick **Remember in this browser**.
+  The page's address is shared with other pages of the same site, so encrypt conversations you want
+  unreadable at rest. On an iPhone, add the page to the Home Screen so Safari keeps its data.
 
 ## Install
 

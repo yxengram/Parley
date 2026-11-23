@@ -1,0 +1,26 @@
+[
+  {
+    "contextLength" : 8192,
+    "text" : "This model's maximum context length is 8192 tokens. However, your messages resulted in 9000 tokens."
+  },
+  {
+    "contextLength" : null,
+    "text" : "the request exceeds the available context size, try increasing it (n_ctx: 4096)"
+  },
+  {
+    "contextLength" : null,
+    "text" : "Trying to keep the first 5000 tokens when context the overflows. However, the model is loaded with context length of only 4096 tokens"
+  },
+  {
+    "contextLength" : null,
+    "text" : "prompt is too long: 200000 tokens > 131072 maximum"
+  },
+  {
+    "contextLength" : null,
+    "text" : "HTTP 500: boom"
+  },
+  {
+    "contextLength" : null,
+    "text" : ""
+  }
+]

@@ -135,6 +135,17 @@ Parley 自带七个基础工具，不需要 MCP 服务器。**默认全部关闭
 - **总结怎么发送**：放在系统消息里，接在系统提示词和 ReAct 说明之后，并标明是数据；不插在历史中间（有些模型模板不接受中途的系统消息），所以系统提示词和工具定义的前缀不变，服务器的提示词缓存照样有效。没有压缩时，请求和以前逐字节相同。
 - **文件格式**：`Conversation.compaction` 是可选字段，文件版本仍是 1。旧版 Parley 会忽略它并发送完整历史；加密对话的总结和其他内容一样在密文里。Reader 也会显示分隔线。
 
+## Parley Web（预览版）
+
+`Web/` 是单文件网页版聊天客户端，构建和发布方式与 Reader 相同：`tools/build_web.sh` 把共用的 `Reader/src/core.js`、`markdown.js` 和 `Web/src/chat.js`、`context.js`、`store.js` 内联进 `Web/src/web.html`，生成的 `Web/ParleyWeb.html` 提交到仓库，由 GitHub Pages 发布在 `/web/`，并附在每个发布版本里。规格见 `Web/SPEC.md`。Reader 不变，仍然完全不联网。
+
+- 对话保存在浏览器的 IndexedDB 里，格式就是 Parley 的对话文件格式（加密对话保存为 Parley 的加密文件文本，索引里不存标题），导出的文件 Mac 版可以直接打开。`WebFixtureTests` 用 Mac 版自己的代码打开网页版写出的文件来核对。
+- `chat.js`、`context.js` 是 Mac 版请求、流式解析、上下文估算和压缩逻辑的移植；`WebOracleTests` 用 Mac 版代码生成对照数据（`Web/tests/vectors/`），JS 必须完全一致。
+- 只有 `chat.js` 会联网，而且只连你添加的服务器；`tools/test_web_page.mjs` 静态检查这一点。API key 默认只在本次会话里保存；勾选“在此浏览器中记住”时会提醒：这个网页的地址和同一 GitHub Pages 账号下的其他页面共用。
+- 浏览器的限制：服务器必须允许跨域（CORS）；https 页面不能访问局域网里的 http 服务器（下载的 `ParleyWeb.html` 用 Chrome 打开可以）。
+- 暂不支持：工具、内置工具、MCP、技能、文件夹存储，以及修改或去掉密码。
+- 测试：`tools/test_web.sh`。
+
 ## Strata
 Parley 能识别 [Strata](https://github.com/Niko1221/Strata)，并针对它做了这些处理：
 - **识别方式**：Strata 桌面版“在网络上共享”的端口（默认 47832）的模型列表写着 `owned_by: "strata"`；直接运行的 Strata 引擎（`serve/server.py`，默认 8080）则通过不需要 key 的 `GET /health`（`"service":"strata"`）识别。识别后弹窗里的“Server”显示 Strata。共享端口只有 `/v1/models`、`/v1/chat/completions`、`/v1/messages` 三个接口，所以 Parley 不会再向它发送其他探测请求。

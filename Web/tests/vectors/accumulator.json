@@ -1,0 +1,113 @@
+[
+  {
+    "content" : "Hello world",
+    "deltas" : [
+      {
+        "content" : "Hello"
+      },
+      {
+        "content" : " world"
+      }
+    ],
+    "reasoning" : ""
+  },
+  {
+    "content" : "Answer.",
+    "deltas" : [
+      {
+        "reasoning" : "Let me think."
+      },
+      {
+        "content" : "Answer."
+      }
+    ],
+    "reasoning" : "Let me think."
+  },
+  {
+    "content" : "Final",
+    "deltas" : [
+      {
+        "content" : "<think>plan"
+      },
+      {
+        "content" : " more</think>"
+      },
+      {
+        "content" : "Final"
+      }
+    ],
+    "reasoning" : "plan more"
+  },
+  {
+    "content" : "y",
+    "deltas" : [
+      {
+        "content" : "<thi"
+      },
+      {
+        "content" : "nk>x</th"
+      },
+      {
+        "content" : "ink>y"
+      }
+    ],
+    "reasoning" : "x"
+  },
+  {
+    "content" : "No tags here",
+    "deltas" : [
+      {
+        "content" : "No tags here"
+      }
+    ],
+    "reasoning" : ""
+  },
+  {
+    "content" : "Before  after",
+    "deltas" : [
+      {
+        "content" : "Before <think>inside</think> after"
+      }
+    ],
+    "reasoning" : "inside"
+  },
+  {
+    "content" : "",
+    "deltas" : [
+      {
+        "content" : "<think>never closed"
+      }
+    ],
+    "reasoning" : "never closed"
+  },
+  {
+    "content" : "\n\nbody",
+    "deltas" : [
+      {
+        "content" : "\n\n<think>\nlead</think>\n\nbody"
+      }
+    ],
+    "reasoning" : "lead"
+  },
+  {
+    "content" : "c",
+    "deltas" : [
+      {
+        "reasoning" : "r1"
+      },
+      {
+        "content" : "<think>r2</think>c"
+      }
+    ],
+    "reasoning" : "r1r2"
+  },
+  {
+    "content" : "answer",
+    "deltas" : [
+      {
+        "content" : "plan</think>answer"
+      }
+    ],
+    "reasoning" : "plan"
+  }
+]

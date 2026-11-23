@@ -51,6 +51,10 @@ chat_template_kwargs {"enable_thinking": false} and ollama honours reasoning_eff
 servers do: the reasoning models (mock-reasoning-content, mock-reasoning, mock-think-tags,
 mock-orphan-think, mock-slow-think) then send their answer without any thinking. lmstudio,
 lmstudio-v0 and plain ignore both fields and still stream thinking (unknown fields are ignored).
+MOCK_CORS=1 in the environment makes the server usable from a web page on another origin (Parley Web):
+every OPTIONS request is answered 204 with Access-Control-Allow-Origin: *, Allow-Methods GET, POST, OPTIONS,
+Allow-Headers Authorization, Content-Type and Max-Age 600, and every other response (streams and
+errors included) carries Access-Control-Allow-Origin: *. Without it nothing changes.
 MOCK_PROBE_DELAY=<seconds> in the environment delays every native GET (/props, /api/…, /health)
 by that much, so tests can send while a context probe is still running (/v1/models is not delayed).
 
@@ -407,6 +411,8 @@ class Handler(BaseHTTPRequestHandler):
         return "cloudflare" if self.cloudflare else BaseHTTPRequestHandler.version_string(self)
 
     def end_headers(self):
+        if os.environ.get("MOCK_CORS") == "1":
+            self.send_header("Access-Control-Allow-Origin", "*")
         if self.cloudflare:
             self.send_header("CF-RAY", CF_RAY + "-SYD")
             self.send_header("CF-Cache-Status", "DYNAMIC")
@@ -511,6 +517,19 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, {"error": f"Unexpected endpoint or method. ({method} {path})"})
 
     # ---- routing -------------------------------------------------------
+
+    def do_OPTIONS(self):
+        # A browser's preflight. Only with MOCK_CORS=1; otherwise OPTIONS stays unsupported (501) as before.
+        if os.environ.get("MOCK_CORS") != "1":
+            self.send_error(501, "Unsupported method ('OPTIONS')")
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        self.wfile.flush()
 
     def do_GET(self):
         path, answered = self.cloudflare_route(self.path.split("?", 1)[0].rstrip("/"))

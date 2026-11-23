@@ -1,0 +1,1853 @@
+{
+  "estimates" : [
+    {
+      "text" : "",
+      "tokens" : 0
+    },
+    {
+      "text" : "hello",
+      "tokens" : 2
+    },
+    {
+      "text" : "Hello, world! How are you today?",
+      "tokens" : 8
+    },
+    {
+      "text" : "你好世界",
+      "tokens" : 4
+    },
+    {
+      "text" : "混合 text 和中文，还有 emoji 🎉",
+      "tokens" : 12
+    },
+    {
+      "text" : "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word ",
+      "tokens" : 125
+    },
+    {
+      "text" : "日本語のテキスト",
+      "tokens" : 8
+    },
+    {
+      "text" : "한국어 문장",
+      "tokens" : 6
+    }
+  ],
+  "limits" : [
+    {
+      "learned" : null,
+      "limit" : {
+        "source" : "manual",
+        "tokens" : 8192
+      },
+      "loaded" : null,
+      "manual" : 8192,
+      "max" : null
+    },
+    {
+      "learned" : 4096,
+      "limit" : {
+        "source" : "manual",
+        "tokens" : 8192
+      },
+      "loaded" : null,
+      "manual" : 8192,
+      "max" : null
+    },
+    {
+      "learned" : 4096,
+      "limit" : {
+        "source" : "learned",
+        "tokens" : 4096
+      },
+      "loaded" : null,
+      "manual" : null,
+      "max" : 32768
+    },
+    {
+      "learned" : null,
+      "limit" : {
+        "source" : "serverMaximum",
+        "tokens" : 32768
+      },
+      "loaded" : null,
+      "manual" : null,
+      "max" : 32768
+    },
+    {
+      "learned" : null,
+      "limit" : {
+        "source" : "server",
+        "tokens" : 16384
+      },
+      "loaded" : 16384,
+      "manual" : 8192,
+      "max" : 32768
+    },
+    {
+      "learned" : null,
+      "limit" : null,
+      "loaded" : null,
+      "manual" : null,
+      "max" : null
+    }
+  ],
+  "messages" : [
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Hi",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 5
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Hello!",
+        "createdAt" : "2027-01-15T08:00:03Z",
+        "id" : "00000000-0000-4000-8000-000000000003",
+        "isComplete" : true,
+        "reasoning" : "Think first.",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 40,
+          "promptTokens" : 120,
+          "reasoningTokens" : 12,
+          "totalTokens" : 160
+        }
+      },
+      "tokens" : 6
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Next question",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 8
+    },
+    {
+      "message" : {
+        "attachments" : [
+          {
+            "data" : "iVBORw==",
+            "filename" : "a.png",
+            "id" : "00000000-0000-4000-8000-000000000900",
+            "kind" : "image",
+            "mimeType" : "image/png"
+          },
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "Look",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 790
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Counted reply",
+        "createdAt" : "2027-01-15T08:00:05Z",
+        "id" : "00000000-0000-4000-8000-000000000005",
+        "isComplete" : true,
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 20,
+          "promptTokens" : 300
+        }
+      },
+      "tokens" : 8
+    },
+    {
+      "message" : {
+        "attachments" : [
+          {
+            "filename" : "notes \"a\".txt",
+            "id" : "00000000-0000-4000-8000-000000000901",
+            "kind" : "text",
+            "mimeType" : "text/plain",
+            "text" : "line one\nline two"
+          }
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:07Z",
+        "id" : "00000000-0000-4000-8000-000000000007",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 21
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Q",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 5
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "",
+        "createdAt" : "2027-01-15T08:00:06Z",
+        "error" : "HTTP 500: boom",
+        "id" : "00000000-0000-4000-8000-000000000006",
+        "isComplete" : false,
+        "role" : "assistant"
+      },
+      "tokens" : 4
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "  ",
+        "createdAt" : "2027-01-15T08:00:02Z",
+        "id" : "00000000-0000-4000-8000-000000000002",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      "tokens" : 5
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Be terse.",
+        "createdAt" : "2027-01-15T08:00:09Z",
+        "id" : "00000000-0000-4000-8000-000000000009",
+        "isComplete" : true,
+        "role" : "system"
+      },
+      "tokens" : 7
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Again",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 6
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "你好，请用三句话介绍杭州。",
+        "createdAt" : "2027-01-15T08:00:01Z",
+        "id" : "00000000-0000-4000-8000-000000000001",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 17
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "Answer",
+        "createdAt" : "2027-01-15T08:00:08Z",
+        "id" : "00000000-0000-4000-8000-000000000008",
+        "isComplete" : true,
+        "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+        "role" : "assistant",
+        "usage" : {
+          "completionTokens" : 200,
+          "promptTokens" : 50
+        }
+      },
+      "tokens" : 6
+    },
+    {
+      "message" : {
+        "attachments" : [
+
+        ],
+        "content" : "再说说西湖的历史吧",
+        "createdAt" : "2027-01-15T08:00:04Z",
+        "id" : "00000000-0000-4000-8000-000000000004",
+        "isComplete" : true,
+        "role" : "user"
+      },
+      "tokens" : 13
+    }
+  ],
+  "usage" : [
+    {
+      "anchorsFrom" : 0,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 156
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 156
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 19
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 156
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 156
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "plain",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 28
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "plain+inFlight",
+      "inFlightID" : "00000000-0000-4000-8000-000000000099",
+      "isEstimated" : true,
+      "liveCompletionTokens" : 33,
+      "liveIsEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hi",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Hello!",
+          "createdAt" : "2027-01-15T08:00:03Z",
+          "id" : "00000000-0000-4000-8000-000000000003",
+          "isComplete" : true,
+          "reasoning" : "Think first.",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 40,
+            "promptTokens" : 120,
+            "reasoningTokens" : 12,
+            "totalTokens" : 160
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Next question",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "partial",
+          "createdAt" : "2027-01-15T08:01:39Z",
+          "id" : "00000000-0000-4000-8000-000000000099",
+          "isComplete" : false,
+          "role" : "assistant"
+        }
+      ],
+      "systemPrompt" : "S",
+      "tokens" : 189
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 341
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 341
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 819
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 341
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 341
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "attachments",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 828
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "attachments+inFlight",
+      "inFlightID" : "00000000-0000-4000-8000-000000000099",
+      "isEstimated" : true,
+      "liveCompletionTokens" : 33,
+      "liveIsEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+            {
+              "data" : "iVBORw==",
+              "filename" : "a.png",
+              "id" : "00000000-0000-4000-8000-000000000900",
+              "kind" : "image",
+              "mimeType" : "image/png"
+            },
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "Look",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Counted reply",
+          "createdAt" : "2027-01-15T08:00:05Z",
+          "id" : "00000000-0000-4000-8000-000000000005",
+          "isComplete" : true,
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 20,
+            "promptTokens" : 300
+          }
+        },
+        {
+          "attachments" : [
+            {
+              "filename" : "notes \"a\".txt",
+              "id" : "00000000-0000-4000-8000-000000000901",
+              "kind" : "text",
+              "mimeType" : "text/plain",
+              "text" : "line one\nline two"
+            }
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:07Z",
+          "id" : "00000000-0000-4000-8000-000000000007",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "partial",
+          "createdAt" : "2027-01-15T08:01:39Z",
+          "id" : "00000000-0000-4000-8000-000000000099",
+          "isComplete" : false,
+          "role" : "assistant"
+        }
+      ],
+      "systemPrompt" : "S",
+      "tokens" : 374
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 23
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 23
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 23
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 32
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 32
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "failedAndSystem",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 32
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "failedAndSystem+inFlight",
+      "inFlightID" : "00000000-0000-4000-8000-000000000099",
+      "isEstimated" : true,
+      "liveCompletionTokens" : 33,
+      "liveIsEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Q",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "",
+          "createdAt" : "2027-01-15T08:00:06Z",
+          "error" : "HTTP 500: boom",
+          "id" : "00000000-0000-4000-8000-000000000006",
+          "isComplete" : false,
+          "role" : "assistant"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "  ",
+          "createdAt" : "2027-01-15T08:00:02Z",
+          "id" : "00000000-0000-4000-8000-000000000002",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Be terse.",
+          "createdAt" : "2027-01-15T08:00:09Z",
+          "id" : "00000000-0000-4000-8000-000000000009",
+          "isComplete" : true,
+          "role" : "system"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Again",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "partial",
+          "createdAt" : "2027-01-15T08:01:39Z",
+          "id" : "00000000-0000-4000-8000-000000000099",
+          "isComplete" : false,
+          "role" : "assistant"
+        }
+      ],
+      "systemPrompt" : "S",
+      "tokens" : 61
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 153
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 153
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "",
+      "tokens" : 36
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 153
+    },
+    {
+      "anchorsFrom" : 1,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 153
+    },
+    {
+      "anchorsFrom" : 2,
+      "history" : "chinese",
+      "isEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        }
+      ],
+      "systemPrompt" : "System prompt here.",
+      "tokens" : 45
+    },
+    {
+      "anchorsFrom" : 0,
+      "history" : "chinese+inFlight",
+      "inFlightID" : "00000000-0000-4000-8000-000000000099",
+      "isEstimated" : true,
+      "liveCompletionTokens" : 33,
+      "liveIsEstimated" : true,
+      "messages" : [
+        {
+          "attachments" : [
+
+          ],
+          "content" : "你好，请用三句话介绍杭州。",
+          "createdAt" : "2027-01-15T08:00:01Z",
+          "id" : "00000000-0000-4000-8000-000000000001",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "Answer",
+          "createdAt" : "2027-01-15T08:00:08Z",
+          "id" : "00000000-0000-4000-8000-000000000008",
+          "isComplete" : true,
+          "reasoning" : "deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate deliberate ",
+          "role" : "assistant",
+          "usage" : {
+            "completionTokens" : 200,
+            "promptTokens" : 50
+          }
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "再说说西湖的历史吧",
+          "createdAt" : "2027-01-15T08:00:04Z",
+          "id" : "00000000-0000-4000-8000-000000000004",
+          "isComplete" : true,
+          "role" : "user"
+        },
+        {
+          "attachments" : [
+
+          ],
+          "content" : "partial",
+          "createdAt" : "2027-01-15T08:01:39Z",
+          "id" : "00000000-0000-4000-8000-000000000099",
+          "isComplete" : false,
+          "role" : "assistant"
+        }
+      ],
+      "systemPrompt" : "S",
+      "tokens" : 186
+    }
+  ]
+}
