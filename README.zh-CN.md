@@ -71,6 +71,7 @@ AI 应用使用的同一类工具。所有工具在你打开之前都是关闭�
 - 网页直接从你的浏览器连接你添加的服务器，所以服务器需要允许这样做：LM Studio 在服务器设置里打开“**Enable CORS**”；Ollama 设置 `OLLAMA_ORIGINS`；llama.cpp 默认允许。OpenRouter 可以直接用；OpenAI 官方 API 不允许浏览器直接访问。
 - `https://` 网页无法访问局域网里 `http://` 地址的服务器。可以给服务器配一个 `https://` 地址（例如 `tailscale serve` 或 Cloudflare Tunnel），或者从[发布页面](https://github.com/yxengram/Parley/releases/latest)下载 `ParleyWeb.html`，用 Chrome 打开这个文件。
 - 连接这台电脑上（`http://127.0.0.1:1234/v1`、`http://localhost:…`）或局域网里的服务器时，Chrome 会询问是否允许本页连接本设备或本地网络上的应用，请选择“**允许**”。如果之前拒绝了，请点击地址栏左侧的图标，在网站设置里重新允许。下载的文件不需要这项权限。服务器地址请写到 `/v1`。
+- Safari（以及 iPhone、iPad 上的所有浏览器）不允许在线网页访问任何 `http://` 服务器，连这台电脑上的也不行，而且没有可以放行的设置。在 Safari 中请打开下载的 `ParleyWeb.html` 文件，或者给服务器配一个 `https://` 地址。
 - API key 默认只保存到关闭页面为止，除非勾选“**在此浏览器中记住**”。这个网页的地址和同一网站的其他页面共用，所以希望内容不可读的对话请加密。在 iPhone 上请把网页添加到主屏幕，Safari 才会长期保留它的数据。
 
 ## 安装

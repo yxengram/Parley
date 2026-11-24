@@ -144,6 +144,8 @@ Reader keeps using only parse/decrypt; its page audit (no network APIs) must sti
   network error. `ParleyChat.addressSpace(baseURL)` → `'loopback' | 'local' | 'public' | null`;
   the page compares it with its own address and, after a network failure, shows a hint for a
   denied or unanswered permission instead of the general one. A local file needs no permission.
+  Safari (WebKit) blocks every http server from an https page, loopback included, with no
+  permission to ask for; there (`navigator.vendor` Apple, https page, http server) the hint says so.
 - **Mock server for browser tests:** `MOCK_CORS=1 tools/mock_server.py …` answers preflights and
   adds `Access-Control-Allow-Origin: *` (and the allowed headers) to every response.
 

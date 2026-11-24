@@ -109,6 +109,9 @@ round. Tools, MCP and skills are not in the web version yet.
   network, Chrome asks whether the page may connect to apps on this device or on your local network:
   choose **Allow**. If you blocked it, allow it again in the site settings (the icon to the left of
   the address). The downloaded file does not need this permission. Use the base URL with `/v1`.
+- Safari (and every browser on iPhone and iPad) does not let the online page reach any `http://`
+  server, not even one on this computer, and has no setting to allow it. In Safari, open the
+  downloaded `ParleyWeb.html` file, or give the server an `https://` address.
 - API keys are kept only until you close the page unless you tick **Remember in this browser**.
   The page's address is shared with other pages of the same site, so encrypt conversations you want
   unreadable at rest. On an iPhone, add the page to the Home Screen so Safari keeps its data.

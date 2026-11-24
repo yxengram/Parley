@@ -4231,6 +4231,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
       privacyBrowser: 'Conversations stay in this browser (its storage on your device). Export them to keep a copy.',
       privacyEncrypt: 'Encrypt a conversation to keep it unreadable at rest: it is stored as ciphertext, and the password is needed to open it.',
       privacyOrigin: 'Browser storage belongs to the web address, not to this page: other pages on the same address can read what is stored here. API keys are therefore kept for this session only unless you choose otherwise.',
+      netHintWebKitHTTP: 'Safari does not let a page on https connect to a server on http://, not even one on this computer, and has no setting to allow it. Download ParleyWeb.html from the Parley release page and open the file in Safari, or give the server an https address (for example with tailscale serve). Chrome can connect from this page after you allow it.',
       netHintLoopbackDenied: 'This browser has blocked this page from connecting to apps on this computer, so it can\'t reach a server at this address. Click the icon to the left of the web address, open the site settings, allow access to apps and services on this device (Chrome may call it “Local network access”), then reload the page. Or open the downloaded ParleyWeb.html file, which doesn\'t need this permission. If it still fails, check that the server is running and allows requests from this page (in LM Studio, “Enable CORS”).',
       netHintLoopbackPrompt: 'The browser asks whether this page may connect to apps on this computer: choose Allow, then try again. If you see no question, click the icon to the left of the web address and allow it in the site settings, or open the downloaded ParleyWeb.html file, which doesn\'t need this permission. If it still fails, check that the server is running and allows requests from this page (in LM Studio, “Enable CORS”).',
       netHintLocalDenied: 'This browser has blocked this page from connecting to devices on your local network. Click the icon to the left of the web address, open the site settings and allow local network access, then reload the page.',
@@ -4586,6 +4587,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
       privacyBrowser: '对话只保存在此浏览器中（你设备上的浏览器存储）。导出可以保留一份副本。',
       privacyEncrypt: '加密对话可以让它在存储时无法被读取：它以密文保存，打开时需要密码。',
       privacyOrigin: '浏览器存储属于网址而不是这个页面：同一网址下的其他页面可以读取这里保存的内容。因此除非你另行选择，API 密钥只在本次会话中保留。',
+      netHintWebKitHTTP: 'Safari 不允许 https 网页连接 http:// 地址的服务器，连这台电脑上的也不行，而且没有可以放行的设置。请从 Parley 发布页面下载 ParleyWeb.html，用 Safari 打开这个文件；或者给服务器配一个 https 地址（例如用 tailscale serve）。Chrome 在你允许后可以从本页连接。',
       netHintLoopbackDenied: '浏览器已禁止本页连接这台电脑上的应用，所以无法访问这个地址的服务器。请点击网址左侧的图标，打开网站设置，允许访问本设备上的应用和服务（Chrome 中可能叫“本地网络访问”），然后刷新页面。也可以改用下载的 ParleyWeb.html 文件，它不需要这项权限。如果仍然失败，请确认服务器正在运行，并允许来自本页的请求（LM Studio 中打开“Enable CORS”）。',
       netHintLoopbackPrompt: '浏览器会询问是否允许本页连接这台电脑上的应用：请选择“允许”，然后重试。如果没有看到询问，请点击网址左侧的图标，在网站设置中允许；也可以改用下载的 ParleyWeb.html 文件，它不需要这项权限。如果仍然失败，请确认服务器正在运行，并允许来自本页的请求（LM Studio 中打开“Enable CORS”）。',
       netHintLocalDenied: '浏览器已禁止本页连接局域网中的设备。请点击网址左侧的图标，打开网站设置，允许本地网络访问，然后刷新页面。',
@@ -5285,10 +5287,21 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
     // On the local network an http server is also mixed content, which the permission does not lift.
     return space === 'loopback' ? text : text + ' ' + t('netHint');
   }
+  /** Safari (WebKit, also every iPhone and iPad browser) blocks an http server from an https page, this
+   * computer included, and has no permission to allow it: the general hint would send the user to CORS. */
+  function webKitBlocksHTTP(baseURL) {
+    if (!/^https:/i.test(String(document.URL)) || !/Apple/.test(String(navigator.vendor || ''))) return false;
+    try { return new URL(String(baseURL || '').trim()).protocol === 'http:'; } catch (_) { return false; }
+  }
   /** The hint for a failed connection, from the last known permission state. */
-  const netHint = baseURL => { const space = lnaSpace(baseURL); return netHintFor(space, space ? lnaStates[space] : undefined); };
+  const netHint = baseURL => {
+    if (webKitBlocksHTTP(baseURL)) return t('netHintWebKitHTTP');
+    const space = lnaSpace(baseURL);
+    return netHintFor(space, space ? lnaStates[space] : undefined);
+  };
   /** The same after asking the browser again (the user may just have answered its question). */
   async function freshNetHint(baseURL) {
+    if (webKitBlocksHTTP(baseURL)) return t('netHintWebKitHTTP');
     const space = lnaSpace(baseURL);
     return netHintFor(space, space ? await queryLna(space) : undefined);
   }
