@@ -22,11 +22,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # Two jobs: the artifact is listed for the run only some seconds after its upload, and deploy-pages
+  # failed with "No artifacts named github-pages" when it ran right after the upload in the same job.
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Prepare site
@@ -35,9 +34,15 @@ jobs:
           cp Reader/ParleyReader.html _site/index.html
           mkdir _site/web
           cp Web/ParleyWeb.html _site/web/index.html
-          touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
