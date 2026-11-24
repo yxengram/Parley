@@ -122,6 +122,22 @@ await test('URL rules', () => {
   }
 });
 
+await test('address spaces (Local Network Access)', () => {
+  const cases = {
+    'http://127.0.0.1:1234': 'loopback', 'http://localhost:1234/v1': 'loopback', 'http://LOCALHOST': 'loopback',
+    'http://app.localhost:8080': 'loopback', 'http://[::1]:1234': 'loopback', 'http://127.5.6.7': 'loopback',
+    'http://[::ffff:127.0.0.1]:1234': 'loopback', 'http://0.0.0.0:1234/v1': 'loopback',
+    'http://192.168.1.20:1234': 'local', 'http://10.0.0.5': 'local', 'http://172.16.0.1': 'local',
+    'http://172.31.255.255': 'local', 'http://169.254.1.1': 'local', 'http://100.64.0.1': 'local',
+    'http://100.127.1.1': 'local', 'http://[fd00::1]': 'local', 'http://[fe80::1]': 'local',
+    'http://studio.local:1234': 'local',
+    'http://172.32.0.1': 'public', 'http://100.128.0.1': 'public', 'https://8.8.8.8': 'public',
+    'http://[2001:db8::1]': 'public',
+    'https://api.example.com/v1': null, 'http://mybox:1234': null, 'not a url': null, '': null,
+  };
+  for (const [url, want] of Object.entries(cases)) assert.equal(C.addressSpace(url), want, url);
+});
+
 await test('thinking-off fields per server kind', () => {
   assert.deepEqual(C.thinkingOffFields('llamaCpp'), { chat_template_kwargs: { enable_thinking: false } });
   assert.deepEqual(C.thinkingOffFields('vLLM'), { chat_template_kwargs: { enable_thinking: false } });

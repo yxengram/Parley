@@ -105,6 +105,10 @@ round. Tools, MCP and skills are not in the web version yet.
   `https://` address (for example `tailscale serve` or a Cloudflare tunnel), or download
   `ParleyWeb.html` from the [release page](https://github.com/yxengram/Parley/releases/latest) and
   open the file in Chrome.
+- To reach a server on this computer (`http://127.0.0.1:1234/v1`, `http://localhost:…`) or in your
+  network, Chrome asks whether the page may connect to apps on this device or on your local network:
+  choose **Allow**. If you blocked it, allow it again in the site settings (the icon to the left of
+  the address). The downloaded file does not need this permission. Use the base URL with `/v1`.
 - API keys are kept only until you close the page unless you tick **Remember in this browser**.
   The page's address is shared with other pages of the same site, so encrypt conversations you want
   unreadable at rest. On an iPhone, add the page to the Home Screen so Safari keeps its data.

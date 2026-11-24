@@ -139,6 +139,11 @@ Reader keeps using only parse/decrypt; its page audit (no network APIs) must sti
   `/v1/models`.
 - **Two tabs** on the same conversation: a `BroadcastChannel('parley-web')` message after each
   save makes the other tab reload it when it is not streaming; otherwise the last write wins.
+- **Local Network Access.** Chrome asks the user before a page on the internet reaches this device
+  (`loopback-network`) or the local network (`local-network`); refused, the fetch fails like any
+  network error. `ParleyChat.addressSpace(baseURL)` → `'loopback' | 'local' | 'public' | null`;
+  the page compares it with its own address and, after a network failure, shows a hint for a
+  denied or unanswered permission instead of the general one. A local file needs no permission.
 - **Mock server for browser tests:** `MOCK_CORS=1 tools/mock_server.py …` answers preflights and
   adds `Access-Control-Allow-Origin: *` (and the allowed headers) to every response.
 

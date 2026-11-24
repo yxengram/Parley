@@ -142,7 +142,7 @@ Parley 自带七个基础工具，不需要 MCP 服务器。**默认全部关闭
 - 对话保存在浏览器的 IndexedDB 里，格式就是 Parley 的对话文件格式（加密对话保存为 Parley 的加密文件文本，索引里不存标题），导出的文件 Mac 版可以直接打开。`WebFixtureTests` 用 Mac 版自己的代码打开网页版写出的文件来核对。
 - `chat.js`、`context.js` 是 Mac 版请求、流式解析、上下文估算和压缩逻辑的移植；`WebOracleTests` 用 Mac 版代码生成对照数据（`Web/tests/vectors/`），JS 必须完全一致。
 - 只有 `chat.js` 会联网，而且只连你添加的服务器；`tools/test_web_page.mjs` 静态检查这一点。API key 默认只在本次会话里保存；勾选“在此浏览器中记住”时会提醒：这个网页的地址和同一 GitHub Pages 账号下的其他页面共用。
-- 浏览器的限制：服务器必须允许跨域（CORS）；https 页面不能访问局域网里的 http 服务器（下载的 `ParleyWeb.html` 用 Chrome 打开可以）。
+- 浏览器的限制：服务器必须允许跨域（CORS）；https 页面不能访问局域网里的 http 服务器（下载的 `ParleyWeb.html` 用 Chrome 打开可以）；Chrome 的“本地网络访问”权限：线上页面连接本机（loopback）或局域网地址前要用户允许，拒绝后表现为连接失败。`ParleyChat.addressSpace` 判断服务器地址属于哪类，页面用 `navigator.permissions` 查询 `loopback-network` / `local-network` 的状态，被拒绝或未回答时给出对应提示。
 - 暂不支持：工具、内置工具、MCP、技能、文件夹存储，以及修改或去掉密码。
 - 测试：`tools/test_web.sh`。
 

@@ -932,6 +932,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       privacyBrowser: 'Conversations stay in this browser (its storage on your device). Export them to keep a copy.',
       privacyEncrypt: 'Encrypt a conversation to keep it unreadable at rest: it is stored as ciphertext, and the password is needed to open it.',
       privacyOrigin: 'Browser storage belongs to the web address, not to this page: other pages on the same address can read what is stored here. API keys are therefore kept for this session only unless you choose otherwise.',
+      netHintLoopbackDenied: 'This browser has blocked this page from connecting to apps on this computer, so it can\'t reach a server at this address. Click the icon to the left of the web address, open the site settings, allow access to apps and services on this device (Chrome may call it “Local network access”), then reload the page. Or open the downloaded ParleyWeb.html file, which doesn\'t need this permission. If it still fails, check that the server is running and allows requests from this page (in LM Studio, “Enable CORS”).',
+      netHintLoopbackPrompt: 'The browser asks whether this page may connect to apps on this computer: choose Allow, then try again. If you see no question, click the icon to the left of the web address and allow it in the site settings, or open the downloaded ParleyWeb.html file, which doesn\'t need this permission. If it still fails, check that the server is running and allows requests from this page (in LM Studio, “Enable CORS”).',
+      netHintLocalDenied: 'This browser has blocked this page from connecting to devices on your local network. Click the icon to the left of the web address, open the site settings and allow local network access, then reload the page.',
+      netHintLocalPrompt: 'The browser asks whether this page may connect to devices on your local network: choose Allow, then try again.',
       netHint: 'The browser could not reach the server. Is it running? If it is, the server may not allow requests from this page (CORS): in LM Studio turn on “Enable CORS” in the server settings; start Ollama with OLLAMA_ORIGINS set to this page\'s address (or *); other servers need an Access-Control-Allow-Origin header. If this page is on https and the server address is http, the browser blocks the request: use an https address, or open the downloaded ParleyWeb.html file instead.',
     },
     'zh-Hans': {
@@ -1283,6 +1287,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       privacyBrowser: '对话只保存在此浏览器中（你设备上的浏览器存储）。导出可以保留一份副本。',
       privacyEncrypt: '加密对话可以让它在存储时无法被读取：它以密文保存，打开时需要密码。',
       privacyOrigin: '浏览器存储属于网址而不是这个页面：同一网址下的其他页面可以读取这里保存的内容。因此除非你另行选择，API 密钥只在本次会话中保留。',
+      netHintLoopbackDenied: '浏览器已禁止本页连接这台电脑上的应用，所以无法访问这个地址的服务器。请点击网址左侧的图标，打开网站设置，允许访问本设备上的应用和服务（Chrome 中可能叫“本地网络访问”），然后刷新页面。也可以改用下载的 ParleyWeb.html 文件，它不需要这项权限。如果仍然失败，请确认服务器正在运行，并允许来自本页的请求（LM Studio 中打开“Enable CORS”）。',
+      netHintLoopbackPrompt: '浏览器会询问是否允许本页连接这台电脑上的应用：请选择“允许”，然后重试。如果没有看到询问，请点击网址左侧的图标，在网站设置中允许；也可以改用下载的 ParleyWeb.html 文件，它不需要这项权限。如果仍然失败，请确认服务器正在运行，并允许来自本页的请求（LM Studio 中打开“Enable CORS”）。',
+      netHintLocalDenied: '浏览器已禁止本页连接局域网中的设备。请点击网址左侧的图标，打开网站设置，允许本地网络访问，然后刷新页面。',
+      netHintLocalPrompt: '浏览器会询问是否允许本页连接局域网中的设备：请选择“允许”，然后重试。',
       netHint: '浏览器无法连接到服务器。服务器是否正在运行？如果在运行，可能是服务器不允许来自本页的请求（CORS）：在 LM Studio 的服务器设置中打开“Enable CORS”；启动 Ollama 时把 OLLAMA_ORIGINS 设为本页的地址（或 *）；其他服务器需要返回 Access-Control-Allow-Origin 头。如果本页是 https 而服务器地址是 http，浏览器会拦截请求：请改用 https 地址，或打开下载的 ParleyWeb.html 文件。',
     },
   };
@@ -1907,6 +1915,9 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       cached.models = await Chat.listModels({ baseURL: provider.baseURL, apiKey: provider.apiKey });
     } catch (e) {
       cached.error = e;
+      // The field's tooltip reads the cached permission state: the user may just have answered the browser.
+      const space = lnaSpace(provider.baseURL);
+      if (space) await queryLna(space);
     }
     cached.loading = false;
     refreshModelUI(provider);
@@ -1924,15 +1935,64 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     if (k.length >= 4) out = out.split(k).join('…');
     return out.length > 4000 ? out.slice(0, 4000) + '…' : out;
   };
-  function failureText(e) {
+  function failureText(e, baseURL) {
     const raw = e && e.message ? String(e.message) : String(e);
     const p = presentError(raw, {});
     let text = p.title;
     if (p.detail) text += ' ' + p.detail;
-    if (isNetworkText(raw)) text += ' ' + t('netHint');
+    if (isNetworkText(raw)) text += ' ' + netHint(baseURL);
     return text;
   }
   const isNetworkText = raw => /^could not connect to the server\./i.test(raw.trim());
+  const serverURL = settings => { const p = providerFor(settings); return p ? str(p.baseURL) : ''; };
+
+  // ---- Local Network Access: Chrome lets a page on the internet reach this device (loopback) or the
+  // local network only with the user's permission; refused, it looks like any failed connection.
+  // A local file or a page served from this device does not need it for the same or a wider space.
+  const LNA_PERMISSION = { loopback: 'loopback-network', local: 'local-network' };
+  const LNA_HINT = {
+    loopback: { denied: () => t('netHintLoopbackDenied'), prompt: () => t('netHintLoopbackPrompt') },
+    local: { denied: () => t('netHintLocalDenied'), prompt: () => t('netHintLocalPrompt') },
+  };
+  const lnaStates = {};
+  const spaceRank = space => (space === 'loopback' ? 2 : space === 'local' ? 1 : 0);
+  /** The page's own space: a host name on the internet is public; one that only a home or office network
+   * resolves (a single label, .lan, .home.arpa, .internal…) is unknown (null), and then no permission hint. */
+  function pageSpace(page) {
+    const space = Chat.addressSpace(page);
+    if (space) return space;
+    let host = '';
+    try { host = new URL(page).hostname.toLowerCase().replace(/\.$/, ''); } catch (_) { return null; }
+    if (!host.includes('.') || /\.(lan|home|home\.arpa|internal|intranet|corp|localdomain|test)$/.test(host)) return null;
+    return 'public';
+  }
+  function lnaSpace(baseURL) {
+    const page = String(document.URL);
+    if (!/^https?:/i.test(page)) return null;
+    const target = Chat.addressSpace(baseURL || '');
+    if (target !== 'loopback' && target !== 'local') return null;
+    const own = pageSpace(page);
+    return own && spaceRank(target) > spaceRank(own) ? target : null;
+  }
+  /** The permission's state, or undefined in a browser that has no such permission. Never throws. */
+  async function queryLna(space) {
+    try { lnaStates[space] = (await navigator.permissions.query({ name: LNA_PERMISSION[space] })).state; }
+    catch (_) { lnaStates[space] = undefined; }
+    return lnaStates[space];
+  }
+  function netHintFor(space, state) {
+    if (!space || (state !== 'denied' && state !== 'prompt')) return t('netHint');
+    const text = LNA_HINT[space][state]();
+    // On the local network an http server is also mixed content, which the permission does not lift.
+    return space === 'loopback' ? text : text + ' ' + t('netHint');
+  }
+  /** The hint for a failed connection, from the last known permission state. */
+  const netHint = baseURL => { const space = lnaSpace(baseURL); return netHintFor(space, space ? lnaStates[space] : undefined); };
+  /** The same after asking the browser again (the user may just have answered its question). */
+  async function freshNetHint(baseURL) {
+    const space = lnaSpace(baseURL);
+    return netHintFor(space, space ? await queryLna(space) : undefined);
+  }
 
   // ---- list and loading
   async function refreshList() {
@@ -2788,7 +2848,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const cached = provider && modelCache.get(provider.id);
     datalist.replaceChildren(...(cached ? cached.models.map(m => h('option', { value: m.id })) : []));
     refresh.disabled = !provider || !!(cached && cached.loading);
-    input.title = cached && cached.error ? failureText(cached.error) : '';
+    input.title = cached && cached.error ? failureText(cached.error, provider.baseURL) : '';
     refresh.classList.toggle('spinning', !!(cached && cached.loading));
   }
   /** Called when a server's model list arrives or fails: every open chat of that server updates. */
@@ -3835,12 +3895,16 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     }
     return { title: title || t('errGeneric'), detail, status, raw: rawOut };
   }
-  function errorCallout(raw, m) {
+  function errorCallout(raw, m, baseURL) {
     const p = presentError(raw, m);
     const text = h('div', { class: 'callout-text' }, h('div', { class: 'callout-title', text: p.title }));
     if (p.detail) text.append(h('div', { class: 'callout-detail', text: p.detail }));
     // The browser could not reach the server: the likely causes, in the interface language (ChatError.hint is English).
-    if (isNetworkText(raw)) text.append(h('div', { class: 'callout-hint', text: t('netHint') }));
+    if (isNetworkText(raw)) {
+      const hint = h('div', { class: 'callout-hint', text: netHint(baseURL) });
+      text.append(hint);
+      freshNetHint(baseURL).then(fresh => { hint.textContent = fresh; });
+    }
     const row = h('div', { class: 'callout-row' });
     if (p.status) row.append(h('span', { text: p.status }));
     let rawEl = null;
@@ -4161,7 +4225,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       note.__shape.svg.firstChild.style.fill = 'var(--peach)';
       stack.append(note);
     }
-    if (str(m.error) !== '') stack.append(errorCallout(m.error, m));
+    if (str(m.error) !== '') stack.append(errorCallout(m.error, m, serverURL(entry.conversation.settings)));
     const actions = h('div', { class: 'actions' }, ...rowActions(entry, m, index));
     return h('div', { class: 'msg msg-user' }, actions, stack);
   }
@@ -4196,7 +4260,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const off = thinkingOffText(m, repeated);
     if (off) row.append(smallNote('info', off[0], off[1]));
     for (const note of arr(m.toolNotes)) if (obj(note)) { const noteText = toolNoteText(note); if (noteText) row.append(smallNote('info', noteText, str(note.detail))); }
-    if (error !== '') row.append(errorCallout(error, m));
+    if (error !== '') row.append(errorCallout(error, m, serverURL(entry.conversation.settings)));
     else if (m.isComplete === false && !streaming) row.append(h('div', { class: 'stopped', text: t('stoppedBeforeFinish') }));
     const footer = footerLine(m);
     if (footer) row.append(h('div', { class: 'footer-stats', text: footer }));
@@ -4489,7 +4553,9 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
           modelList.replaceChildren(...models.map(m => h('option', { value: m.id })));
           showStatus(models.length === 1 ? t('testOkOne') : t('testOk', { n: models.length }), false);
         } catch (e) {
-          showStatus(failureText(e), true);
+          const space = lnaSpace(p.baseURL);
+          if (space) await queryLna(space);
+          showStatus(failureText(e, p.baseURL), true);
         }
         test.disabled = false;
       });
@@ -4647,6 +4713,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     applyLook();
     renderList();
     renderRoom();
+    queryLna('loopback'); queryLna('local');
     let factory = null;
     try { factory = window.indexedDB; } catch (_) { factory = null; } // some browsers refuse even to look (private windows, file pages)
     const probe = await Store.probe(factory);

@@ -930,6 +930,39 @@ const ParleyChat = (() => {
     return errorBodyText(response.status, headerMap(response), bytes, baseURL);
   }
 
+  /**
+   * Where a server address points, as Chrome's Local Network Access sorts it: 'loopback' (this
+   * device), 'local' (a private network), 'public', or null for a host name, whose address only the
+   * browser's lookup knows. A page on the internet needs the user's permission to reach the first two.
+   */
+  function addressSpace(baseURL) {
+    let url;
+    try { url = new URL(String(baseURL).trim()); } catch (e) { return null; }
+    let host = url.hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    if (host === 'localhost' || host.endsWith('.localhost')) return 'loopback';
+    const mapped = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mapped) {
+      const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16);
+      host = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+    }
+    const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4) {
+      const a = Number(v4[1]), b = Number(v4[2]);
+      if (a === 127 || a === 0) return 'loopback'; // Chrome reaches this device at 0.0.0.0 and treats it so
+      if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+          (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127)) return 'local';
+      return 'public';
+    }
+    if (host.includes(':')) {
+      if (host === '::1') return 'loopback';
+      if (/^f[cd]/.test(host) || /^fe[89ab]/.test(host)) return 'local';
+      return 'public';
+    }
+    if (host.endsWith('.local')) return 'local';
+    return null;
+  }
+
   async function doFetch(fetchImpl, url, init, signal) {
     const f = fetchImpl || globalThis.fetch;
     if (typeof f !== 'function') throw new ChatError('network', NETWORK_TEXT, { hint: NETWORK_HINT });
@@ -1233,6 +1266,6 @@ const ParleyChat = (() => {
   return {
     ChatError, chatURL, modelsURL, buildRequestBody, thinkingOffFields, sentThinkingOffFields,
     SSEParser, parseChunk, StreamAccumulator, GenerationMeter, streamChat, listModels,
-    contextLengthFromError, htmlSummary, MISSING_VERSION_PATH_HINT, NETWORK_HINT,
+    contextLengthFromError, htmlSummary, MISSING_VERSION_PATH_HINT, NETWORK_HINT, addressSpace,
   };
 })();
