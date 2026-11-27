@@ -286,7 +286,7 @@ struct MCPOAuthSignIn: Sendable {
                 throw MCPOAuthFailure.metadataNotFound
             }
             return ServerMetadata(
-                issuer: issuer, authorization: authorization, token: token, registration: try endpoint("registration_endpoint"),
+                issuer: issuer, authorization: authorization, token: token, registration: (try? endpoint("registration_endpoint")) ?? nil,
                 respondsWithIssuer: body["authorization_response_iss_parameter_supported"]?.boolValue == true,
                 scopes: body["scopes_supported"]?.arrayValue?.compactMap(\.stringValue) ?? [],
                 authMethods: body["token_endpoint_auth_methods_supported"]?.arrayValue?.compactMap(\.stringValue) ?? [],

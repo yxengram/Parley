@@ -2040,7 +2040,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     clearTimeout(entry.saveTimer);
     if (entry.run) { entry.run.stopped = true; entry.run.controller.abort(); }
     entry.keyInfo = null; entry.header = null; entry.conversation = null;
-    dropView(entry);
+    dropView(entry, true); // a row removed in another tab must not close this tab's Settings or questions
+    if (convDialogEntry === entry && convDialog.open) convDialog.close();
     const i = entries.indexOf(entry);
     if (i >= 0) entries.splice(i, 1);
   }
@@ -2069,6 +2070,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   }
   /** Forgets what is loaded (after a change made in another tab) and loads it again if it is shown. */
   function reloadEntry(entry) {
+    // The settings dialog edits the conversation object that is dropped here: close it, or its edits would go nowhere.
+    if (convDialogEntry === entry && convDialog.open) convDialog.close();
+    const input = entry.view && entry.view.composer.input;
+    entry.refocus = input && document.activeElement === input ? { start: input.selectionStart, end: input.selectionEnd } : null;
     entry.loaded = false;
     entry.conversation = null;
     entry.header = null;
@@ -2086,7 +2091,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   // ---- saving: after each change, and every couple of seconds while a reply streams
   function scheduleSave(entry, delay) {
-    if (entry.discarded || entry.saveTimer) return;
+    if (entry.discarded || entry.saveTimer || entry.encryptedElsewhere) return;
     entry.saveTimer = setTimeout(() => { entry.saveTimer = 0; saveNow(entry); }, delay);
   }
   function saveNow(entry) {
@@ -2103,8 +2108,22 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       await store.put(c, entry.encrypted ? { key: entry.keyInfo } : undefined);
       syncRow(entry);
     } catch (e) {
+      if (e && e.code === 'wouldDecrypt') { staleAfterEncrypt(entry, e); return; }
       showStorageError(e);
     }
+  }
+  /** Another tab encrypted this conversation while a reply streamed here: say so once, stop saving, reopen it locked when the reply ends. */
+  function staleAfterEncrypt(entry, e) {
+    if (entry.encryptedElsewhere) return;
+    entry.encryptedElsewhere = true;
+    showStorageError(e);
+    Promise.resolve(entry.runDone).catch(() => {}).then(() => {
+      entry.encryptedElsewhere = false;
+      if (entry.discarded || entry.run) return;
+      entry.encrypted = true; entry.keyInfo = null;
+      reloadEntry(entry);
+      refreshList();
+    });
   }
   function touch(entry) {
     entry.conversation.updatedAt = Ctx.isoNow();
@@ -2148,15 +2167,18 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   async function exportEntry(entry) {
     try {
-      let text;
-      if (entry.encrypted && !entry.conversation) {
+      let text, base, conversation = entry.conversation;
+      if (!conversation) {
+        // Not opened in this tab yet (or reloaded after a save in another tab): export what is stored.
         const got = await store.get(entry.id);
-        if (!got || got.kind !== 'encrypted') return;
-        text = got.text;
-      } else {
-        text = await store.exportFile(entry.conversation, entry.encrypted ? entry.keyInfo : undefined);
+        if (!got) return;
+        if (got.kind === 'encrypted') { text = got.text; base = t('encryptedRow'); }
+        else conversation = got.conversation;
       }
-      const base = entry.encrypted ? t('encryptedRow') : nameOf(entry.conversation);
+      if (conversation) {
+        text = await store.exportFile(conversation, entry.encrypted ? entry.keyInfo : undefined);
+        base = entry.encrypted ? t('encryptedRow') : nameOf(conversation);
+      }
       await saveTextFile(fileNameFor(base), text);
     } catch (e) {
       toast(t('exportFailed'), String((e && e.message) || e));
@@ -2167,6 +2189,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   async function importFiles(fileList) {
     const files = Array.from(fileList || []);
     let first = null;
+    const imported = new Set(); // ids stored by this batch: `entries` is only refreshed after the loop
     const failed = [];
     for (const file of files) {
       const name = str(file.name) || t('untitledFile');
@@ -2176,13 +2199,21 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
         if (parsed.kind === 'encrypted') {
           if (!(globalThis.crypto && globalThis.crypto.subtle)) { failed.push([name, ERROR_TEXT.noWebCrypto]); continue; }
           const known = entries.find(e => e.id === parsed.header.id);
-          if (known) { first = first || known; toast(t('alreadyHere', { name: middle(name, 40) }), ''); continue; }
-          first = first || { id: await store.putFile(text) };
+          if (known || imported.has(String(parsed.header.id).toUpperCase())) {
+            if (known) first = first || known;
+            toast(t('alreadyHere', { name: middle(name, 40) }), '');
+            continue;
+          }
+          const id = await store.putFile(text);
+          imported.add(String(id).toUpperCase());
+          first = first || { id };
         } else {
           // A plain file whose id is taken becomes a copy: nothing already stored is overwritten.
-          const taken = entries.some(e => e.id === parsed.conversation.id.toUpperCase());
+          const taken = entries.some(e => e.id === parsed.conversation.id.toUpperCase()) || imported.has(parsed.conversation.id.toUpperCase());
           const conversation = taken ? { ...parsed.conversation, id: Ctx.newID() } : parsed.conversation;
-          first = first || { id: await store.put(conversation) };
+          const id = await store.put(conversation);
+          imported.add(String(id).toUpperCase());
+          first = first || { id };
         }
       } catch (e) {
         failed.push([name, e && e.name === 'ReaderError' ? errorText(e) : String((e && e.message) || e)]);
@@ -2200,8 +2231,10 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
   // ---- new, rename, delete, encrypt, lock
   async function newChat() {
-    const fresh = entries.find(e => e.loaded && !e.encrypted && e.conversation && !e.conversation.messages.length
-      && str(e.conversation.title) === DEFAULT_TITLE && !e.run);
+    // An empty "New Chat" from an earlier visit is known by its index row until it is opened.
+    const fresh = entries.find(e => !e.encrypted && !e.run && !e.discarded && (e.conversation
+      ? !e.conversation.messages.length && str(e.conversation.title) === DEFAULT_TITLE
+      : !e.loaded && e.row && e.row.encrypted !== true && e.row.messageCount === 0 && e.row.title === DEFAULT_TITLE));
     if (fresh) { select(fresh.key); return; }
     const provider = providerFor(null);
     const now = Ctx.isoNow();
@@ -2560,6 +2593,13 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
       renderHeaderToggle();
       scrollToEnd(entry.view.scroller);
       ensureModels(providerFor(entry.conversation.settings));
+      if (entry.refocus) { // rebuilt after a save in another tab: keep the caret where the user was typing
+        const { start, end } = entry.refocus;
+        entry.refocus = null;
+        const input = entry.view.composer.input;
+        input.focus({ preventScroll: true });
+        try { input.setSelectionRange(start, end); } catch (_) { /* not a text field */ }
+      }
     } else {
       room.append(entry.view.root);
       headerToggleSlot = entry.view.toggleSlot;
@@ -4287,13 +4327,14 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   const imageDialog = document.getElementById('image-dialog');
   const textDialog = document.getElementById('text-dialog');
   const convDialog = document.getElementById('conv-dialog');
+  let convDialogEntry = null; // the conversation whose settings are open
   const ctxDialog = document.getElementById('ctx-dialog');
   const settingsDialog = document.getElementById('settings-dialog');
   const askDialog = document.getElementById('ask-dialog');
   const allDialogs = [linkDialog, imageDialog, textDialog, convDialog, ctxDialog, settingsDialog, askDialog];
   for (const d of allDialogs) {
     // Clear the contents on close, so nothing from a conversation lingers in a hidden dialog.
-    on(d, 'close', () => { clearDialog(d); if (d === linkDialog) gate.cancel(); if (d === ctxDialog) ctxState = null; });
+    on(d, 'close', () => { clearDialog(d); if (d === linkDialog) gate.cancel(); if (d === ctxDialog) ctxState = null; if (d === convDialog) convDialogEntry = null; });
     // A click on the backdrop (the dialog element itself, outside the sheet) closes it.
     on(d, 'click', ev => { if (ev.target === d) d.close(); });
   }
@@ -4401,6 +4442,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     const c = entry.conversation;
     if (!c) return;
     const settings = c.settings;
+    convDialogEntry = entry;
     const changed = delay => { touch(entry); scheduleSave(entry, delay === undefined ? 500 : delay); updateHeader(entry); updateStrip(entry); };
 
     const serverSelect = h('select', { class: 'field-input', 'aria-label': t('server') });
@@ -4716,7 +4758,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   function onStoreChange(change) {
     refreshList().then(() => {
       const entry = entryOf(change.id);
-      if (entry && change.type === 'saved' && entry.loaded && !entry.run) reloadEntry(entry);
+      if (entry && change.type === 'saved' && entry.loaded && !entry.run && !entry.saveTimer) reloadEntry(entry); // a pending local save wins: it goes out next
     });
   }
 

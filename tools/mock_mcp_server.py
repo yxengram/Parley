@@ -13,7 +13,8 @@ Eras (a 2026-07-28 "modern" server is stateless and has no initialize; a "legacy
 
 The HTTP mock binds 127.0.0.1 only. POST / takes messages; GET / is 405; DELETE ends a session.
 Mock routes: GET /mock/log (every message received, with its headers, as JSON), POST
-/mock/expire-sessions, POST /mock/refuse-initialize (the next initialize is a 503). With the oauth
+/mock/expire-sessions, POST /mock/refuse-initialize (the next initialize is a 503),
+/mock/hang-initialize (the next initialize is never answered). With the oauth
 behavior it also serves the metadata documents, /authorize, /token and /register.
 
 Every message received is logged as one JSON line to --log-file. Nothing is ever sent anywhere.
@@ -67,7 +68,8 @@ Behaviors (--behaviors, comma separated):
            /token wants it by Basic), oauth-other-metadata (resource_metadata is on
            MOCK_OTHER_PORT), oauth-other-issuer (authorization_servers names MOCK_OTHER_PORT),
            oauth-other-token (the token endpoint is on localhost:MOCK_OTHER_PORT),
-           oauth-plain-endpoint (the token endpoint is http://example.invalid), oauth-denied
+           oauth-plain-endpoint (the token endpoint is http://example.invalid),
+           oauth-plain-registration (the registration endpoint is http://example.invalid), oauth-denied
            (the callback carries error=access_denied), oauth-bearer-403 (add is a 403 with a
            Bearer invalid_token challenge), oauth-no-scope (nothing names a scope),
            oauth-long-error (the error body has the Authorization header across 2000 characters)
@@ -109,6 +111,7 @@ SESSIONS = set()
 INITIALIZED = False
 FAILED_HEADER_ONCE = False
 REFUSE_INITIALIZE = False
+HANG_INITIALIZE = False
 INPUT_ROUNDS = {}
 CHILDREN = []
 
@@ -637,6 +640,8 @@ class OAuthRoutes:
             document["code_challenge_methods_supported"] = ["S256"]
         if "oauth-no-registration" not in BEHAVIORS:
             document["registration_endpoint"] = origin + "/register"
+        if "oauth-plain-registration" in BEHAVIORS:
+            document["registration_endpoint"] = "http://example.invalid/register"
         self.send_json(200, document)
 
     def authorize(self):
@@ -821,7 +826,7 @@ class Handler(OAuthRoutes, BaseHTTPRequestHandler):
         self.send_empty(200)
 
     def do_POST(self):
-        global INITIALIZED, FAILED_HEADER_ONCE, REFUSE_INITIALIZE
+        global INITIALIZED, FAILED_HEADER_ONCE, REFUSE_INITIALIZE, HANG_INITIALIZE
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
         if self.path == "/mock/expire-sessions":
@@ -831,6 +836,10 @@ class Handler(OAuthRoutes, BaseHTTPRequestHandler):
             return
         if self.path == "/mock/refuse-initialize":
             REFUSE_INITIALIZE = True
+            self.send_empty(204)
+            return
+        if self.path == "/mock/hang-initialize":
+            HANG_INITIALIZE = True
             self.send_empty(204)
             return
         if self.path == "/mock/expire-tokens":
@@ -898,6 +907,10 @@ class Handler(OAuthRoutes, BaseHTTPRequestHandler):
             self.send_empty(202)
             return
 
+        if method == "initialize" and HANG_INITIALIZE:
+            HANG_INITIALIZE = False
+            time.sleep(ARGS.max_seconds)
+            return
         if method == "initialize" and REFUSE_INITIALIZE:
             REFUSE_INITIALIZE = False
             self.send_empty(503)

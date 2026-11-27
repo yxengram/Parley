@@ -74,16 +74,32 @@ enum LibraryScanner {
             urls.append(URL(fileURLWithPath: path))
         }
 
-        var seenIDs = Set<UUID>()
         var seenPaths = Set<String>()
-        var entries: [LibraryEntry] = []
+        var candidates: [LibraryEntry] = []
         for url in urls {
             let norm = AppSettingsPaths.normalized(url)
             guard seenPaths.insert(norm).inserted else { continue }
-            guard let entry = entry(for: url), seenIDs.insert(entry.id).inserted else { continue }
-            entries.append(entry)
+            if let entry = entry(for: url) { candidates.append(entry) }
         }
-        return entries
+        // Same id in two files (a Finder copy, a backup): keep one, the same one every scan.
+        // The file named `<id>.json` wins, then the most recently modified, then the path.
+        func modified(_ e: LibraryEntry) -> Date {
+            (try? e.url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+        }
+        func preferred(_ a: LibraryEntry, over b: LibraryEntry) -> Bool {
+            let aNamed = a.url.deletingPathExtension().lastPathComponent.lowercased() == a.id.uuidString.lowercased()
+            let bNamed = b.url.deletingPathExtension().lastPathComponent.lowercased() == b.id.uuidString.lowercased()
+            if aNamed != bNamed { return aNamed }
+            let (am, bm) = (modified(a), modified(b))
+            if am != bm { return am > bm }
+            return a.url.path < b.url.path
+        }
+        var best: [UUID: LibraryEntry] = [:]
+        for entry in candidates {
+            if let current = best[entry.id], !preferred(entry, over: current) { continue }
+            best[entry.id] = entry
+        }
+        return candidates.filter { best[$0.id]?.url == $0.url }
     }
 
     static func entry(for url: URL) -> LibraryEntry? {

@@ -255,6 +255,27 @@ public enum ContextBudget {
         return min(configured, max(2_000, (limit.tokens - used) * 2))
     }
 
+    /// `toolResultBudget` counts characters at about 4 per token, which CJK text overruns (1 token
+    /// per character). This cuts a result that still costs more than half the room left, by the
+    /// same estimate the rest of the budget uses. Never below 500 tokens, like the 2,000-character floor.
+    public static func fitToolResult(_ result: ToolCallResult, limit: ContextLimit?, used: Int) -> ToolCallResult {
+        guard let limit else { return result }
+        let allowed = max(500, (limit.tokens - used) / 2)
+        guard estimateTokens(result.text) > allowed else { return result }
+        var kept = ""
+        var tokens = 0
+        for character in result.text {
+            let cost = character.unicodeScalars.contains(where: isCJK) ? 4 : 1  // quarter-tokens
+            if (tokens + cost + 3) / 4 > allowed { break }
+            tokens += cost
+            kept.append(character)
+        }
+        var fitted = result
+        fitted.originalCharacters = result.originalCharacters ?? result.text.count
+        fitted.text = kept + "\n\n[Truncated by Parley: showing the first \(kept.count) of \(fitted.originalCharacters ?? 0) characters.]"
+        return fitted
+    }
+
     /// The context size named in an overflow error, if any:
     /// llama.cpp `"n_ctx": M` / "available context size (M tokens)", vLLM and OpenAI
     /// "maximum context length is M tokens", Strata "exceeds the context window: … the context (M)".

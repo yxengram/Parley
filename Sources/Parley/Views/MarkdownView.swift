@@ -201,7 +201,7 @@ enum MarkdownParser {
                 i += 1
                 while i < lines.count {
                     let t = lines[i].trimmingCharacters(in: .whitespaces)
-                    if t.hasPrefix(fence) && t.trimmingCharacters(in: CharacterSet(charactersIn: String(fence.first!))).isEmpty {
+                    if t.count >= fence.count && t.allSatisfy({ $0 == fence.first! }) {
                         break
                     }
                     codeLines.append(lines[i])
@@ -264,9 +264,10 @@ enum MarkdownParser {
     }
 
     private static func fenceMarker(_ trimmed: String) -> String? {
-        if trimmed.hasPrefix("```") { return "```" }
-        if trimmed.hasPrefix("~~~") { return "~~~" }
-        return nil
+        // The whole opening run, so a longer fence is only closed by a run at least as long.
+        guard let first = trimmed.first, first == "`" || first == "~" else { return nil }
+        let run = trimmed.prefix { $0 == first }
+        return run.count >= 3 ? String(run) : nil
     }
 
     private static func heading(_ trimmed: String) -> (Int, String)? {
@@ -276,7 +277,12 @@ enum MarkdownParser {
         let rest = trimmed.dropFirst(hashes.count)
         guard rest.isEmpty || rest.first == " " else { return nil }
         var content = rest.trimmingCharacters(in: .whitespaces)
-        while content.hasSuffix("#") { content.removeLast() }
+        // A closing run of #s only counts when whitespace precedes it ("C#" keeps its #).
+        let closing = content.reversed().prefix { $0 == "#" }.count
+        if closing > 0 {
+            let before = content.dropLast(closing)
+            if before.isEmpty || before.last == " " || before.last == "\t" { content = String(before) }
+        }
         return (hashes.count, content.trimmingCharacters(in: .whitespaces))
     }
 

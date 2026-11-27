@@ -29,12 +29,17 @@ const code = async fn => { try { await fn(); return 'none'; } catch (e) { return
 function fakeIndexedDB() {
   const dbs = new Map(); // name -> {version, stores: Map(name -> {keyPath, rows: Map})}
   const later = fn => queueMicrotask(fn);
+  const reads = []; // store names read with getAll
+  const txs = []; // per transaction: the calls made on it
   return {
+    reads, txs,
     open(name, version) {
       const req = {};
       later(() => {
         let rec = dbs.get(name);
         const fresh = !rec;
+        const upgrade = !!rec && version > rec.version;
+        if (upgrade) rec.version = version;
         if (!rec) { rec = { version, stores: new Map() }; dbs.set(name, rec); }
         const db = {
           objectStoreNames: { contains: n => rec.stores.has(n) },
@@ -42,20 +47,22 @@ function fakeIndexedDB() {
           close() {},
           transaction(names, mode) {
             const tx = {};
-            let pending = 0;
-            const settle = () => { if (pending === 0) later(() => tx.oncomplete && tx.oncomplete()); };
+            const calls = []; txs.push(calls);
+            let pending = 0, aborted = false;
+            const settle = () => { if (pending === 0 && !aborted) later(() => tx.oncomplete && tx.oncomplete()); };
+            tx.abort = () => { aborted = true; later(() => tx.onabort && tx.onabort()); };
             tx.objectStore = n => {
               const s = rec.stores.get(n);
               if (!s) throw new Error('NotFoundError');
               const op = fn => {
                 const r = {}; pending++;
-                later(() => { r.result = fn(); r.onsuccess && r.onsuccess(); pending--; settle(); });
+                later(() => { if (aborted) return; r.result = fn(); r.onsuccess && r.onsuccess(); pending--; settle(); });
                 return r;
               };
               return {
-                get: k => op(() => structuredClone(s.rows.get(k))),
-                getAll: () => op(() => [...s.rows.values()].map(v => structuredClone(v))),
-                put: v => op(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
+                get: k => { calls.push(n + '.get'); return op(() => structuredClone(s.rows.get(k))); },
+                getAll: () => op(() => { reads.push(n); return [...s.rows.values()].map(v => structuredClone(v)); }),
+                put: v => { calls.push(n + '.put'); return op(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }); },
                 delete: k => op(() => { s.rows.delete(k); }),
               };
             };
@@ -63,8 +70,11 @@ function fakeIndexedDB() {
           },
         };
         req.result = db;
-        if (fresh) req.onupgradeneeded && req.onupgradeneeded();
-        req.onsuccess && req.onsuccess();
+        if (upgrade) req.transaction = db.transaction([], 'versionchange');
+        if (fresh || upgrade) req.onupgradeneeded && req.onupgradeneeded();
+        // A real upgrade finishes its transaction before the open succeeds.
+        if (upgrade) later(() => later(() => later(() => later(() => req.onsuccess && req.onsuccess()))));
+        else req.onsuccess && req.onsuccess();
       });
       return req;
     },
@@ -325,6 +335,72 @@ await test('store: broadcast undefined falls back to the global; open releases o
   dbRef.onversionchange();
   assert(closed);
   s.close();
+});
+
+await test('store: list reads only the index store, never the bodies (item 30)', async () => {
+  const idb = fakeIndexedDB();
+  const s = await store.open(idb, { broadcast: null });
+  const a = sampleConversation();
+  await s.put(a);
+  idb.reads.length = 0;
+  const rows = await s.list();
+  eq(idb.reads, ['index']);
+  eq(Object.keys(rows[0]).sort(), ['encrypted', 'id', 'messageCount', 'title', 'updatedAt']);
+  assert(!JSON.stringify([...idb.dump('parley-web').stores.get('index').rows.values()]).includes(a.messages[0].content || '\u0000'), 'no body in the index');
+  assert('body' in [...idb.dump('parley-web').stores.get('conversations').rows.values()][0]);
+  await s.remove(a.id);
+  eq(idb.dump('parley-web').stores.get('index').rows.size, 0);
+  eq(idb.dump('parley-web').stores.get('conversations').rows.size, 0);
+});
+await test('store: a version 1 database is migrated, keeping its conversations (item 30)', async () => {
+  const idb = fakeIndexedDB();
+  // What the previous page wrote: version 1, three stores, no index.
+  await new Promise(resolve => {
+    const req = idb.open('parley-web', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      db.createObjectStore('conversations', { keyPath: 'id' }); db.createObjectStore('providers', { keyPath: 'id' }); db.createObjectStore('settings', { keyPath: 'key' });
+    };
+    req.onsuccess = () => {
+      const a = sampleConversation();
+      const tx = req.result.transaction(['conversations'], 'readwrite');
+      tx.objectStore('conversations').put({ id: a.id.toUpperCase(), title: a.title, updatedAt: a.updatedAt, encrypted: false, messageCount: a.messages.length, body: a });
+      tx.objectStore('conversations').put({ id: 'ENC', title: store.ENCRYPTED_TITLE, updatedAt: '2020-01-01T00:00:00Z', encrypted: true, messageCount: null, body: 'cipher text' });
+      tx.oncomplete = resolve;
+    };
+  });
+  const s = await store.open(idb, { broadcast: null });
+  const rows = await s.list();
+  eq(rows.map(r => r.id), [sampleConversation().id.toUpperCase(), 'ENC']);
+  eq(rows[0].messageCount, 4);
+  eq((await s.get(sampleConversation().id)).conversation, sampleConversation());
+  eq(idb.dump('parley-web').stores.get('conversations').rows.size, 2, 'nothing lost');
+  assert(!('body' in rows[0]));
+  await s.put({ ...sampleConversation(), title: 'Edited' });
+  eq((await s.list())[0].title, 'Edited');
+});
+await test('store: plain over encrypted is refused inside the writing transaction (item 34)', async () => {
+  for (const [name, make] of [['indexedDB', () => store.open(fakeIndexedDB(), { broadcast: null })], ['memory', async () => store.memory({ broadcast: null })]]) {
+    const s = await make();
+    const conv = sampleConversation();
+    const key = await core.newKey(PW, ITER);
+    await s.put(conv, { key });
+    const before = (await s.get(conv.id)).text;
+    eq(await code(() => s.put({ ...conv, title: 'plaintext' })), 'wouldDecrypt', name);
+    eq((await s.get(conv.id)).text, before, `${name}: ciphertext intact`);
+    eq((await s.list())[0].encrypted, true, `${name}: index intact`);
+    await s.put({ ...conv, title: 'plaintext' }, { overwriteEncrypted: true });
+    eq((await s.get(conv.id)).kind, 'plain');
+  }
+});
+await test('store: the guard and the write are one transaction (item 34)', async () => {
+  const idb = fakeIndexedDB();
+  const s = await store.open(idb, { broadcast: null });
+  const conv = sampleConversation();
+  idb.txs.length = 0;
+  await s.put(conv);
+  // One transaction read the existing row and wrote the conversation and its index row.
+  eq(idb.txs, [['conversations.get', 'conversations.put', 'index.put']]);
 });
 
 console.log(failed ? `${failed} FAILED, ${passed} passed` : `all ${passed} passed`);

@@ -21,13 +21,14 @@ public enum AttachmentLoader {
     private static let extraTextExtensions: Set<String> = ["md", "markdown", "json", "yaml", "yml", "xml", "csv", "tsv", "txt", "log"]
 
     public static func load(url: URL) throws -> Attachment {
+        // A symlink's own size is its length, not the target's: check and read the target.
         let filename = url.lastPathComponent
+        let url = url.resolvingSymlinksInPath()
+        let type = contentType(of: url)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
             throw ParleyError.unsupportedAttachment(filename)
         }
-
-        let type = contentType(of: url)
 
         if let type, type.conforms(to: .image) {
             if fileSize(url) > maxImageFileBytes { throw ParleyError.attachmentTooLarge(filename) }

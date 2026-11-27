@@ -8,7 +8,7 @@ import Foundation
 /// 400 and leaves it listening, so a stray request cannot end a sign-in.
 final class MCPOAuthLoopback: @unchecked Sendable {
     static let path = "/callback"
-    private static let maxRequestBytes = 8 * 1024
+    private static let maxRequestBytes = 64 * 1024
 
     let port: Int
     private let descriptor: Int32
@@ -137,7 +137,7 @@ final class MCPOAuthLoopback: @unchecked Sendable {
 
     private func readRequest(_ client: Int32) -> String? {
         var data = Data()
-        var buffer = [UInt8](repeating: 0, count: 1024)
+        var buffer = [UInt8](repeating: 0, count: 4096)
         let deadline = Date().addingTimeInterval(Self.requestTimeout)
         while data.count <= Self.maxRequestBytes, Date() < deadline {
             let count = read(client, &buffer, buffer.count)

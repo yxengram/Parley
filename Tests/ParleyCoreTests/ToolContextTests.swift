@@ -100,6 +100,19 @@ private func round(content: String = "", result: String?, usage: TokenUsage? = n
         #expect(ContextBudget.toolResultBudget(configured: 1_000, limit: small, used: 8_190) == 1_000)
     }
 
+    @Test func toolResultFitsRoomForCJK() {
+        let small = ContextLimit(tokens: 8_192, source: .server)
+        let room = 8_192 - 4_000
+        let cjk = String(repeating: "字", count: 8_000)
+        let fitted = ContextBudget.fitToolResult(ToolCallResult(status: .completed, text: cjk), limit: small, used: 4_000)
+        #expect(ContextBudget.estimateTokens(fitted.text) <= room / 2 + 40)
+        #expect(fitted.originalCharacters == 8_000)
+        // Latin text within the character budget is left alone.
+        let latin = ToolCallResult(status: .completed, text: String(repeating: "a", count: 8_000))
+        #expect(ContextBudget.fitToolResult(latin, limit: small, used: 4_000) == latin)
+        #expect(ContextBudget.fitToolResult(ToolCallResult(status: .completed, text: cjk), limit: nil, used: 0).text == cjk)
+    }
+
     @Test func modelInfoCarriesIgnoresTools() {
         var info = ModelContextInfo(model: "m")
         var other = ModelContextInfo(model: "m")

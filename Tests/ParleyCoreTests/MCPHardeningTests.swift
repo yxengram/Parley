@@ -624,4 +624,37 @@ struct MCPHTTPCloseTests {
         #expect(result.callStatus == .completed)
         #expect(result.text.contains("hi"))
     }
+
+    @Test func theWorkingFolderTakesTildeAndRelativeFolders() async throws {
+        let home = NSHomeDirectory()
+        #expect(MCPConnectionManager.expandedDirectory(nil) == home)
+        #expect(MCPConnectionManager.expandedDirectory("") == home)
+        #expect(MCPConnectionManager.expandedDirectory("~") == home)
+        #expect(MCPConnectionManager.expandedDirectory("~/work") == home + "/work")
+        #expect(MCPConnectionManager.expandedDirectory("proj") == home + "/proj")
+        #expect(MCPConnectionManager.expandedDirectory("/tmp/x") == "/tmp/x")
+        // And the server really starts there.
+        let harness = try MCPStdioHarness()
+        defer { harness.finish() }
+        harness.config.workingDirectory = "~"
+        let secrets = try harness.store.secrets(for: harness.config.id)
+        let prints = MCPServerConfig.fingerprints(config: harness.config, secrets: secrets)
+        harness.config.connectionFingerprint = prints.connection
+        harness.config.identityFingerprint = prints.identity
+        let catalog = await harness.catalog()
+        #expect(!catalog.bindings.isEmpty, "\(catalog.unavailable)")
+    }
+
+    @Test func aTimeoutRecoveringALostSessionIsNotTheToolTimingOut() async throws {
+        let harness = try await MCPHTTPHarness(era: "legacy", behaviors: ["session"])
+        defer { harness.finish() }
+        harness.config.startupTimeout = 1
+        let catalog = await harness.catalog()
+        let binding = try #require(catalog.bindings.first { $0.tool.name == "echo" })
+        try await harness.expireSessions()
+        try await harness.hangInitialize()
+        let result = await harness.manager.call(binding, arguments: ["text": .string("x")], timeout: 30, maxCharacters: 1000)
+        #expect(result.callStatus == .notCalled, "\(result.text)")
+        #expect(!result.text.contains("partly run"))
+    }
 }

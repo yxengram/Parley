@@ -136,7 +136,9 @@ public enum SkillManifest {
         let lines = text.components(separatedBy: "\n")
         guard let first = lines.first, first.trimmingCharacters(in: .whitespaces) == "---" else { return nil }
         guard let close = lines.indices.dropFirst().first(where: {
-            let line = lines[$0].trimmingCharacters(in: .whitespaces)
+            // A document marker counts only at column 0; an indented one is content.
+            var line = Substring(lines[$0])
+            while let last = line.last, last == " " || last == "\t" { line.removeLast() }
             return line == "---" || line == "..."
         }) else { return nil }
         let block = Array(lines[1..<close])
@@ -153,13 +155,18 @@ public enum SkillManifest {
             if value.isEmpty {
                 // A nested mapping or a list: take the indented lines that follow.
                 var nested: [String: String] = [:]
+                let start = i
                 while i < block.count, isBlank(block[i]) || indentation(block[i]) > 0 {
                     if let (k, v) = keyValue(block[i].trimmingCharacters(in: .whitespaces)) {
                         nested[k] = scalar(v.trimmingCharacters(in: .whitespaces))
                     }
                     i += 1
                 }
-                if !nested.isEmpty { maps[key] = nested }
+                if !nested.isEmpty {
+                    maps[key] = nested
+                } else if let plain = plainOnNextLines(Array(block[start..<i])) {
+                    fields[key] = plain
+                }
                 continue
             }
             if let style = value.first, style == "|" || style == ">" {
@@ -192,6 +199,14 @@ public enum SkillManifest {
         return Parsed(fields: fields, maps: maps, body: body)
     }
 
+    /// A plain or quoted scalar that starts on the line after `key:`. Lists are not scalars.
+    private static func plainOnNextLines(_ lines: [String]) -> String? {
+        let parts = lines.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard let first = parts.first, !first.hasPrefix("- "), first != "-", !first.hasPrefix("#") else { return nil }
+        if let quote = first.first, quote == "\"" || quote == "'" { return scalar(parts.joined(separator: " ")) }
+        return parts.map(stripComment).filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
     private static func isBlank(_ line: String) -> Bool { line.trimmingCharacters(in: .whitespaces).isEmpty }
 
     private static func indentation(_ line: String) -> Int {
@@ -216,50 +231,85 @@ public enum SkillManifest {
         return String(value[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
     }
 
-    private static func isClosed(_ value: String, quote: Character) -> Bool {
-        guard value.count >= 2, value.last == quote else { return false }
-        if quote == "'" { return true }
-        // A closing " not escaped by a backslash.
-        var backslashes = 0
-        for c in value.dropLast().reversed() {
-            if c == "\\" { backslashes += 1 } else { break }
+    /// The index of the quote that closes `value`, which starts with `quote`.
+    private static func closingQuote(_ value: String, quote: Character) -> String.Index? {
+        var index = value.index(after: value.startIndex)
+        while index < value.endIndex {
+            let c = value[index]
+            let next = value.index(after: index)
+            if quote == "\"", c == "\\" {
+                guard next < value.endIndex else { return nil }
+                index = value.index(after: next)
+                continue
+            }
+            if c == quote {
+                if quote == "'", next < value.endIndex, value[next] == "'" {
+                    index = value.index(after: next)
+                    continue
+                }
+                return index
+            }
+            index = next
         }
-        return backslashes % 2 == 0
+        return nil
+    }
+
+    private static func isClosed(_ value: String, quote: Character) -> Bool {
+        closingQuote(value, quote: quote) != nil
     }
 
     /// A quoted or plain scalar's value.
     private static func scalar(_ value: String) -> String {
-        if value.count >= 2, value.first == "'", value.last == "'" {
-            return String(value.dropFirst().dropLast()).replacingOccurrences(of: "''", with: "'")
-        }
-        if value.count >= 2, value.first == "\"", value.last == "\"" {
-            var out = ""
-            var escaping = false
-            var iterator = value.dropFirst().dropLast().makeIterator()
-            while let c = iterator.next() {
-                if escaping {
-                    escaping = false
-                    switch c {
-                    case "n": out.append("\n")
-                    case "t": out.append("\t")
-                    case "\"": out.append("\"")
-                    case "\\": out.append("\\")
-                    case "/": out.append("/")
-                    case "u":
-                        var hex = ""
-                        for _ in 0..<4 { if let h = iterator.next() { hex.append(h) } }
-                        if let code = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(code) { out.unicodeScalars.append(scalar) }
-                    default: out.append(c)
-                    }
-                } else if c == "\\" {
-                    escaping = true
-                } else {
-                    out.append(c)
-                }
+        if let quote = value.first, quote == "\"" || quote == "'", let end = closingQuote(value, quote: quote) {
+            let after = value[value.index(after: end)...].trimmingCharacters(in: .whitespaces)
+            if after.isEmpty || after.hasPrefix("#") {
+                let inner = String(value[value.index(after: value.startIndex)..<end])
+                return quote == "'" ? inner.replacingOccurrences(of: "''", with: "'") : unescape(inner)
             }
-            return out
         }
         return stripComment(value)
+    }
+
+    private static func unescape(_ inner: String) -> String {
+        let chars = Array(inner)
+        var out = ""
+        var i = 0
+        func hex(_ count: Int) -> UInt32? {
+            guard i + count <= chars.count else { return nil }
+            let code = UInt32(String(chars[i..<i + count]), radix: 16)
+            if code != nil { i += count }
+            return code
+        }
+        while i < chars.count {
+            let c = chars[i]
+            i += 1
+            guard c == "\\", i < chars.count else { out.append(c); continue }
+            let e = chars[i]
+            i += 1
+            switch e {
+            case "n": out.append("\n")
+            case "t": out.append("\t")
+            case "r": out.append("\r")
+            case "\"": out.append("\"")
+            case "\\": out.append("\\")
+            case "/": out.append("/")
+            case "x", "u", "U":
+                guard var code = hex(e == "x" ? 2 : e == "u" ? 4 : 8) else { break }
+                // A JSON-style surrogate pair is one character.
+                if (0xD800...0xDBFF).contains(code), i + 1 < chars.count, chars[i] == "\\", chars[i + 1] == "u" {
+                    let saved = i
+                    i += 2
+                    if let low = hex(4), (0xDC00...0xDFFF).contains(low) {
+                        code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00)
+                    } else {
+                        i = saved
+                    }
+                }
+                if let scalar = Unicode.Scalar(code) { out.unicodeScalars.append(scalar) }
+            default: out.append(e)
+            }
+        }
+        return out
     }
 
     /// A `|` (literal) or `>` (folded) block, its indentation taken from the first line with text.

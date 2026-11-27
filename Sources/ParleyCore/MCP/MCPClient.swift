@@ -373,7 +373,7 @@ final class MCPClient: @unchecked Sendable {
         var inputRounds = 0
         var retriedHeaders = false
         var retriedSession = false
-        try await restoreSession()
+        try await beforeSending { try await self.restoreSession() }
         while true {
             let message = callRequest(tool.name, schema: schema, params: params, arguments: arguments)
             let response: MCPResponse
@@ -382,7 +382,7 @@ final class MCPClient: @unchecked Sendable {
             } catch MCPError.sessionExpired where !retriedSession {
                 // The server did not know the session, so the tool did not run.
                 retriedSession = true
-                try await initialize()
+                try await beforeSending { try await self.initialize() }
                 continue
             } catch {
                 giveUp(on: message, after: error)
@@ -391,7 +391,7 @@ final class MCPClient: @unchecked Sendable {
             if response.error?.code == MCPProtocol.headerMismatch, transport.isHTTP, !retriedHeaders {
                 // Refused before the tool ran: the definition may have changed.
                 retriedHeaders = true
-                if let fresh = try await listTools().tools.first(where: { $0.name == tool.name }) {
+                if let fresh = try await beforeSending({ try await self.listTools() }).tools.first(where: { $0.name == tool.name }) {
                     schema = fresh.inputSchema
                 }
                 continue
@@ -408,6 +408,16 @@ final class MCPClient: @unchecked Sendable {
             default:
                 return result
             }
+        }
+    }
+
+    /// Work done before the tool request goes out. A timeout there is the start's, not the tool's:
+    /// nothing was sent, so nothing can have partly run.
+    private func beforeSending<T>(_ body: () async throws -> T) async throws -> T {
+        do {
+            return try await body()
+        } catch MCPError.timedOut(let seconds) {
+            throw MCPError.startupTimedOut(seconds: seconds, stderrTail: [])
         }
     }
 

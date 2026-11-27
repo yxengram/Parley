@@ -31,7 +31,8 @@ codesign --force --sign - "$APP" >/dev/null
 codesign --verify --deep --strict "$APP"
 lipo -archs "$NATIVE"
 
-if strings "$NATIVE" | grep -q PARLEY_SNAPSHOT; then
+# No pipeline: under pipefail `grep -q` exiting early SIGPIPEs `strings` and the check fails open.
+if LC_ALL=C grep -qaF PARLEY_SNAPSHOT "$NATIVE"; then
     echo "error: the release binary contains the snapshot harness" >&2
     exit 1
 fi

@@ -921,14 +921,16 @@ const ParleyMarkdown = (() => {
 
       // Fenced code. An unclosed fence runs to the end (an interrupted reply).
       const fence = t.startsWith('```') ? '`' : t.startsWith('~~~') ? '~' : null;
+      let fenceLen = 0;
+      if (fence) while (fenceLen < t.length && t[fenceLen] === fence) fenceLen++;
       if (fence) {
         flushAll();
-        const language = trim(t.slice(3));
+        const language = trim(t.slice(fenceLen));
         const code = [];
         i++;
         while (i < lines.length) {
           const u = trim(lines[i]);
-          if (u.length >= 3 && onlyChar(u, fence)) break;
+          if (u.length >= fenceLen && onlyChar(u, fence)) break;
           code.push(lines[i]);
           i++;
         }
@@ -945,7 +947,12 @@ const ParleyMarkdown = (() => {
         const rest = t.slice(h);
         if (h <= 6 && (rest === '' || rest[0] === ' ')) {
           let content = trim(rest);
-          while (content.endsWith('#')) content = content.slice(0, -1);
+          // A closing run of #s only counts when whitespace precedes it ("C#" keeps its #).
+          const closing = content.match(/#+$/);
+          if (closing) {
+            const before = content.slice(0, content.length - closing[0].length);
+            if (before === '' || before.endsWith(' ') || before.endsWith('\t')) content = before;
+          }
           flushAll();
           blocks.push({ type: 'heading', level: h, text: trim(content) });
           i++;
@@ -1176,7 +1183,9 @@ const ParleyMarkdown = (() => {
   function scanAttributes(s, i) {
     if (s[i] !== '(') return -1;
     let depth = 0, quoted = false;
-    for (let j = i; j < s.length; j++) {
+    // Capped so that many unbalanced `^[a](` openers cannot each scan to the end of the text.
+    const limit = Math.min(s.length, i + 2000);
+    for (let j = i; j < limit; j++) {
       const c = s[j];
       if (quoted) {
         if (c === '\\') j++;
@@ -3566,8 +3575,11 @@ const ParleyStore = (() => {
   'use strict';
 
   const DB_NAME = 'parley-web';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const CONVERSATIONS = 'conversations';
+  // One row per conversation without its body (images and ciphertext can be megabytes), so the list
+  // never reads bodies. Added in version 2; written together with the conversation in one transaction.
+  const INDEX = 'index';
   const PROVIDERS = 'providers';
   const SETTINGS = 'settings';
   const CHANNEL_NAME = 'parley-web';
@@ -3597,6 +3609,13 @@ const ParleyStore = (() => {
     });
   }
 
+  function wouldDecryptError() {
+    const e = new Error('An encrypted conversation with this id exists; pass overwriteEncrypted to replace it');
+    e.code = 'wouldDecrypt';
+    return e;
+  }
+  const indexRowOf = ({ body, ...row }) => row;
+
   function idbBackend(db) {
     // Writes resolve when the transaction commits, not when the request succeeds.
     function run(storeName, mode, fn) {
@@ -3617,13 +3636,37 @@ const ParleyStore = (() => {
       get: (name, key) => run(name, 'readonly', s => s.get(key)),
       put: (name, value) => run(name, 'readwrite', s => s.put(value)),
       delete: (name, key) => run(name, 'readwrite', s => s.delete(key)),
+      /** Writes a conversation row and its index row in one transaction. With `plainOnly`, an encrypted row with this id is checked for and kept in the same transaction. */
+      putConversation: (row, plainOnly) => new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([CONVERSATIONS, INDEX], 'readwrite'); } catch (e) { reject(e); return; }
+        let failure = null;
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        tx.onabort = () => reject(failure || tx.error || new Error('IndexedDB transaction aborted'));
+        const write = () => { tx.objectStore(CONVERSATIONS).put(row); tx.objectStore(INDEX).put(indexRowOf(row)); };
+        if (!plainOnly) { write(); return; }
+        const existing = tx.objectStore(CONVERSATIONS).get(row.id);
+        existing.onsuccess = () => {
+          if (existing.result && existing.result.encrypted) { failure = wouldDecryptError(); try { tx.abort(); } catch (_) { reject(failure); } } else write();
+        };
+      }),
+      deleteConversation: key => new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([CONVERSATIONS, INDEX], 'readwrite'); } catch (e) { reject(e); return; }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+        tx.objectStore(CONVERSATIONS).delete(key);
+        tx.objectStore(INDEX).delete(key);
+      }),
       close: () => { try { db.close(); } catch (_) { /* already closed */ } },
     };
   }
 
   function memoryBackend() {
-    const tables = { [CONVERSATIONS]: new Map(), [PROVIDERS]: new Map(), [SETTINGS]: new Map() };
-    const keyOf = { [CONVERSATIONS]: 'id', [PROVIDERS]: 'id', [SETTINGS]: 'key' };
+    const tables = { [CONVERSATIONS]: new Map(), [INDEX]: new Map(), [PROVIDERS]: new Map(), [SETTINGS]: new Map() };
+    const keyOf = { [CONVERSATIONS]: 'id', [INDEX]: 'id', [PROVIDERS]: 'id', [SETTINGS]: 'key' };
     const copy = v => (v === undefined ? v : structuredClone(v));
     return {
       kind: 'memory',
@@ -3631,6 +3674,13 @@ const ParleyStore = (() => {
       get: async (name, key) => copy(tables[name].get(key)),
       put: async (name, value) => { tables[name].set(value[keyOf[name]], copy(value)); },
       delete: async (name, key) => { tables[name].delete(key); },
+      putConversation: async (row, plainOnly) => {
+        const existing = tables[CONVERSATIONS].get(row.id);
+        if (plainOnly && existing && existing.encrypted) throw wouldDecryptError();
+        tables[CONVERSATIONS].set(row.id, copy(row));
+        tables[INDEX].set(row.id, copy(indexRowOf(row)));
+      },
+      deleteConversation: async key => { tables[CONVERSATIONS].delete(key); tables[INDEX].delete(key); },
       close: () => {},
     };
   }
@@ -3643,7 +3693,17 @@ const ParleyStore = (() => {
       request.onupgradeneeded = () => {
         const db = request.result;
         const has = name => db.objectStoreNames.contains(name);
-        if (!has(CONVERSATIONS)) db.createObjectStore(CONVERSATIONS, { keyPath: 'id' });
+        const hadConversations = has(CONVERSATIONS);
+        if (!hadConversations) db.createObjectStore(CONVERSATIONS, { keyPath: 'id' });
+        if (!has(INDEX)) {
+          db.createObjectStore(INDEX, { keyPath: 'id' });
+          // Version 1 had no index: build it once from the stored conversations; nothing is removed.
+          if (hadConversations) {
+            const tx = request.transaction;
+            const all = tx.objectStore(CONVERSATIONS).getAll();
+            all.onsuccess = () => { for (const row of all.result) tx.objectStore(INDEX).put(indexRowOf(row)); };
+          }
+        }
         if (!has(PROVIDERS)) db.createObjectStore(PROVIDERS, { keyPath: 'id' });
         if (!has(SETTINGS)) db.createObjectStore(SETTINGS, { keyPath: 'key' });
       };
@@ -3704,7 +3764,7 @@ const ParleyStore = (() => {
 
       /** Index rows, newest first, without bodies. */
       async list() {
-        const rows = await backend.getAll(CONVERSATIONS);
+        const rows = await backend.getAll(INDEX);
         return rows
           .map(({ id, title, updatedAt, encrypted, messageCount }) => ({ id, title, updatedAt, encrypted, messageCount }))
           .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
@@ -3722,18 +3782,11 @@ const ParleyStore = (() => {
       async put(conversation, putOptions) {
         const key = putOptions && putOptions.key;
         const encrypted = !!key;
-        if (!encrypted && !(putOptions && putOptions.overwriteEncrypted)) {
-          // Plain over encrypted would silently turn ciphertext into plaintext.
-          const existing = await backend.get(CONVERSATIONS, String(conversation.id).toUpperCase());
-          if (existing && existing.encrypted) {
-            const e = new Error('An encrypted conversation with this id exists; pass overwriteEncrypted to replace it');
-            e.code = 'wouldDecrypt';
-            throw e;
-          }
-        }
+        // Plain over encrypted would silently turn ciphertext into plaintext: checked in the writing transaction.
+        const plainOnly = !encrypted && !(putOptions && putOptions.overwriteEncrypted);
         const body = encrypted ? await core(opts).encryptFile(conversation, key) : conversation;
         const row = { ...indexOf(conversation, encrypted), body };
-        await backend.put(CONVERSATIONS, row);
+        await backend.putConversation(row, plainOnly);
         announce('saved', row.id);
         return row.id;
       },
@@ -3743,14 +3796,14 @@ const ParleyStore = (() => {
         const parsed = core(opts).parseFile(text);
         if (parsed.kind === 'plain') return store.put(parsed.conversation);
         const row = { id: parsed.id, title: ENCRYPTED_TITLE, updatedAt: nowISO(), encrypted: true, messageCount: null, body: text };
-        await backend.put(CONVERSATIONS, row);
+        await backend.putConversation(row, false);
         announce('saved', row.id);
         return row.id;
       },
 
       async remove(id) {
         const key = String(id).toUpperCase();
-        await backend.delete(CONVERSATIONS, key);
+        await backend.deleteConversation(key);
         announce('removed', key);
       },
 
@@ -5339,7 +5392,8 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
     clearTimeout(entry.saveTimer);
     if (entry.run) { entry.run.stopped = true; entry.run.controller.abort(); }
     entry.keyInfo = null; entry.header = null; entry.conversation = null;
-    dropView(entry);
+    dropView(entry, true); // a row removed in another tab must not close this tab's Settings or questions
+    if (convDialogEntry === entry && convDialog.open) convDialog.close();
     const i = entries.indexOf(entry);
     if (i >= 0) entries.splice(i, 1);
   }
@@ -5368,6 +5422,10 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
   }
   /** Forgets what is loaded (after a change made in another tab) and loads it again if it is shown. */
   function reloadEntry(entry) {
+    // The settings dialog edits the conversation object that is dropped here: close it, or its edits would go nowhere.
+    if (convDialogEntry === entry && convDialog.open) convDialog.close();
+    const input = entry.view && entry.view.composer.input;
+    entry.refocus = input && document.activeElement === input ? { start: input.selectionStart, end: input.selectionEnd } : null;
     entry.loaded = false;
     entry.conversation = null;
     entry.header = null;
@@ -5385,7 +5443,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
 
   // ---- saving: after each change, and every couple of seconds while a reply streams
   function scheduleSave(entry, delay) {
-    if (entry.discarded || entry.saveTimer) return;
+    if (entry.discarded || entry.saveTimer || entry.encryptedElsewhere) return;
     entry.saveTimer = setTimeout(() => { entry.saveTimer = 0; saveNow(entry); }, delay);
   }
   function saveNow(entry) {
@@ -5402,8 +5460,22 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
       await store.put(c, entry.encrypted ? { key: entry.keyInfo } : undefined);
       syncRow(entry);
     } catch (e) {
+      if (e && e.code === 'wouldDecrypt') { staleAfterEncrypt(entry, e); return; }
       showStorageError(e);
     }
+  }
+  /** Another tab encrypted this conversation while a reply streamed here: say so once, stop saving, reopen it locked when the reply ends. */
+  function staleAfterEncrypt(entry, e) {
+    if (entry.encryptedElsewhere) return;
+    entry.encryptedElsewhere = true;
+    showStorageError(e);
+    Promise.resolve(entry.runDone).catch(() => {}).then(() => {
+      entry.encryptedElsewhere = false;
+      if (entry.discarded || entry.run) return;
+      entry.encrypted = true; entry.keyInfo = null;
+      reloadEntry(entry);
+      refreshList();
+    });
   }
   function touch(entry) {
     entry.conversation.updatedAt = Ctx.isoNow();
@@ -5447,15 +5519,18 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
 
   async function exportEntry(entry) {
     try {
-      let text;
-      if (entry.encrypted && !entry.conversation) {
+      let text, base, conversation = entry.conversation;
+      if (!conversation) {
+        // Not opened in this tab yet (or reloaded after a save in another tab): export what is stored.
         const got = await store.get(entry.id);
-        if (!got || got.kind !== 'encrypted') return;
-        text = got.text;
-      } else {
-        text = await store.exportFile(entry.conversation, entry.encrypted ? entry.keyInfo : undefined);
+        if (!got) return;
+        if (got.kind === 'encrypted') { text = got.text; base = t('encryptedRow'); }
+        else conversation = got.conversation;
       }
-      const base = entry.encrypted ? t('encryptedRow') : nameOf(entry.conversation);
+      if (conversation) {
+        text = await store.exportFile(conversation, entry.encrypted ? entry.keyInfo : undefined);
+        base = entry.encrypted ? t('encryptedRow') : nameOf(conversation);
+      }
       await saveTextFile(fileNameFor(base), text);
     } catch (e) {
       toast(t('exportFailed'), String((e && e.message) || e));
@@ -5466,6 +5541,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
   async function importFiles(fileList) {
     const files = Array.from(fileList || []);
     let first = null;
+    const imported = new Set(); // ids stored by this batch: `entries` is only refreshed after the loop
     const failed = [];
     for (const file of files) {
       const name = str(file.name) || t('untitledFile');
@@ -5475,13 +5551,21 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
         if (parsed.kind === 'encrypted') {
           if (!(globalThis.crypto && globalThis.crypto.subtle)) { failed.push([name, ERROR_TEXT.noWebCrypto]); continue; }
           const known = entries.find(e => e.id === parsed.header.id);
-          if (known) { first = first || known; toast(t('alreadyHere', { name: middle(name, 40) }), ''); continue; }
-          first = first || { id: await store.putFile(text) };
+          if (known || imported.has(String(parsed.header.id).toUpperCase())) {
+            if (known) first = first || known;
+            toast(t('alreadyHere', { name: middle(name, 40) }), '');
+            continue;
+          }
+          const id = await store.putFile(text);
+          imported.add(String(id).toUpperCase());
+          first = first || { id };
         } else {
           // A plain file whose id is taken becomes a copy: nothing already stored is overwritten.
-          const taken = entries.some(e => e.id === parsed.conversation.id.toUpperCase());
+          const taken = entries.some(e => e.id === parsed.conversation.id.toUpperCase()) || imported.has(parsed.conversation.id.toUpperCase());
           const conversation = taken ? { ...parsed.conversation, id: Ctx.newID() } : parsed.conversation;
-          first = first || { id: await store.put(conversation) };
+          const id = await store.put(conversation);
+          imported.add(String(id).toUpperCase());
+          first = first || { id };
         }
       } catch (e) {
         failed.push([name, e && e.name === 'ReaderError' ? errorText(e) : String((e && e.message) || e)]);
@@ -5499,8 +5583,10 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
 
   // ---- new, rename, delete, encrypt, lock
   async function newChat() {
-    const fresh = entries.find(e => e.loaded && !e.encrypted && e.conversation && !e.conversation.messages.length
-      && str(e.conversation.title) === DEFAULT_TITLE && !e.run);
+    // An empty "New Chat" from an earlier visit is known by its index row until it is opened.
+    const fresh = entries.find(e => !e.encrypted && !e.run && !e.discarded && (e.conversation
+      ? !e.conversation.messages.length && str(e.conversation.title) === DEFAULT_TITLE
+      : !e.loaded && e.row && e.row.encrypted !== true && e.row.messageCount === 0 && e.row.title === DEFAULT_TITLE));
     if (fresh) { select(fresh.key); return; }
     const provider = providerFor(null);
     const now = Ctx.isoNow();
@@ -5859,6 +5945,13 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
       renderHeaderToggle();
       scrollToEnd(entry.view.scroller);
       ensureModels(providerFor(entry.conversation.settings));
+      if (entry.refocus) { // rebuilt after a save in another tab: keep the caret where the user was typing
+        const { start, end } = entry.refocus;
+        entry.refocus = null;
+        const input = entry.view.composer.input;
+        input.focus({ preventScroll: true });
+        try { input.setSelectionRange(start, end); } catch (_) { /* not a text field */ }
+      }
     } else {
       room.append(entry.view.root);
       headerToggleSlot = entry.view.toggleSlot;
@@ -7586,13 +7679,14 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
   const imageDialog = document.getElementById('image-dialog');
   const textDialog = document.getElementById('text-dialog');
   const convDialog = document.getElementById('conv-dialog');
+  let convDialogEntry = null; // the conversation whose settings are open
   const ctxDialog = document.getElementById('ctx-dialog');
   const settingsDialog = document.getElementById('settings-dialog');
   const askDialog = document.getElementById('ask-dialog');
   const allDialogs = [linkDialog, imageDialog, textDialog, convDialog, ctxDialog, settingsDialog, askDialog];
   for (const d of allDialogs) {
     // Clear the contents on close, so nothing from a conversation lingers in a hidden dialog.
-    on(d, 'close', () => { clearDialog(d); if (d === linkDialog) gate.cancel(); if (d === ctxDialog) ctxState = null; });
+    on(d, 'close', () => { clearDialog(d); if (d === linkDialog) gate.cancel(); if (d === ctxDialog) ctxState = null; if (d === convDialog) convDialogEntry = null; });
     // A click on the backdrop (the dialog element itself, outside the sheet) closes it.
     on(d, 'click', ev => { if (ev.target === d) d.close(); });
   }
@@ -7700,6 +7794,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
     const c = entry.conversation;
     if (!c) return;
     const settings = c.settings;
+    convDialogEntry = entry;
     const changed = delay => { touch(entry); scheduleSave(entry, delay === undefined ? 500 : delay); updateHeader(entry); updateStrip(entry); };
 
     const serverSelect = h('select', { class: 'field-input', 'aria-label': t('server') });
@@ -8015,7 +8110,7 @@ if (typeof globalThis !== 'undefined') globalThis.ParleyStore = ParleyStore;
   function onStoreChange(change) {
     refreshList().then(() => {
       const entry = entryOf(change.id);
-      if (entry && change.type === 'saved' && entry.loaded && !entry.run) reloadEntry(entry);
+      if (entry && change.type === 'saved' && entry.loaded && !entry.run && !entry.saveTimer) reloadEntry(entry); // a pending local save wins: it goes out next
     });
   }
 

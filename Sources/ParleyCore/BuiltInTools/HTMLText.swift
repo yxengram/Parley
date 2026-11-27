@@ -22,11 +22,46 @@ enum HTMLText {
         "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "dl", "table", "pre", "blockquote", "hr",
     ]
     private static let cellBreaks: Set<String> = ["td", "th"]
-    private static let entities: [String: String] = [
-        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "ensp": " ", "emsp": " ", "thinsp": " ",
-        "mdash": "\u{2014}", "ndash": "\u{2013}", "hellip": "\u{2026}", "lsquo": "\u{2018}", "rsquo": "\u{2019}",
-        "ldquo": "\u{201C}", "rdquo": "\u{201D}", "laquo": "\u{AB}", "raquo": "\u{BB}", "bull": "\u{2022}", "middot": "\u{B7}",
-        "copy": "\u{A9}", "reg": "\u{AE}", "trade": "\u{2122}", "times": "\u{D7}", "euro": "\u{20AC}", "pound": "\u{A3}",
+    private static let entities: [String: String] = {
+        var table: [String: String] = [
+            "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "AMP": "&", "LT": "<", "GT": ">", "QUOT": "\"",
+            "ensp": " ", "emsp": " ", "thinsp": " ",
+            "mdash": "\u{2014}", "ndash": "\u{2013}", "hellip": "\u{2026}", "lsquo": "\u{2018}", "rsquo": "\u{2019}",
+            "ldquo": "\u{201C}", "rdquo": "\u{201D}", "sbquo": "\u{201A}", "bdquo": "\u{201E}", "lsaquo": "\u{2039}",
+            "rsaquo": "\u{203A}", "bull": "\u{2022}", "dagger": "\u{2020}", "Dagger": "\u{2021}", "permil": "\u{2030}",
+            "prime": "\u{2032}", "Prime": "\u{2033}", "trade": "\u{2122}", "euro": "\u{20AC}", "fnof": "\u{192}",
+            "circ": "\u{2C6}", "tilde": "\u{2DC}", "OElig": "\u{152}", "oelig": "\u{153}", "Scaron": "\u{160}",
+            "scaron": "\u{161}", "Yuml": "\u{178}", "zwnj": "\u{200C}", "zwj": "\u{200D}",
+            "larr": "\u{2190}", "uarr": "\u{2191}", "rarr": "\u{2192}", "darr": "\u{2193}", "harr": "\u{2194}",
+            "lArr": "\u{21D0}", "uArr": "\u{21D1}", "rArr": "\u{21D2}", "dArr": "\u{21D3}", "hArr": "\u{21D4}",
+            "forall": "\u{2200}", "part": "\u{2202}", "exist": "\u{2203}", "empty": "\u{2205}", "nabla": "\u{2207}",
+            "isin": "\u{2208}", "sum": "\u{2211}", "minus": "\u{2212}", "radic": "\u{221A}", "infin": "\u{221E}",
+            "and": "\u{2227}", "or": "\u{2228}", "cap": "\u{2229}", "cup": "\u{222A}", "int": "\u{222B}",
+            "asymp": "\u{2248}", "ne": "\u{2260}", "equiv": "\u{2261}", "le": "\u{2264}", "ge": "\u{2265}",
+            "loz": "\u{25CA}", "spades": "\u{2660}", "clubs": "\u{2663}", "hearts": "\u{2665}", "diams": "\u{2666}",
+            "alpha": "\u{3B1}", "beta": "\u{3B2}", "gamma": "\u{3B3}", "delta": "\u{3B4}", "epsilon": "\u{3B5}",
+            "lambda": "\u{3BB}", "mu": "\u{3BC}", "pi": "\u{3C0}", "sigma": "\u{3C3}", "omega": "\u{3C9}",
+            "Delta": "\u{394}", "Omega": "\u{3A9}", "Sigma": "\u{3A3}", "Pi": "\u{3A0}",
+        ]
+        // The HTML 4 Latin-1 names, U+00A0 onwards in order.
+        let latin1 = """
+            nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute \
+            micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring \
+            AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml \
+            times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil \
+            egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash \
+            ugrave uacute ucirc uuml yacute thorn yuml
+            """.split(separator: " ")
+        for (offset, name) in latin1.enumerated() {
+            table[String(name)] = String(Character(Unicode.Scalar(UInt32(0xA0 + offset))!))
+        }
+        table["nbsp"] = " "
+        return table
+    }()
+    /// What browsers make of numeric references 0x80-0x9F: Windows-1252, not the C1 controls.
+    private static let windows1252: [UInt32] = [
+        0x20AC, 0x81, 0x201A, 0x192, 0x201E, 0x2026, 0x2020, 0x2021, 0x2C6, 0x2030, 0x160, 0x2039, 0x152, 0x8D, 0x17D, 0x8F,
+        0x90, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x2DC, 0x2122, 0x161, 0x203A, 0x153, 0x9D, 0x17E, 0x178,
     ]
     /// `&` plus the longest entity anyone writes. A bound, so a page of `&&&&` stays linear.
     private static let entityLookahead = 32
@@ -67,9 +102,15 @@ enum HTMLText {
         var index = 0
         var output = Output()
         var title: String?
+        /// Open `<pre>` and `<textarea>` elements, where whitespace is content.
+        var preformatted = 0
 
         mutating func run() {
             while index < source.count {
+                if preformatted > 0, Self.isSpace(source[index]) {
+                    verbatimSpace()
+                    continue
+                }
                 switch source[index] {
                 case UInt8(ascii: "<"): tag()
                 case UInt8(ascii: "&"): entity()
@@ -80,6 +121,17 @@ enum HTMLText {
                     output.add(source[index])
                     index += 1
                 }
+            }
+        }
+
+        private mutating func verbatimSpace() {
+            let byte = source[index]
+            index += 1
+            if byte == 0x0D {
+                if index < source.count, source[index] == 0x0A { index += 1 }
+                output.add(0x0A)
+            } else {
+                output.add(byte == 0x0C ? 0x20 : byte)
             }
         }
 
@@ -110,6 +162,20 @@ enum HTMLText {
             while nameEnd < source.count, Self.isNameByte(source[nameEnd]) { nameEnd += 1 }
             let name = String(decoding: source[nameStart..<nameEnd], as: UTF8.self).lowercased()
             index = endOfTag(from: nameEnd)
+
+            if name == "pre" || name == "textarea" {
+                if closing {
+                    preformatted = max(0, preformatted - 1)
+                } else {
+                    preformatted += 1
+                    // A newline right after the opening tag is not content.
+                    if index < source.count, source[index] == 0x0A {
+                        index += 1
+                    } else if index + 1 < source.count, source[index] == 0x0D, source[index + 1] == 0x0A {
+                        index += 2
+                    }
+                }
+            }
 
             if !closing, name == "title" {
                 let text = rawContent(of: name)
@@ -208,6 +274,7 @@ enum HTMLText {
                 }
                 guard i > digits else { return nil }
                 if i < limit, source[i] == UInt8(ascii: ";") { i += 1 }
+                if (0x80...0x9F).contains(value) { value = HTMLText.windows1252[Int(value) - 0x80] }
                 let scalar = value == 0 ? nil : Unicode.Scalar(value)
                 return (String(Character(scalar ?? "\u{FFFD}")), i - start)
             }

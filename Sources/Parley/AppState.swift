@@ -26,6 +26,9 @@ final class AppState {
     var selection: UUID?
 
     var isScanning = false
+    /// Runs `replyFinished` whenever a reply ends. Tests that call it by hand turn this off.
+    @ObservationIgnored var followsReplyEnd = true
+    @ObservationIgnored private var libraryScanGeneration = 0
     /// Per-entry load errors (e.g. damaged file).
     var loadErrors: [UUID: String] = [:]
     /// Model lists fetched from providers, memory only.
@@ -248,16 +251,27 @@ final class AppState {
         let extra = settings.extraConversationPaths
         let hidden = Set(settings.hiddenConversationPaths)
         isScanning = true
+        libraryScanGeneration += 1
+        let generation = libraryScanGeneration
+        let before = Set(entries.map(\.id))
         Task {
             let scanned = await Task.detached(priority: .userInitiated) {
                 LibraryScanner.scan(directory: dir, extraPaths: extra, hiddenPaths: hidden)
             }.value
-            self.mergeScanned(scanned)
+            // A newer scan supersedes this one.
+            guard generation == self.libraryScanGeneration else { return }
+            self.mergeScanned(scanned, entriesBefore: before)
             self.isScanning = false
         }
     }
 
-    private func mergeScanned(_ scanned: [LibraryEntry]) {
+    /// `entriesBefore` are the ids listed when the scan started: entries added since are kept,
+    /// and entries removed since are not brought back.
+    func mergeScanned(_ scanned: [LibraryEntry], entriesBefore: Set<UUID>? = nil) {
+        let currentIDs = Set(entries.map(\.id))
+        let scanned = entriesBefore.map { before in
+            scanned.filter { !before.contains($0.id) || currentIDs.contains($0.id) }
+        } ?? scanned
         var result: [LibraryEntry] = []
         var seen = Set<UUID>()
         for var e in scanned {
@@ -271,7 +285,8 @@ final class AppState {
             seen.insert(e.id)
         }
         // Keep entries for open sessions whose file isn't visible to the scan.
-        for e in entries where !seen.contains(e.id) && sessions[e.id] != nil {
+        for e in entries where !seen.contains(e.id)
+            && (sessions[e.id] != nil || !(entriesBefore?.contains(e.id) ?? true)) {
             result.append(e)
         }
         entries = result
@@ -280,7 +295,7 @@ final class AppState {
         }
     }
 
-    private func upsertEntry(_ entry: LibraryEntry) {
+    func upsertEntry(_ entry: LibraryEntry) {
         if let i = entries.firstIndex(where: { $0.id == entry.id }) {
             entries[i] = entry
         } else {
@@ -306,6 +321,10 @@ final class AppState {
     }
 
     private func register(_ session: ConversationSession) {
+        session.replyEnded = { [weak self] s in
+            guard let self, self.followsReplyEnd else { return }
+            self.replyFinished(in: s)
+        }
         session.didEnqueueSave = { [weak self] s in
             self?.syncEntry(from: s)
         }
@@ -496,6 +515,10 @@ final class AppState {
         let key = try await Task.detached(priority: .userInitiated) {
             try ConversationCrypto.newKey(password: password)
         }.value
+        // Locked, removed or trashed while the key was derived: nothing would be written.
+        guard !session.isClosed, sessions[session.id] === session else {
+            throw SaveFailure(message: String(localized: "The conversation was closed."))
+        }
         let previous = session.encryption
         session.encryption = key
         if let error = session.flushSync() {

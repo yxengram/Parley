@@ -375,6 +375,22 @@ import Testing
         "\(method) \(target) HTTP/1.1\r\nHost: \(host ?? self.host)\r\n\(extra)\r\n"
     }
 
+    @Test func aLargeCookieHeaderDoesNotStopTheCallback() async throws {
+        let listener = try MCPOAuthLoopback(port: 0)
+        defer { listener.close() }
+        listener.expect(state: "s")
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(listener.port)/callback?state=s&code=c")!)
+        request.httpShouldHandleCookies = false
+        let big = String(repeating: "a=" + String(repeating: "b", count: 100) + "; ", count: 120)
+        request.setValue(big, forHTTPHeaderField: "Cookie")
+        request.setValue(big, forHTTPHeaderField: "X-Pad")
+        let session = URLSession(configuration: { let c = URLSessionConfiguration.ephemeral; c.httpCookieStorage = nil; return c }())
+        async let reply = session.data(for: request)
+        let query = try await listener.callback(timeout: 10)
+        #expect(query["code"] == "c")
+        _ = try? await reply
+    }
+
     @Test func onlyTheExactRequestCounts() {
         let query = MCPOAuthLoopback.matchingQuery(request("/callback?state=s&code=c"), host: host, state: "s")
         #expect(query?["code"] == "c")

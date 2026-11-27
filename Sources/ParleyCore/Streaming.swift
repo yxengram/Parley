@@ -41,6 +41,37 @@ public struct ChatDelta: Sendable, Equatable {
     }
 }
 
+// MARK: - SSELineSplitter
+
+/// Splits a byte stream into SSE lines. Only LF, CRLF and CR end a line (unlike
+/// AsyncBytes.lines, which also breaks on U+2028, U+2029 and U+0085 inside JSON strings).
+/// Blank lines are kept. Each line is returned as soon as its terminator arrives.
+public struct SSELineSplitter {
+    private var line = Data()
+    private var afterCR = false
+
+    public init() {}
+
+    public mutating func feed(_ byte: UInt8) -> String? {
+        defer { afterCR = byte == 0x0D }
+        if byte == 0x0A, afterCR { return nil }
+        if byte != 0x0A, byte != 0x0D {
+            line.append(byte)
+            return nil
+        }
+        let text = String(decoding: line, as: UTF8.self)
+        line.removeAll(keepingCapacity: true)
+        return text
+    }
+
+    /// The unterminated last line, if any.
+    public mutating func finish() -> String? {
+        guard !line.isEmpty else { return nil }
+        defer { line.removeAll() }
+        return String(decoding: line, as: UTF8.self)
+    }
+}
+
 // MARK: - SSEDecoder
 
 /// Splits an SSE byte stream's lines into JSON payload strings.
@@ -49,7 +80,12 @@ public struct SSEDecoder {
     /// The current event's type ("event:" field), applied to the next dispatched payload.
     private var eventType: String?
 
-    public init() {}
+    /// Spec mode: an event is dispatched only at its blank line (or at the end of the stream),
+    /// with its data lines joined by "\n". Needs a source that keeps blank lines. The default
+    /// mode also guesses event ends from complete JSON, for sources that drop them.
+    private let strict: Bool
+
+    public init(strict: Bool = false) { self.strict = strict }
 
     /// Feed one line, without its newline. Returns 0..n complete data payloads. "[DONE]" is returned verbatim.
     /// Handles "data:" with or without a space, ignores ":" comments, "id:" and "retry:".
@@ -114,11 +150,12 @@ public struct SSEDecoder {
         // If something incomplete is buffered and this line is a complete payload on its own,
         // the blank line that should have separated them was most likely dropped. Emit the
         // stale buffer as its own payload rather than gluing the two together.
-        if !dataLines.isEmpty, !Self.isCompletePayload(dataLines.joined(separator: "\n")), Self.isCompletePayload(piece) {
+        if !strict, !dataLines.isEmpty, !Self.isCompletePayload(dataLines.joined(separator: "\n")), Self.isCompletePayload(piece) {
             out.append(contentsOf: flush())
         }
 
         dataLines.append(piece)
+        if strict { return out }
         let joined = dataLines.joined(separator: "\n")
         if Self.isCompletePayload(joined) {
             dataLines.removeAll(keepingCapacity: true)
@@ -315,8 +352,8 @@ public enum ChunkParser {
     }
 
     static func doubleValue(_ any: Any?) -> Double? {
-        if let n = any as? NSNumber { return n.doubleValue }
-        if let s = any as? String { return Double(s) }
+        if let n = any as? NSNumber, n.doubleValue.isFinite { return n.doubleValue }
+        if let s = any as? String, let d = Double(s), d.isFinite { return d }
         return nil
     }
 }

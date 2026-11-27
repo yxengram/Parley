@@ -227,6 +227,7 @@
 "Could not move to Trash" = "无法移到废纸篓";
 "Could not open" = "无法打开";
 "Could not remove encryption" = "无法移除加密";
+"The conversation was closed." = "对话已关闭。";
 "Could not remove from list" = "无法从列表中移除";
 "Could not save the conversation: %@" = "无法保存对话：%@";
 "Could not save: %@" = "无法保存：%@";

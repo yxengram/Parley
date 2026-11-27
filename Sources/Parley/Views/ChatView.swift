@@ -70,9 +70,6 @@ struct ChatView: View {
             guard let provider else { return }
             await appState.refreshContextInfo(provider: provider, model: currentModel(provider))
         }
-        .onChange(of: session.isStreaming) { wasStreaming, isStreaming in
-            if wasStreaming && !isStreaming { appState.replyFinished(in: session) }
-        }
         .onChange(of: appState.conversationSettingsRequest) { _, id in
             guard id == session.id else { return }
             appState.conversationSettingsRequest = nil

@@ -227,6 +227,7 @@
 "Could not move to Trash" = "Could not move to Trash";
 "Could not open" = "Could not open";
 "Could not remove encryption" = "Could not remove encryption";
+"The conversation was closed." = "The conversation was closed.";
 "Could not remove from list" = "Could not remove from list";
 "Could not save the conversation: %@" = "Could not save the conversation: %@";
 "Could not save: %@" = "Could not save: %@";

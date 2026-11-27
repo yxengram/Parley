@@ -811,14 +811,16 @@ const ParleyMarkdown = (() => {
 
       // Fenced code. An unclosed fence runs to the end (an interrupted reply).
       const fence = t.startsWith('```') ? '`' : t.startsWith('~~~') ? '~' : null;
+      let fenceLen = 0;
+      if (fence) while (fenceLen < t.length && t[fenceLen] === fence) fenceLen++;
       if (fence) {
         flushAll();
-        const language = trim(t.slice(3));
+        const language = trim(t.slice(fenceLen));
         const code = [];
         i++;
         while (i < lines.length) {
           const u = trim(lines[i]);
-          if (u.length >= 3 && onlyChar(u, fence)) break;
+          if (u.length >= fenceLen && onlyChar(u, fence)) break;
           code.push(lines[i]);
           i++;
         }
@@ -835,7 +837,12 @@ const ParleyMarkdown = (() => {
         const rest = t.slice(h);
         if (h <= 6 && (rest === '' || rest[0] === ' ')) {
           let content = trim(rest);
-          while (content.endsWith('#')) content = content.slice(0, -1);
+          // A closing run of #s only counts when whitespace precedes it ("C#" keeps its #).
+          const closing = content.match(/#+$/);
+          if (closing) {
+            const before = content.slice(0, content.length - closing[0].length);
+            if (before === '' || before.endsWith(' ') || before.endsWith('\t')) content = before;
+          }
           flushAll();
           blocks.push({ type: 'heading', level: h, text: trim(content) });
           i++;
@@ -1066,7 +1073,9 @@ const ParleyMarkdown = (() => {
   function scanAttributes(s, i) {
     if (s[i] !== '(') return -1;
     let depth = 0, quoted = false;
-    for (let j = i; j < s.length; j++) {
+    // Capped so that many unbalanced `^[a](` openers cannot each scan to the end of the text.
+    const limit = Math.min(s.length, i + 2000);
+    for (let j = i; j < limit; j++) {
       const c = s[j];
       if (quoted) {
         if (c === '\\') j++;

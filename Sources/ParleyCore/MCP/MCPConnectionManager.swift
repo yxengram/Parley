@@ -166,6 +166,9 @@ public actor MCPConnectionManager: MCPToolHost {
                 // Refused, or never sent, so nothing ran.
                 await authorizationFailed(serverID: binding.serverID, client: client, error: error)
                 return finished(ToolCallResult(status: .notCalled, text: ToolResultText.notCalled(Self.summary(error))))
+            case .startupTimedOut:
+                // The session could not be restored before the request went out.
+                return finished(ToolCallResult(status: .notCalled, text: ToolResultText.notCalled(Self.summary(error))))
             case .timedOut:
                 return finished(ToolCallResult(status: .timedOut, text: ToolResultText.timedOut(seconds: timeout)))
             case .exited:
@@ -506,6 +509,17 @@ public actor MCPConnectionManager: MCPToolHost {
         }
     }
 
+    /// The working folder as typed: `~` and relative folders (a `cwd` from a per-project file) are
+    /// taken from the home folder, as the command already is.
+    static func expandedDirectory(_ typed: String?) -> String {
+        let home = NSHomeDirectory()
+        guard let typed = typed?.trimmingCharacters(in: .whitespaces), !typed.isEmpty else { return home }
+        if typed == "~" { return home }
+        if typed.hasPrefix("~/") { return home + typed.dropFirst() }
+        if typed.hasPrefix("/") { return typed }
+        return (home as NSString).appendingPathComponent(typed)
+    }
+
     private func makeTransport(_ config: MCPServerConfig, connection: Connection) async throws -> MCPTransport {
         let log = connection.log
         let secrets: MCPServerSecrets
@@ -521,7 +535,7 @@ public actor MCPConnectionManager: MCPToolHost {
         }
         switch config.kind {
         case MCPServerConfig.kindStdio:
-            let directory = config.workingDirectory.flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
+            let directory = Self.expandedDirectory(config.workingDirectory)
             let resolved = try await pathResolver.resolve(config.command, overridePATH: secrets.env["PATH"], relativeTo: directory)
             let launch = MCPStdioTransport.Launch(
                 executable: resolved.executable, arguments: secrets.args,

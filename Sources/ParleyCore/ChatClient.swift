@@ -377,11 +377,15 @@ public final class ChatClient: @unchecked Sendable {
         }
 
         var decoder = SSEDecoder()
-        for try await line in bytes.lines {
+        var splitter = SSELineSplitter()
+        for try await byte in bytes {
+            guard let line = splitter.feed(byte) else { continue }
             try Task.checkCancellation()
             if try Self.emit(decoder.feed(line: line), to: continuation, progress: &progress) { return }
         }
         try Task.checkCancellation()
+        if let line = splitter.finish(),
+           try Self.emit(decoder.feed(line: line), to: continuation, progress: &progress) { return }
         if try Self.emit(decoder.finish(), to: continuation, progress: &progress) { return }
         // The body ended cleanly but the reply did not: no finish_reason and no [DONE] after
         // something was sent (a proxy or tunnel that closed the response, a server that died

@@ -208,6 +208,12 @@ final class MCPHTTPHarness: @unchecked Sendable {
         _ = try await URLSession(configuration: .ephemeral).data(for: request)
     }
 
+    func hangInitialize() async throws {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/mock/hang-initialize")!)
+        request.httpMethod = "POST"
+        _ = try await URLSession(configuration: .ephemeral).data(for: request)
+    }
+
     /// Requests in the order they arrived: (HTTP method, JSON-RPC method, headers lower-cased, body).
     func requests() async throws -> [(http: String, method: String?, headers: [String: String], body: [String: Any])] {
         try await log().compactMap { entry in

@@ -109,7 +109,7 @@ test('the one download: a File System Access save dialog, else a temporary link 
 });
 test('an encrypted export is never named after the plaintext title (security)', () => {
   const fn = piece('  async function exportEntry(', '  // ---- import');
-  assert.ok(fn.includes("const base = entry.encrypted ? t('encryptedRow') : nameOf(entry.conversation);"));
+  assert.ok(fn.includes("base = entry.encrypted ? t('encryptedRow') : nameOf(conversation);"));
 });
 test('server errors are scrubbed of the API key and capped before they are stored', () => {
   assert.ok(PAGE_JS.includes('const scrubError = '));
@@ -467,6 +467,140 @@ test('in Chinese, stored English errors are still recognised; only the words aro
   const replay = piece('  function replayResult(', '  function boardBlock(');
   assert.ok(replay.includes("'(The tool returned no output.)'") && !replay.includes("t('"), 'the texts the model was sent stay English');
 });
+
+// ---- multi-tab and file fixes, run against small stand-ins for the page's state
+const later = [];
+const atest = (name, fn) => later.push([name, fn]);
+const STUBS = `
+  let entries = [], selectedKey = null, store, convDialogEntry = null, activeElement = null;
+  const toasts = [], selected = [], dropped = [], rendered = [];
+  const toast = (title, message) => toasts.push(title);
+  const middle = s => s;
+  const ERROR_TEXT = {}, errorText = e => String(e.message);
+  const readText = async f => f.text;
+  const DEFAULT_TITLE = 'New Chat';
+  const Ctx = { newID: (() => { let n = 0; return () => 'GEN' + (++n); })(), isoNow: () => '2026-01-01T00:00:00Z' };
+  const entryOf = key => entries.find(e => e.key === key) || null;
+  const select = key => selected.push(key);
+  async function refreshList() { entries = (await store.list()).map(row => entries.find(e => e.id === row.id) || { key: row.id, id: row.id, row }); }
+  const showStorageError = e => toasts.push('storageError');
+  const convDialog = { open: true, closed: 0, close() { this.open = false; this.closed++; } };
+  const dropView = (entry, keepDialogs) => dropped.push([entry.id, keepDialogs === true]);
+  const renderRoom = () => rendered.push(1);
+  const providerFor = () => null;
+  const clearTimeout = () => {};
+  globalThis.crypto = { subtle: {} };
+  const document = { get activeElement() { return activeElement; } };
+  const setup = o => { if ('store' in o) store = o.store; if ('entries' in o) entries = o.entries; if ('selectedKey' in o) selectedKey = o.selectedKey; if ('dialogEntry' in o) convDialogEntry = o.dialogEntry; if ('active' in o) activeElement = o.active; };
+`;
+const load = (source, names) => run(STUBS + source, ['setup', 'toasts', 'selected', 'dropped', 'rendered', 'convDialog', ...names]);
+function memStore() {
+  const rows = new Map();
+  return {
+    rows,
+    async put(c) { rows.set(c.id.toUpperCase(), c); return c.id.toUpperCase(); },
+    async putFile(text) { const id = JSON.parse(text).id; rows.set(id, { encrypted: true }); return id; },
+    async list() { return [...rows.entries()].map(([id, c]) => ({ id, title: c.title, messageCount: (c.messages || []).length, encrypted: !!c.encrypted })); },
+    importFile(text) {
+      const o = JSON.parse(text);
+      return o.encrypted ? { kind: 'encrypted', header: { id: o.id } } : { kind: 'plain', conversation: o };
+    },
+  };
+}
+const plainFile = (id, title) => ({ name: title + '.json', text: JSON.stringify({ id, title, messages: [] }) });
+const lockedFile = id => ({ name: id + '.json', text: JSON.stringify({ id, encrypted: true }) });
+
+atest('importing several files stores every one; same-id files in a batch become copies (IMPORT-MANY)', async () => {
+  const m = load(piece('  async function importFiles(', '  // ---- new, rename'), ['importFiles']);
+  const st = memStore();
+  m.setup({ store: st, entries: [], selectedKey: null });
+  await m.importFiles([plainFile('AAAA', 'A'), plainFile('BBBB', 'B'), plainFile('CCCC', 'C')]);
+  assert.deepEqual([...st.rows.keys()].sort(), ['AAAA', 'BBBB', 'CCCC']);
+  assert.deepEqual(same(m.selected), ['AAAA'], 'the first one is shown');
+  const st2 = memStore();
+  m.setup({ store: st2, entries: [] });
+  await m.importFiles([plainFile('DDDD', 'one'), plainFile('dddd', 'two')]);
+  assert.equal(st2.rows.size, 2, 'the second is stored as a copy, not overwritten');
+  assert.deepEqual([...st2.rows.values()].map(c => c.title).sort(), ['one', 'two']);
+  const st3 = memStore();
+  m.setup({ store: st3, entries: [] });
+  m.toasts.length = 0;
+  await m.importFiles([lockedFile('E1'), lockedFile('E2'), lockedFile('E1')]);
+  assert.deepEqual([...st3.rows.keys()].sort(), ['E1', 'E2']);
+  assert.equal(m.toasts.length, 1, 'the repeated encrypted file says it is already here');
+});
+atest('export of a row that was never opened reads the stored conversation (EXPORT-UNLOADED)', async () => {
+  const m = load(`const saved = []; const saveTextFile = async (n, text) => { saved.push([n, text]); };
+    const fileNameFor = x => x + '.json'; const nameOf = c => c.title;` + piece('  async function exportEntry(', '  // ---- import'), ['exportEntry', 'saved']);
+  const conv = { id: 'A', title: 'Stored title', messages: [] };
+  m.setup({ store: { get: async () => ({ kind: 'plain', conversation: conv }), exportFile: async c => JSON.stringify({ conversation: c }) } });
+  await m.exportEntry({ id: 'A', encrypted: false, conversation: null });
+  assert.deepEqual(same(m.saved), [['Stored title.json', JSON.stringify({ conversation: conv })]]);
+  m.saved.length = 0;
+  m.setup({ store: { get: async () => ({ kind: 'encrypted', text: 'CIPHER' }), exportFile: async () => { throw new Error('no'); } } });
+  await m.exportEntry({ id: 'A', encrypted: true, conversation: null });
+  assert.equal(m.saved.length, 1);
+  assert.equal(m.saved[0][1], 'CIPHER');
+  assert.ok(!m.saved[0][0].includes('Stored'), 'never named after the plaintext title');
+});
+atest('New Chat reuses an empty chat known only by its index row (NEWCHAT-REUSE)', async () => {
+  const m = load(piece('  async function newChat() {', '  function renameEntry'), ['newChat']);
+  const st = memStore();
+  m.setup({ store: st, entries: [{ key: 'X', id: 'X', encrypted: false, loaded: false, conversation: null, row: { id: 'X', title: 'New Chat', messageCount: 0, encrypted: false } }] });
+  await m.newChat();
+  assert.deepEqual(same(m.selected), ['X']);
+  assert.equal(st.rows.size, 0, 'nothing new was written');
+  m.setup({ entries: [{ key: 'Y', id: 'Y', encrypted: false, loaded: false, conversation: null, row: { id: 'Y', title: 'New Chat', messageCount: 2, encrypted: false } },
+    { key: 'Z', id: 'Z', encrypted: true, loaded: false, conversation: null, row: { id: 'Z', title: 'Encrypted conversation', messageCount: null, encrypted: true } }] });
+  await m.newChat();
+  assert.equal(st.rows.size, 1, 'a used or encrypted row is not reused');
+});
+test('a row removed in another tab keeps open dialogs, except the settings of that conversation (DISCARD-DIALOGS)', () => {
+  const m = load(piece('  function discardEntry(entry) {', '  async function loadEntry'), ['discardEntry']);
+  const other = { id: 'O', run: null, saveTimer: 0 }, mine = { id: 'M', run: null, saveTimer: 0 };
+  m.setup({ entries: [other, mine], dialogEntry: mine });
+  m.discardEntry(other);
+  assert.deepEqual(same(m.dropped), [['O', true]], 'dialogs kept');
+  assert.equal(m.convDialog.closed, 0);
+  m.discardEntry(mine);
+  assert.equal(m.convDialog.closed, 1, 'the settings of the removed conversation close');
+});
+test('a reload from another tab closes that conversation\'s settings and keeps the caret (RELOAD-SETTINGS-FOCUS)', () => {
+  const m = load(piece('  function reloadEntry(', '  /** Brings the index row'), ['reloadEntry']);
+  const input = { selectionStart: 3, selectionEnd: 5 };
+  const entry = { key: 'M', id: 'M', view: { composer: { input } }, keyInfo: null };
+  m.setup({ entries: [entry], dialogEntry: entry, selectedKey: 'M', active: null });
+  m.reloadEntry(entry);
+  assert.equal(m.convDialog.closed, 1, 'its edits would go to a dropped object');
+  assert.equal(entry.refocus, null, 'composer not focused: nothing to restore');
+  const typing = { key: 'N', id: 'N', view: { composer: { input } }, keyInfo: null };
+  m.setup({ entries: [typing], dialogEntry: null, selectedKey: 'N', active: input });
+  m.reloadEntry(typing);
+  assert.deepEqual(same(typing.refocus), { start: 3, end: 5 });
+  assert.equal(m.convDialog.closed, 1, 'another conversation\'s settings stay open');
+  assert.ok(page.includes('if (entry.refocus) {') && page.includes('input.setSelectionRange(start, end)'), 'the rebuilt composer takes focus again');
+  assert.ok(page.includes('entry.loaded && !entry.run && !entry.saveTimer) reloadEntry(entry)'), 'unsaved local changes are not dropped by a reload');
+});
+atest('a tab streaming into a conversation another tab encrypted stops saving, says so once, and reopens it locked (ENCRYPTED-ELSEWHERE)', async () => {
+  const m = load(`const syncRow = () => {}; const reloadEntry = e => { e.reloaded = true; };` + piece('  async function writeEntry(', '  function touch(entry)'), ['writeEntry']);
+  let finish;
+  const entry = { id: 'E', encrypted: false, keyInfo: null, discarded: false, conversation: { id: 'E' }, run: {}, runDone: new Promise(r => { finish = r; }) };
+  const refused = Object.assign(new Error('An encrypted conversation with this id exists'), { code: 'wouldDecrypt' });
+  m.setup({ store: { put: async () => { throw refused; }, list: async () => [] } });
+  await m.writeEntry(entry); await m.writeEntry(entry);
+  assert.deepEqual(same(m.toasts), ['storageError'], 'one toast, not one per autosave');
+  assert.equal(entry.encryptedElsewhere, true);
+  entry.run = null; finish();
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(entry.encrypted, true);
+  assert.equal(entry.reloaded, true);
+  assert.equal(entry.encryptedElsewhere, false);
+  assert.ok(page.includes('entry.saveTimer || entry.encryptedElsewhere) return;'), 'scheduleSave honours the flag');
+});
+
+for (const [name, fn] of later) {
+  try { await fn(); passed++; } catch (e) { failures++; console.log(`FAIL ${name}\n     ${e.message}`); }
+}
 
 console.log(failures ? `page: ${failures} failed, ${passed} passed` : `page: all ${passed} passed`);
 process.exit(failures ? 1 : 0);

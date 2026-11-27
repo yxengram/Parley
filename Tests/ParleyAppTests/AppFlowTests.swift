@@ -172,6 +172,8 @@ final class Fixture {
         // An empty skills folder of its own (it does not exist until a test writes a skill there).
         state = AppState(settings: settings, mcp: host, mcpSecrets: mcpSecrets,
                          skillsRoot: root.appendingPathComponent("Skills", isDirectory: true))
+        // These tests call replyFinished themselves, where a reply's follow-up requests matter.
+        state.followsReplyEnd = false
     }
 
     /// The fixture's skills folder. Never the user's.

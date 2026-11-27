@@ -161,6 +161,8 @@ final class ConversationSession: Identifiable {
     @ObservationIgnored private(set) var isClosed = false
     /// Called on the main actor after each save is enqueued (library bookkeeping).
     @ObservationIgnored var didEnqueueSave: ((ConversationSession) -> Void)?
+    /// Called when a reply has ended, whether or not its conversation is on screen.
+    @ObservationIgnored var replyEnded: ((ConversationSession) -> Void)?
     /// What AppState knows about a provider's model (server kind, context length, limits); set
     /// when the session is registered. Nil (or a nil answer) sends a plain OpenAI-style request.
     @ObservationIgnored var serverInfo: ((Provider, String) -> ModelContextInfo?)?
@@ -901,14 +903,18 @@ final class ConversationSession: Identifiable {
             saveNow()
             replyPhase = .runningTool(binding.tool.name)
             activeCallID = callID
+            let contextLimit = tools.contextLimit(target.provider, target.model)
+            let usedBefore = contextUsage().tokens
             let budget = ContextBudget.toolResultBudget(
                 configured: server.effectiveMaxResultCharacters,
-                limit: tools.contextLimit(target.provider, target.model),
-                used: contextUsage().tokens
+                limit: contextLimit,
+                used: usedBefore
             )
             var result = await tools.host.call(binding, arguments: arguments,
                                                timeout: server.effectiveCallTimeout,
                                                maxCharacters: budget)
+            // The character budget assumes Latin text; CJK costs more tokens per character.
+            result = ContextBudget.fitToolResult(result, limit: contextLimit, used: usedBefore)
             // Stop has already written a result.
             guard isCurrent(messageID) else { return }
             activeCallID = nil
@@ -1138,6 +1144,7 @@ final class ConversationSession: Identifiable {
         streamReasoningStartedAt = nil
         conversation.updatedAt = Date()
         saveNow()
+        replyEnded?(self)
     }
 
     /// Stop button: cancel the request and keep the partial message.
@@ -1152,7 +1159,7 @@ final class ConversationSession: Identifiable {
 
     func rollback(toMessageAt index: Int) {
         guard !isBusy, index >= 0, index < conversation.messages.count else { return }
-        pendingEditMessageID = nil
+        cancelEdit()
         conversation.truncate(keepingThrough: index)
         saveNow()
     }
@@ -1211,7 +1218,7 @@ final class ConversationSession: Identifiable {
     func regenerate(messageAt index: Int, settings: AppSettings) {
         guard !isBusy, conversation.messages.indices.contains(index) else { return }
         guard conversation.messages[index].role == .assistant else { return }
-        pendingEditMessageID = nil
+        cancelEdit()
         conversation.truncate(keepingThrough: index - 1)
         startReply(settings: settings)
     }

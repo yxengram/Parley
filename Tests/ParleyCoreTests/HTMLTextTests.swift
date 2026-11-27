@@ -125,6 +125,22 @@ import Testing
         #expect(HTMLText.plain("") == "")
     }
 
+    @Test func latin1AndSymbolEntitiesDecode() {
+        #expect(HTMLText.plain("<p>Caf&eacute; &ndash; &rarr; &deg;C &auml; &szlig; &AMP; &QUOT;</p>") == "Café – → °C ä ß & \"")
+        #expect(HTMLText.plain("&frac12;&plusmn;&yuml;&nosuchname;") == "½±ÿ&nosuchname;")
+    }
+
+    @Test func numericReferencesInTheC1RangeUseWindows1252() {
+        #expect(HTMLText.plain("a&#150;b&#146;s &#x80; &#133;") == "a–b’s € …")
+    }
+
+    @Test func preAndTextareaKeepWhitespace() {
+        #expect(HTMLText.plain("<pre>\nline1\n  indented\n\tdeep</pre>") == "line1\n  indented\n\tdeep")
+        #expect(HTMLText.plain("a<pre>x\r\ny</pre>b") == "a\n\nx\ny\n\nb")
+        #expect(HTMLText.plain("<textarea>keep\nme</textarea>") == "keep\nme")
+        #expect(HTMLText.plain("<pre>a  b</pre> c  d") == "a  b\n\nc d")
+    }
+
     /// Each of these is quadratic in a naive scanner. A generous bound, so a busy machine cannot fail
     /// it: at quadratic cost these inputs would take hours, not seconds.
     @Test(arguments: ["<", "<a ", "<!--", "&", "&#", "<script>", "</script", "<title>", "<a b='", "<div>", "-->"])

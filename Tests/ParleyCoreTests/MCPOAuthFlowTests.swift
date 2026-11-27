@@ -800,6 +800,19 @@ struct MCPOAuthFlowTests {
         }
     }
 
+    @Test func aRefusedRegistrationEndpointDoesNotBlockATypedInClient() async throws {
+        try await withServer(["oauth-plain-registration"]) { harness in
+            try setClient(harness, id: "fake-own-client")
+            let script = SignInScript()
+            try await harness.signIn(script)
+            #expect(script.opened.first.flatMap { query($0, "client_id") } == "fake-own-client")
+        }
+    }
+
+    @Test func aRefusedRegistrationEndpointWithoutAClientIDAsksForOne() async throws {
+        try await refuses(["oauth-plain-registration"], .clientIDRequired)
+    }
+
     @Test func aMetadataURLNeedsAProviderThatTakesOne() async throws {
         try await withServer { harness in
             try setClient(harness, id: "https://fake.example/client.json")

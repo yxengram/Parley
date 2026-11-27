@@ -434,7 +434,8 @@ enum AttachmentImport {
                 case .failure(let e): errors.append(e.localizedDescription)
                 }
             }
-            session.composerError = errors.isEmpty ? nil : errors.joined(separator: "\n")
+            // Never clear here: a parallel import that succeeded must not hide another one's error.
+            if !errors.isEmpty { session.composerError = errors.joined(separator: "\n") }
         }
     }
 

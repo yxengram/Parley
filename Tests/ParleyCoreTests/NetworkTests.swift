@@ -11,6 +11,38 @@ import Testing
 // MARK: - SSEDecoder
 
 @Suite struct SSEDecoderTests {
+    @Test func splitterBreaksOnlyOnLFCRCRLF() {
+        var sp = SSELineSplitter()
+        var lines: [String] = []
+        for b in Array("data: a\u{2028}b\u{85}c\u{2029}d\r\ndata: x\rdata: y\n\ntail".utf8) {
+            if let l = sp.feed(b) { lines.append(l) }
+        }
+        if let l = sp.finish() { lines.append(l) }
+        #expect(lines == ["data: a\u{2028}b\u{85}c\u{2029}d", "data: x", "data: y", "", "tail"])
+    }
+
+    @Test func strictJoinsMultiLineEventsUntilBlankLine() {
+        var d = SSEDecoder(strict: true)
+        #expect(d.feed(line: #"data: {"id":1,"result":"#) == [])
+        #expect(d.feed(line: #"data: {"ok":true}"#) == [])
+        #expect(d.feed(line: "data: }") == [])
+        #expect(d.feed(line: "") == ["{\"id\":1,\"result\":\n{\"ok\":true}\n}"])
+        #expect(d.feed(line: "data: {\"a\":1}") == [])
+        #expect(d.finish() == [#"{"a":1}"#])
+    }
+
+    @Test func strictLargeEventIsLinear() {
+        var d = SSEDecoder(strict: true)
+        for _ in 0..<20000 { _ = d.feed(line: "data:  \"x\",") }
+        #expect(d.feed(line: "").count == 1)
+    }
+
+    @Test func nonFiniteStatsStringsAreRejected() {
+        #expect(ChunkParser.doubleValue("inf") == nil)
+        #expect(ChunkParser.doubleValue("nan") == nil)
+        #expect(ChunkParser.doubleValue("1.5") == 1.5)
+    }
+
     @Test func dataWithAndWithoutSpace() {
         var d = SSEDecoder()
         #expect(d.feed(line: #"data: {"a":1}"#) == [#"{"a":1}"#])
@@ -552,6 +584,33 @@ private func pixelSize(of data: Data) -> (Int, Int)? {
             let a = try AttachmentLoader.load(url: url)
             #expect(a.kind == .text && a.text == "会议记录：明天十点\n", "\(name)")
         }
+    }
+
+    @Test func aSymlinkToALargeTextFileIsRefused() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let target = dir.appendingPathComponent("target.dat")
+        try Data(repeating: 0x61, count: AttachmentLoader.maxTextBytes + 10).write(to: target)
+        let link = dir.appendingPathComponent("notes.txt")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        #expect(throws: ParleyError.self) { try AttachmentLoader.load(url: link) }
+    }
+
+    @Test func symlinksKeepTheTargetsContentType() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let png = dir.appendingPathComponent("real.png")
+        try encodeImage(makeImage(width: 32, height: 32, alpha: true), type: .png).write(to: png)
+        let json = dir.appendingPathComponent("real.json")
+        try Data("{\"a\": 1}".utf8).write(to: json)
+        let pngLink = dir.appendingPathComponent("pic-link")
+        let jsonLink = dir.appendingPathComponent("data-link")
+        try FileManager.default.createSymbolicLink(at: pngLink, withDestinationURL: png)
+        try FileManager.default.createSymbolicLink(at: jsonLink, withDestinationURL: json)
+        let a = try AttachmentLoader.load(url: pngLink)
+        #expect(a.kind == .image && a.mimeType == "image/png" && a.filename == "pic-link")
+        let b = try AttachmentLoader.load(url: jsonLink)
+        #expect(b.kind == .text && b.mimeType == "application/json" && b.filename == "data-link")
     }
 
     @Test func smallPNGWithAlphaStaysPNG() throws {

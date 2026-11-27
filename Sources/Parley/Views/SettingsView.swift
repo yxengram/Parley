@@ -478,6 +478,10 @@ struct ProviderEditor: View {
     let providerID: UUID
 
     @ViewState private var apiKeyDraft = ""
+    /// The Base URL as typed. It reaches the settings (and so any open chat, which would send the
+    /// API key to it) only when editing ends, never per keystroke.
+    @ViewState private var baseURLDraft: String?
+    @FocusState private var baseURLFocused: Bool
     @ViewState private var storedKey = ""
     @ViewState private var keyError: String?
     @ViewState private var keySaved = false
@@ -505,10 +509,15 @@ struct ProviderEditor: View {
                     TextField("Name", text: $settings.providers[index].name)
                 }
                 SettingsField("Base URL") {
-                    TextField("Base URL", text: $settings.providers[index].baseURL, prompt: Text(verbatim: "http://192.168.1.20:1234/v1").foregroundStyle(Hideout.inkSoft))
+                    TextField("Base URL", text: baseURLBinding(index: index), prompt: Text(verbatim: "http://192.168.1.20:1234/v1").foregroundStyle(Hideout.inkSoft))
                         .textContentType(.URL)
+                        .focused($baseURLFocused)
+                        .onSubmit { commitBaseURL() }
+                        .onChange(of: baseURLFocused) { _, focused in
+                            if !focused { commitBaseURL() }
+                        }
                 }
-                if let warning = Self.urlWarning(provider.baseURL) {
+                if let warning = Self.urlWarning(baseURLDraft ?? provider.baseURL) {
                     SettingsNotice(.caution, warning, systemImage: "exclamationmark.triangle.fill", font: .callout)
                 }
                 SettingsField("Default model") {
@@ -582,6 +591,7 @@ struct ProviderEditor: View {
         // (Not for a provider that was just deleted: its key must stay removed.)
         .onDisappear {
             guard appState.settings.providers.contains(where: { $0.id == providerID }) else { return }
+            commitBaseURL()
             if apiKeyDraft != storedKey { saveKey() }
         }
     }
@@ -623,6 +633,20 @@ struct ProviderEditor: View {
         return nil
     }
 
+    private func baseURLBinding(index: Int) -> Binding<String> {
+        Binding(
+            get: { baseURLDraft ?? appState.settings.providers[index].baseURL },
+            set: { baseURLDraft = $0 }
+        )
+    }
+
+    private func commitBaseURL() {
+        guard let draft = baseURLDraft else { return }
+        baseURLDraft = nil
+        guard let index, appState.settings.providers[index].baseURL != draft else { return }
+        appState.settings.providers[index].baseURL = draft
+    }
+
     /// Keychain is read only when the editor opens for a provider.
     private func loadKey() {
         do {
@@ -650,6 +674,7 @@ struct ProviderEditor: View {
     /// Tests exactly what chats will use: the key is saved first and read back from the Keychain.
     private func test() {
         guard let index else { return }
+        commitBaseURL()
         let provider = appState.settings.providers[index]
         if apiKeyDraft != storedKey {
             saveKey()

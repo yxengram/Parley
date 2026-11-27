@@ -242,7 +242,7 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
 
     /// Lines until the response to `id`. The end of the body before it means the request is lost.
     private func readEvents(_ bytes: URLSession.AsyncBytes, id: Int?) async throws -> MCPResponse {
-        var decoder = SSEDecoder()
+        var decoder = SSEDecoder(strict: true)
         var line = Data()
         var afterCR = false
         do {
@@ -257,7 +257,7 @@ final class MCPHTTPTransport: MCPTransport, MCPStoppable, @unchecked Sendable {
                 }
                 let payloads = decoder.feed(line: String(decoding: line, as: UTF8.self))
                 line = Data()
-                // An SSE event ends with a blank line, which a data line completes in SSEDecoder.
+                // The blank line ends the event (SSEDecoder in strict mode).
                 if let response = firstAnswer(payloads, id: id) { return response }
             }
         } catch let error as URLError {

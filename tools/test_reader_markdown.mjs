@@ -66,6 +66,19 @@ test('markdownRuleAndCodeAreNotLists', () => {
   assert.deepEqual(same(M.parse('---\n```\n- not a list\n```')),
     [{ type: 'rule' }, { type: 'code', language: '', code: '- not a list' }]);
 });
+test('a longer fence is closed only by an equally long run', () => {
+  assert.deepEqual(same(M.parse('````js\nx\n```\ny\n````\nafter')),
+    [{ type: 'code', language: 'js', code: 'x\n```\ny' }, { type: 'paragraph', text: 'after' }]);
+});
+test('a closing run of hashes needs whitespace before it', () => {
+  assert.deepEqual(same(M.parse('# C#\n## H2 ##')),
+    [{ type: 'heading', level: 1, text: 'C#' }, { type: 'heading', level: 2, text: 'H2' }]);
+});
+test('many unbalanced attribute openers do not scan quadratically', () => {
+  const start = Date.now();
+  M.inline('^[a]('.repeat(40000));
+  assert.ok(Date.now() - start < 3000, `took ${Date.now() - start}ms`);
+});
 test('markdownInlineCodeIsStyled', () => {
   const code = same(M.inline('吃 `小笼包` 吧')).filter(r => r.styles.includes('code'));
   assert.equal(code.length, 1);

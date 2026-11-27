@@ -24,6 +24,15 @@ import ParleyCore
     #expect(blocks == [.rule, .code(language: "", code: "- not a list")])
 }
 
+@Test func markdownLongFenceAndHashHeadings() {
+    // A longer fence is only closed by a run at least as long; an inner ``` stays code.
+    let fenced = MarkdownParser.parse("````js\nx\n```\ny\n````\nafter")
+    #expect(fenced == [.code(language: "js", code: "x\n```\ny"), .paragraph("after")])
+    // A closing run of #s needs whitespace before it; "C#" keeps its #.
+    let headings = MarkdownParser.parse("# C#\n## H2 ##")
+    #expect(headings == [.heading(level: 1, text: "C#"), .heading(level: 2, text: "H2")])
+}
+
 @Test func markdownInlineCodeIsStyled() {
     let attributed = MarkdownParser.inline("吃 `小笼包` 吧")
     let codeRuns = attributed.runs.filter { $0.inlinePresentationIntent?.contains(.code) == true }
@@ -426,4 +435,31 @@ import ParleyCore
     let shortIgnored = MessageRow.thinkingOffNote(reply(ignored: true), repeated: true) ?? ""
     #expect(shortIgnored.contains("ignored again") && shortIgnored.count < 90)
     #expect(MessageRow.thinkingOffNote(reply(), repeated: true) == nil)
+}
+
+@Test func libraryScanKeepsOneDeterministicFilePerConversationID() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("scan-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let conversation = Conversation()
+    let data = try ConversationFile.encode(conversation, encryption: nil)
+    let original = dir.appendingPathComponent("\(conversation.id.uuidString).json")
+    let copy = dir.appendingPathComponent("\(conversation.id.uuidString) copy.json")
+    try data.write(to: original)
+    try data.write(to: copy)
+    // The copy is newer, but the file named for the id still wins.
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -100)], ofItemAtPath: original.path)
+    let entries = LibraryScanner.scan(directory: dir, extraPaths: [], hiddenPaths: [])
+    #expect(entries.count == 1)
+    #expect(entries.first?.url.lastPathComponent == original.lastPathComponent)
+
+    // Neither named for the id: the most recently modified wins.
+    let a = dir.appendingPathComponent("a.json"), b = dir.appendingPathComponent("b.json")
+    try FileManager.default.removeItem(at: original)
+    try FileManager.default.removeItem(at: copy)
+    try data.write(to: a)
+    try data.write(to: b)
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -100)], ofItemAtPath: a.path)
+    let again = LibraryScanner.scan(directory: dir, extraPaths: [], hiddenPaths: [])
+    #expect(again.map { $0.url.lastPathComponent } == ["b.json"])
 }

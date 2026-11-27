@@ -6,8 +6,11 @@ const ParleyStore = (() => {
   'use strict';
 
   const DB_NAME = 'parley-web';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const CONVERSATIONS = 'conversations';
+  // One row per conversation without its body (images and ciphertext can be megabytes), so the list
+  // never reads bodies. Added in version 2; written together with the conversation in one transaction.
+  const INDEX = 'index';
   const PROVIDERS = 'providers';
   const SETTINGS = 'settings';
   const CHANNEL_NAME = 'parley-web';
@@ -37,6 +40,13 @@ const ParleyStore = (() => {
     });
   }
 
+  function wouldDecryptError() {
+    const e = new Error('An encrypted conversation with this id exists; pass overwriteEncrypted to replace it');
+    e.code = 'wouldDecrypt';
+    return e;
+  }
+  const indexRowOf = ({ body, ...row }) => row;
+
   function idbBackend(db) {
     // Writes resolve when the transaction commits, not when the request succeeds.
     function run(storeName, mode, fn) {
@@ -57,13 +67,37 @@ const ParleyStore = (() => {
       get: (name, key) => run(name, 'readonly', s => s.get(key)),
       put: (name, value) => run(name, 'readwrite', s => s.put(value)),
       delete: (name, key) => run(name, 'readwrite', s => s.delete(key)),
+      /** Writes a conversation row and its index row in one transaction. With `plainOnly`, an encrypted row with this id is checked for and kept in the same transaction. */
+      putConversation: (row, plainOnly) => new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([CONVERSATIONS, INDEX], 'readwrite'); } catch (e) { reject(e); return; }
+        let failure = null;
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        tx.onabort = () => reject(failure || tx.error || new Error('IndexedDB transaction aborted'));
+        const write = () => { tx.objectStore(CONVERSATIONS).put(row); tx.objectStore(INDEX).put(indexRowOf(row)); };
+        if (!plainOnly) { write(); return; }
+        const existing = tx.objectStore(CONVERSATIONS).get(row.id);
+        existing.onsuccess = () => {
+          if (existing.result && existing.result.encrypted) { failure = wouldDecryptError(); try { tx.abort(); } catch (_) { reject(failure); } } else write();
+        };
+      }),
+      deleteConversation: key => new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([CONVERSATIONS, INDEX], 'readwrite'); } catch (e) { reject(e); return; }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+        tx.objectStore(CONVERSATIONS).delete(key);
+        tx.objectStore(INDEX).delete(key);
+      }),
       close: () => { try { db.close(); } catch (_) { /* already closed */ } },
     };
   }
 
   function memoryBackend() {
-    const tables = { [CONVERSATIONS]: new Map(), [PROVIDERS]: new Map(), [SETTINGS]: new Map() };
-    const keyOf = { [CONVERSATIONS]: 'id', [PROVIDERS]: 'id', [SETTINGS]: 'key' };
+    const tables = { [CONVERSATIONS]: new Map(), [INDEX]: new Map(), [PROVIDERS]: new Map(), [SETTINGS]: new Map() };
+    const keyOf = { [CONVERSATIONS]: 'id', [INDEX]: 'id', [PROVIDERS]: 'id', [SETTINGS]: 'key' };
     const copy = v => (v === undefined ? v : structuredClone(v));
     return {
       kind: 'memory',
@@ -71,6 +105,13 @@ const ParleyStore = (() => {
       get: async (name, key) => copy(tables[name].get(key)),
       put: async (name, value) => { tables[name].set(value[keyOf[name]], copy(value)); },
       delete: async (name, key) => { tables[name].delete(key); },
+      putConversation: async (row, plainOnly) => {
+        const existing = tables[CONVERSATIONS].get(row.id);
+        if (plainOnly && existing && existing.encrypted) throw wouldDecryptError();
+        tables[CONVERSATIONS].set(row.id, copy(row));
+        tables[INDEX].set(row.id, copy(indexRowOf(row)));
+      },
+      deleteConversation: async key => { tables[CONVERSATIONS].delete(key); tables[INDEX].delete(key); },
       close: () => {},
     };
   }
@@ -83,7 +124,17 @@ const ParleyStore = (() => {
       request.onupgradeneeded = () => {
         const db = request.result;
         const has = name => db.objectStoreNames.contains(name);
-        if (!has(CONVERSATIONS)) db.createObjectStore(CONVERSATIONS, { keyPath: 'id' });
+        const hadConversations = has(CONVERSATIONS);
+        if (!hadConversations) db.createObjectStore(CONVERSATIONS, { keyPath: 'id' });
+        if (!has(INDEX)) {
+          db.createObjectStore(INDEX, { keyPath: 'id' });
+          // Version 1 had no index: build it once from the stored conversations; nothing is removed.
+          if (hadConversations) {
+            const tx = request.transaction;
+            const all = tx.objectStore(CONVERSATIONS).getAll();
+            all.onsuccess = () => { for (const row of all.result) tx.objectStore(INDEX).put(indexRowOf(row)); };
+          }
+        }
         if (!has(PROVIDERS)) db.createObjectStore(PROVIDERS, { keyPath: 'id' });
         if (!has(SETTINGS)) db.createObjectStore(SETTINGS, { keyPath: 'key' });
       };
@@ -144,7 +195,7 @@ const ParleyStore = (() => {
 
       /** Index rows, newest first, without bodies. */
       async list() {
-        const rows = await backend.getAll(CONVERSATIONS);
+        const rows = await backend.getAll(INDEX);
         return rows
           .map(({ id, title, updatedAt, encrypted, messageCount }) => ({ id, title, updatedAt, encrypted, messageCount }))
           .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
@@ -162,18 +213,11 @@ const ParleyStore = (() => {
       async put(conversation, putOptions) {
         const key = putOptions && putOptions.key;
         const encrypted = !!key;
-        if (!encrypted && !(putOptions && putOptions.overwriteEncrypted)) {
-          // Plain over encrypted would silently turn ciphertext into plaintext.
-          const existing = await backend.get(CONVERSATIONS, String(conversation.id).toUpperCase());
-          if (existing && existing.encrypted) {
-            const e = new Error('An encrypted conversation with this id exists; pass overwriteEncrypted to replace it');
-            e.code = 'wouldDecrypt';
-            throw e;
-          }
-        }
+        // Plain over encrypted would silently turn ciphertext into plaintext: checked in the writing transaction.
+        const plainOnly = !encrypted && !(putOptions && putOptions.overwriteEncrypted);
         const body = encrypted ? await core(opts).encryptFile(conversation, key) : conversation;
         const row = { ...indexOf(conversation, encrypted), body };
-        await backend.put(CONVERSATIONS, row);
+        await backend.putConversation(row, plainOnly);
         announce('saved', row.id);
         return row.id;
       },
@@ -183,14 +227,14 @@ const ParleyStore = (() => {
         const parsed = core(opts).parseFile(text);
         if (parsed.kind === 'plain') return store.put(parsed.conversation);
         const row = { id: parsed.id, title: ENCRYPTED_TITLE, updatedAt: nowISO(), encrypted: true, messageCount: null, body: text };
-        await backend.put(CONVERSATIONS, row);
+        await backend.putConversation(row, false);
         announce('saved', row.id);
         return row.id;
       },
 
       async remove(id) {
         const key = String(id).toUpperCase();
-        await backend.delete(CONVERSATIONS, key);
+        await backend.deleteConversation(key);
         announce('removed', key);
       },
 

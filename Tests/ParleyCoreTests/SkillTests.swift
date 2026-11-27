@@ -121,6 +121,31 @@ private func zipFile(_ root: URL, _ items: [ZipItem], name: String = "skill.zip"
         #expect(parsed.body == "Body")
     }
 
+    @Test func aScalarOnTheLineAfterTheKeyIsTheValue() throws {
+        let a = try #require(SkillManifest.parse("---\nname: x\ndescription:\n  Use when you need x\n  and y\n---\n"))
+        #expect(a.fields["description"] == "Use when you need x and y")
+        let b = try #require(SkillManifest.parse("---\nname: x\ndescription:\n  Use when: x\nmetadata:\n  author: me\n---\n"))
+        #expect(b.fields["description"] == "Use when: x")
+        #expect(b.maps["metadata"] == ["author": "me"])
+    }
+
+    @Test func aTrailingCommentAfterAQuotedValueIsNotTheValue() throws {
+        let p = try #require(SkillManifest.parse("---\nname: \"my-skill\" # x\ndescription: 'It''s' # n\n---\n"))
+        #expect(p.fields["name"] == "my-skill")
+        #expect(p.fields["description"] == "It's")
+    }
+
+    @Test func escapesInDoubleQuotesIncludeSurrogatePairs() throws {
+        let p = try #require(SkillManifest.parse("---\nname: x\ndescription: \"Hi \\ud83d\\ude00 \\U0001F600 \\x41 there\"\n---\n"))
+        #expect(p.fields["description"] == "Hi \u{1F600} \u{1F600} A there")
+    }
+
+    @Test func anIndentedMarkerInABlockScalarIsContent() throws {
+        let p = try #require(SkillManifest.parse("---\nname: x\ndescription: |\n  line1\n  ---\n  line2\n---\nBody"))
+        #expect(p.fields["description"] == "line1\n---\nline2\n")
+        #expect(p.body == "Body")
+    }
+
     @Test func aPlainValueGoesOnOverIndentedLines() throws {
         let parsed = try #require(SkillManifest.parse("---\nname: x\ndescription: one\n  two\n  three\n---\n"))
         #expect(parsed.fields["description"] == "one two three")
